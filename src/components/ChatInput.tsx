@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   View,
   TextInput,
   TouchableOpacity,
   Text,
+  Animated,
+  Easing,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { Ionicons } from '@expo/vector-icons';
 import { useVoiceRecording } from '../hooks/useVoiceRecording';
+import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
 
 interface ChatInputProps {
   onSendText: (text: string) => void;
@@ -16,7 +21,35 @@ interface ChatInputProps {
 
 export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
   const [text, setText] = useState('');
+  const [isFocused, setIsFocused] = useState(false);
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecording();
+  
+  const recordingPulse = useRef(new Animated.Value(1)).current;
+  const micScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (isRecording) {
+      // Pulse animation while recording
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(recordingPulse, {
+            toValue: 1.2,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(recordingPulse, {
+            toValue: 1,
+            duration: 600,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      recordingPulse.setValue(1);
+    }
+  }, [isRecording]);
 
   const handleSend = async () => {
     if (text.trim()) {
@@ -24,6 +57,20 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
       onSendText(text.trim());
       setText('');
     }
+  };
+
+  const handleMicPressIn = async () => {
+    Animated.spring(micScale, {
+      toValue: 0.9,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handleMicPressOut = async () => {
+    Animated.spring(micScale, {
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
   };
 
   const handleMicPress = async () => {
@@ -43,138 +90,189 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  return (
-    <View style={styles.container}>
-      {isRecording ? (
+  if (isRecording) {
+    return (
+      <View style={styles.container}>
         <View style={styles.recordingContainer}>
-          <TouchableOpacity onPress={cancelRecording} style={styles.cancelButton}>
+          {/* Cancel button */}
+          <TouchableOpacity 
+            onPress={cancelRecording} 
+            style={styles.cancelButton}
+            activeOpacity={0.7}
+          >
             <Text style={styles.cancelText}>Cancel</Text>
           </TouchableOpacity>
+
+          {/* Recording indicator */}
           <View style={styles.recordingIndicator}>
-            <View style={styles.recordingDot} />
+            <Animated.View 
+              style={[
+                styles.recordingDot,
+                { transform: [{ scale: recordingPulse }] }
+              ]} 
+            />
             <Text style={styles.recordingTime}>{formatDuration(duration)}</Text>
           </View>
-          <TouchableOpacity onPress={handleMicPress} style={styles.stopButton}>
-            <Text style={styles.stopIcon}>⬛</Text>
+
+          {/* Stop button */}
+          <TouchableOpacity 
+            onPress={handleMicPress} 
+            style={styles.stopButton}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[colors.primary, colors.primaryMuted]}
+              style={styles.stopButtonGradient}
+            >
+              <Ionicons name="stop" size={20} color={colors.textInverse} />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
-      ) : (
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.input}
-            placeholder="Message Echo..."
-            placeholderTextColor="#666"
-            value={text}
-            onChangeText={setText}
-            multiline
-            maxLength={2000}
-          />
-          {text.trim() ? (
-            <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
-              <Text style={styles.sendIcon}>↑</Text>
-            </TouchableOpacity>
-          ) : (
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      <View style={[
+        styles.inputContainer,
+        isFocused && styles.inputContainerFocused
+      ]}>
+        <TextInput
+          style={styles.input}
+          placeholder="Message Echo..."
+          placeholderTextColor={colors.textTertiary}
+          value={text}
+          onChangeText={setText}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+          multiline
+          maxLength={2000}
+        />
+        
+        {text.trim() ? (
+          <TouchableOpacity 
+            onPress={handleSend} 
+            style={styles.sendButton}
+            activeOpacity={0.8}
+          >
+            <LinearGradient
+              colors={[colors.primary, colors.primaryMuted]}
+              style={styles.sendButtonGradient}
+            >
+              <Ionicons name="arrow-up" size={20} color={colors.textInverse} />
+            </LinearGradient>
+          </TouchableOpacity>
+        ) : (
+          <Animated.View style={{ transform: [{ scale: micScale }] }}>
             <TouchableOpacity
               onPress={handleMicPress}
-              onLongPress={handleMicPress}
+              onPressIn={handleMicPressIn}
+              onPressOut={handleMicPressOut}
               style={styles.micButton}
+              activeOpacity={1}
             >
-              <Text style={styles.micIcon}>🎤</Text>
+              <Ionicons name="mic" size={22} color={colors.primary} />
             </TouchableOpacity>
-          )}
-        </View>
-      )}
+          </Animated.View>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    padding: 12,
-    backgroundColor: '#0a0a0a',
+    padding: spacing.md,
+    paddingBottom: spacing.lg,
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: '#222',
+    borderTopColor: colors.border,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
-    gap: 8,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  inputContainerFocused: {
+    borderColor: colors.borderFocused,
   },
   input: {
     flex: 1,
-    backgroundColor: '#1a1a1a',
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    fontSize: 16,
-    color: '#fff',
+    fontSize: typography.base,
+    color: colors.textPrimary,
     maxHeight: 100,
-    borderWidth: 1,
-    borderColor: '#333',
+    paddingVertical: spacing.sm,
   },
   sendButton: {
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+    marginLeft: spacing.sm,
+  },
+  sendButtonGradient: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: '#6366f1',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  sendIcon: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: 'bold',
   },
   micButton: {
     width: 36,
     height: 36,
-    borderRadius: 18,
-    backgroundColor: '#2a2a2a',
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primarySubtle,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  micIcon: {
-    fontSize: 18,
+    marginLeft: spacing.sm,
   },
   recordingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 8,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.error,
   },
   cancelButton: {
-    padding: 8,
+    padding: spacing.sm,
   },
   cancelText: {
-    color: '#ef4444',
-    fontSize: 16,
+    color: colors.error,
+    fontSize: typography.base,
+    fontWeight: typography.medium,
   },
   recordingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: spacing.sm,
   },
   recordingDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#ef4444',
+    backgroundColor: colors.error,
   },
   recordingTime: {
-    color: '#fff',
-    fontSize: 18,
-    fontFamily: 'monospace',
+    color: colors.textPrimary,
+    fontSize: typography.lg,
+    fontWeight: typography.medium,
+    fontVariant: ['tabular-nums'],
   },
   stopButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#ef4444',
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+  },
+  stopButtonGradient: {
+    width: 44,
+    height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  stopIcon: {
-    color: '#fff',
-    fontSize: 16,
   },
 });

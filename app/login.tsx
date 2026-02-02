@@ -9,9 +9,13 @@ import {
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../src/stores/authStore';
+import { Avatar } from '../src/components/Avatar';
+import { colors, spacing, borderRadius, typography } from '../src/constants/theme';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -21,6 +25,7 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isFocused, setIsFocused] = useState<'email' | 'password' | null>(null);
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -50,129 +55,172 @@ export default function LoginScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
+    <LinearGradient
+      colors={[colors.background, '#0D1526', colors.background]}
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.content}>
-        {/* Avatar */}
-        <View style={styles.avatarContainer}>
-          <Text style={styles.avatar}>🔮</Text>
-          <Text style={styles.title}>Echo</Text>
-          <Text style={styles.subtitle}>Your AI Assistant</Text>
+      <KeyboardAvoidingView
+        style={styles.keyboardView}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <View style={styles.content}>
+          {/* Avatar */}
+          <View style={styles.avatarContainer}>
+            <Avatar state="idle" size={100} />
+            <Text style={styles.title}>Echo</Text>
+            <Text style={styles.subtitle}>Your AI Assistant</Text>
+          </View>
+
+          {/* Login Form */}
+          <View style={styles.form}>
+            <View style={[
+              styles.inputContainer,
+              isFocused === 'email' && styles.inputFocused
+            ]}>
+              <TextInput
+                style={styles.input}
+                placeholder="Email"
+                placeholderTextColor={colors.textTertiary}
+                value={email}
+                onChangeText={setEmail}
+                onFocus={() => setIsFocused('email')}
+                onBlur={() => setIsFocused(null)}
+                autoCapitalize="none"
+                keyboardType="email-address"
+                autoComplete="email"
+              />
+            </View>
+            
+            <View style={[
+              styles.inputContainer,
+              isFocused === 'password' && styles.inputFocused
+            ]}>
+              <TextInput
+                style={styles.input}
+                placeholder="Password"
+                placeholderTextColor={colors.textTertiary}
+                value={password}
+                onChangeText={setPassword}
+                onFocus={() => setIsFocused('password')}
+                onBlur={() => setIsFocused(null)}
+                secureTextEntry
+                autoComplete="password"
+              />
+            </View>
+
+            {error ? (
+              <View style={styles.errorContainer}>
+                <Text style={styles.error}>{error}</Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              style={[styles.button, isLoading && styles.buttonDisabled]}
+              onPress={handleLogin}
+              disabled={isLoading}
+              activeOpacity={0.8}
+            >
+              <LinearGradient
+                colors={[colors.primary, colors.primaryMuted]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.buttonGradient}
+              >
+                {isLoading ? (
+                  <ActivityIndicator color={colors.textInverse} />
+                ) : (
+                  <Text style={styles.buttonText}>Sign In</Text>
+                )}
+              </LinearGradient>
+            </TouchableOpacity>
+
+            {/* Biometric hint */}
+            <Text style={styles.biometricHint}>
+              Face ID will be enabled after setup
+            </Text>
+          </View>
         </View>
-
-        {/* Login Form */}
-        <View style={styles.form}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            placeholderTextColor="#888"
-            value={email}
-            onChangeText={setEmail}
-            autoCapitalize="none"
-            keyboardType="email-address"
-            autoComplete="email"
-          />
-          
-          <TextInput
-            style={styles.input}
-            placeholder="Password"
-            placeholderTextColor="#888"
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="password"
-          />
-
-          {error ? <Text style={styles.error}>{error}</Text> : null}
-
-          <TouchableOpacity
-            style={[styles.button, isLoading && styles.buttonDisabled]}
-            onPress={handleLogin}
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.buttonText}>Sign In</Text>
-            )}
-          </TouchableOpacity>
-
-          {/* 2FA placeholder */}
-          <Text style={styles.twoFaNote}>
-            2FA will be required after initial setup
-          </Text>
-        </View>
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+  },
+  keyboardView: {
+    flex: 1,
   },
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.lg,
   },
   avatarContainer: {
     alignItems: 'center',
-    marginBottom: 48,
-  },
-  avatar: {
-    fontSize: 80,
-    marginBottom: 16,
+    marginBottom: spacing.xxl,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 8,
+    fontSize: typography['3xl'],
+    fontWeight: typography.bold,
+    color: colors.textPrimary,
+    marginTop: spacing.md,
+    letterSpacing: 1,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#888',
+    fontSize: typography.base,
+    color: colors.textSecondary,
+    marginTop: spacing.xs,
   },
   form: {
-    gap: 16,
+    gap: spacing.md,
+  },
+  inputContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  inputFocused: {
+    borderColor: colors.borderFocused,
   },
   input: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
-    fontSize: 16,
-    color: '#fff',
-    borderWidth: 1,
-    borderColor: '#333',
+    padding: spacing.md,
+    fontSize: typography.base,
+    color: colors.textPrimary,
+  },
+  errorContainer: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderRadius: borderRadius.md,
+    padding: spacing.sm,
+  },
+  error: {
+    color: colors.error,
+    textAlign: 'center',
+    fontSize: typography.sm,
   },
   button: {
-    backgroundColor: '#6366f1',
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    marginTop: 8,
+    marginTop: spacing.sm,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
   },
   buttonDisabled: {
     opacity: 0.6,
   },
+  buttonGradient: {
+    padding: spacing.md,
+    alignItems: 'center',
+  },
   buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    color: colors.textInverse,
+    fontSize: typography.lg,
+    fontWeight: typography.semibold,
   },
-  error: {
-    color: '#ef4444',
+  biometricHint: {
+    color: colors.textTertiary,
     textAlign: 'center',
-    fontSize: 14,
-  },
-  twoFaNote: {
-    color: '#666',
-    textAlign: 'center',
-    fontSize: 12,
-    marginTop: 16,
+    fontSize: typography.xs,
+    marginTop: spacing.md,
   },
 });

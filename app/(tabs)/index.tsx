@@ -5,19 +5,23 @@ import {
   FlatList,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
+  Text,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useChatStore } from '../../src/stores/chatStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { Avatar } from '../../src/components/Avatar';
 import { ChatMessage } from '../../src/components/ChatMessage';
 import { ChatInput } from '../../src/components/ChatInput';
 import { useWebSocket } from '../../src/lib/websocket';
+import { colors, spacing, typography } from '../../src/constants/theme';
 import type { Message } from '../../src/types';
 
 export default function ChatScreen() {
+  const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
-  const { messages, avatarState } = useChatStore();
+  const { messages, avatarState, isConnected } = useChatStore();
   const { accessToken } = useAuthStore();
   const { sendMessage } = useWebSocket(accessToken);
 
@@ -37,7 +41,6 @@ export default function ChatScreen() {
   const handleSendAudio = async (uri: string) => {
     // TODO: Upload audio and send transcription or audio URL
     console.log('Audio recorded:', uri);
-    // For now, send as placeholder
     sendMessage('[Voice message]', uri);
   };
 
@@ -45,27 +48,52 @@ export default function ChatScreen() {
     <ChatMessage message={item} />
   );
 
+  const renderEmptyState = () => (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyTitle}>Welcome back</Text>
+      <Text style={styles.emptySubtitle}>
+        Send a message or tap the mic to talk
+      </Text>
+    </View>
+  );
+
   return (
-    <SafeAreaView style={styles.container}>
+    <LinearGradient
+      colors={[colors.background, '#0D1526', colors.background]}
+      style={styles.container}
+    >
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={90}
+        keyboardVerticalOffset={0}
       >
         {/* Header with Avatar */}
-        <View style={styles.header}>
-          <Avatar state={avatarState} size={60} />
+        <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+          <Avatar state={avatarState} size={80} />
+          <View style={styles.statusContainer}>
+            <View style={[
+              styles.statusDot,
+              { backgroundColor: isConnected ? colors.success : colors.textTertiary }
+            ]} />
+            <Text style={styles.statusText}>
+              {isConnected ? 'Online' : 'Connecting...'}
+            </Text>
+          </View>
         </View>
 
         {/* Messages */}
         <FlatList
           ref={flatListRef}
           style={styles.messageList}
-          contentContainerStyle={styles.messageListContent}
+          contentContainerStyle={[
+            styles.messageListContent,
+            messages.length === 0 && styles.emptyListContent,
+          ]}
           data={messages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
+          ListEmptyComponent={renderEmptyState}
         />
 
         {/* Input */}
@@ -74,29 +102,62 @@ export default function ChatScreen() {
           onSendAudio={handleSendAudio}
         />
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
   },
   keyboardView: {
     flex: 1,
   },
   header: {
-    paddingVertical: 16,
     alignItems: 'center',
+    paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#1a1a1a',
+    borderBottomColor: colors.border,
+  },
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.xs,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  statusText: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
   },
   messageList: {
     flex: 1,
   },
   messageListContent: {
-    padding: 16,
-    paddingBottom: 8,
+    padding: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  emptyListContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  emptyState: {
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  emptyTitle: {
+    fontSize: typography.xl,
+    fontWeight: typography.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  emptySubtitle: {
+    fontSize: typography.base,
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
 });

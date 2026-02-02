@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,44 +7,66 @@ import {
   TouchableOpacity,
   Switch,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../src/stores/authStore';
+import { colors, spacing, borderRadius, typography } from '../../src/constants/theme';
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const [voiceEnabled, setVoiceEnabled] = React.useState(true);
-  const [notificationsEnabled, setNotificationsEnabled] = React.useState(true);
+  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
 
   const handleLogout = async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     await logout();
     router.replace('/login');
   };
 
+  const handleToggle = async (setter: (value: boolean) => void, value: boolean) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setter(value);
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+    <LinearGradient
+      colors={[colors.background, '#0D1526', colors.background]}
+      style={styles.container}
+    >
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={{ paddingTop: insets.top + spacing.md }}
+      >
         <Text style={styles.title}>Settings</Text>
 
         {/* Account Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ACCOUNT</Text>
           <View style={styles.card}>
-            <View style={styles.row}>
-              <Text style={styles.label}>Email</Text>
-              <Text style={styles.value}>{user?.email || 'Not signed in'}</Text>
-            </View>
-            <View style={styles.divider} />
-            <TouchableOpacity style={styles.row}>
-              <Text style={styles.label}>Two-Factor Auth</Text>
-              <Text style={styles.value}>Set up →</Text>
-            </TouchableOpacity>
-            <View style={styles.divider} />
-            <TouchableOpacity style={styles.row}>
-              <Text style={styles.label}>Active Sessions</Text>
-              <Text style={styles.value}>1 →</Text>
-            </TouchableOpacity>
+            <SettingsRow 
+              icon="mail-outline"
+              label="Email" 
+              value={user?.email || 'Not signed in'} 
+            />
+            <Divider />
+            <SettingsRow 
+              icon="shield-checkmark-outline"
+              label="Two-Factor Auth" 
+              value="Set up" 
+              showChevron 
+            />
+            <Divider />
+            <SettingsRow 
+              icon="phone-portrait-outline"
+              label="Active Sessions" 
+              value="1" 
+              showChevron 
+            />
           </View>
         </View>
 
@@ -52,19 +74,32 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>VOICE</Text>
           <View style={styles.card}>
-            <View style={styles.row}>
-              <Text style={styles.label}>Voice Output</Text>
-              <Switch
-                value={voiceEnabled}
-                onValueChange={setVoiceEnabled}
-                trackColor={{ false: '#333', true: '#6366f1' }}
-              />
-            </View>
-            <View style={styles.divider} />
-            <TouchableOpacity style={styles.row}>
-              <Text style={styles.label}>Echo's Voice</Text>
-              <Text style={styles.value}>Nova →</Text>
-            </TouchableOpacity>
+            <SettingsRow 
+              icon="volume-high-outline"
+              label="Voice Output"
+              trailing={
+                <Switch
+                  value={voiceEnabled}
+                  onValueChange={(v) => handleToggle(setVoiceEnabled, v)}
+                  trackColor={{ false: colors.surfaceElevated, true: colors.primaryMuted }}
+                  thumbColor={voiceEnabled ? colors.primary : colors.textTertiary}
+                />
+              }
+            />
+            <Divider />
+            <SettingsRow 
+              icon="mic-outline"
+              label="Echo's Voice" 
+              value="Nova" 
+              showChevron 
+            />
+            <Divider />
+            <SettingsRow 
+              icon="speedometer-outline"
+              label="Speed" 
+              value="Normal" 
+              showChevron 
+            />
           </View>
         </View>
 
@@ -72,14 +107,25 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>NOTIFICATIONS</Text>
           <View style={styles.card}>
-            <View style={styles.row}>
-              <Text style={styles.label}>Push Notifications</Text>
-              <Switch
-                value={notificationsEnabled}
-                onValueChange={setNotificationsEnabled}
-                trackColor={{ false: '#333', true: '#6366f1' }}
-              />
-            </View>
+            <SettingsRow 
+              icon="notifications-outline"
+              label="Push Notifications"
+              trailing={
+                <Switch
+                  value={notificationsEnabled}
+                  onValueChange={(v) => handleToggle(setNotificationsEnabled, v)}
+                  trackColor={{ false: colors.surfaceElevated, true: colors.primaryMuted }}
+                  thumbColor={notificationsEnabled ? colors.primary : colors.textTertiary}
+                />
+              }
+            />
+            <Divider />
+            <SettingsRow 
+              icon="moon-outline"
+              label="Focus Mode Behavior" 
+              value="Respect" 
+              showChevron 
+            />
           </View>
         </View>
 
@@ -87,104 +133,185 @@ export default function SettingsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>PRIVACY</Text>
           <View style={styles.card}>
-            <TouchableOpacity style={styles.row}>
-              <Text style={styles.label}>What Echo Knows</Text>
-              <Text style={styles.value}>View →</Text>
-            </TouchableOpacity>
-            <View style={styles.divider} />
-            <TouchableOpacity style={styles.row}>
-              <Text style={styles.label}>Export My Data</Text>
-              <Text style={styles.value}>→</Text>
-            </TouchableOpacity>
-            <View style={styles.divider} />
-            <TouchableOpacity style={styles.row}>
-              <Text style={styles.labelDanger}>Delete All Data</Text>
-              <Text style={styles.value}>→</Text>
-            </TouchableOpacity>
+            <SettingsRow 
+              icon="eye-outline"
+              label="What Echo Knows" 
+              showChevron 
+            />
+            <Divider />
+            <SettingsRow 
+              icon="download-outline"
+              label="Export My Data" 
+              showChevron 
+            />
+            <Divider />
+            <SettingsRow 
+              icon="trash-outline"
+              label="Delete All Data" 
+              labelColor={colors.error}
+              showChevron 
+            />
           </View>
         </View>
 
         {/* Logout */}
-        <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={handleLogout}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="log-out-outline" size={20} color={colors.error} />
           <Text style={styles.logoutText}>Sign Out</Text>
         </TouchableOpacity>
 
         {/* Version */}
-        <Text style={styles.version}>Echo App v0.1.0 (MVP)</Text>
+        <Text style={styles.version}>Echo App v0.1.0</Text>
+        <View style={{ height: insets.bottom + spacing.xl }} />
       </ScrollView>
-    </SafeAreaView>
+    </LinearGradient>
   );
+}
+
+interface SettingsRowProps {
+  icon: string;
+  label: string;
+  value?: string;
+  labelColor?: string;
+  showChevron?: boolean;
+  trailing?: React.ReactNode;
+  onPress?: () => void;
+}
+
+function SettingsRow({ 
+  icon, 
+  label, 
+  value, 
+  labelColor,
+  showChevron, 
+  trailing,
+  onPress 
+}: SettingsRowProps) {
+  const content = (
+    <View style={styles.row}>
+      <View style={styles.rowLeft}>
+        <Ionicons 
+          name={icon as any} 
+          size={20} 
+          color={labelColor || colors.textSecondary} 
+        />
+        <Text style={[styles.label, labelColor && { color: labelColor }]}>
+          {label}
+        </Text>
+      </View>
+      <View style={styles.rowRight}>
+        {trailing || (
+          <>
+            {value && <Text style={styles.value}>{value}</Text>}
+            {showChevron && (
+              <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+            )}
+          </>
+        )}
+      </View>
+    </View>
+  );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
+        {content}
+      </TouchableOpacity>
+    );
+  }
+
+  return content;
+}
+
+function Divider() {
+  return <View style={styles.divider} />;
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
   },
   scrollView: {
     flex: 1,
-    padding: 16,
+    padding: spacing.md,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 24,
+    fontSize: typography['3xl'],
+    fontWeight: typography.bold,
+    color: colors.textPrimary,
+    marginBottom: spacing.lg,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#888',
-    marginBottom: 8,
-    marginLeft: 4,
+    fontSize: typography.xs,
+    fontWeight: typography.semibold,
+    color: colors.textTertiary,
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xs,
+    letterSpacing: 0.5,
   },
   card: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
     overflow: 'hidden',
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: spacing.md,
+  },
+  rowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  rowRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
   },
   label: {
-    fontSize: 16,
-    color: '#fff',
-  },
-  labelDanger: {
-    fontSize: 16,
-    color: '#ef4444',
+    fontSize: typography.base,
+    color: colors.textPrimary,
   },
   value: {
-    fontSize: 16,
-    color: '#888',
+    fontSize: typography.base,
+    color: colors.textTertiary,
   },
   divider: {
     height: 1,
-    backgroundColor: '#333',
-    marginLeft: 16,
+    backgroundColor: colors.border,
+    marginLeft: spacing.md + 20 + spacing.sm, // icon + gap
   },
   logoutButton: {
-    backgroundColor: '#1a1a1a',
-    borderRadius: 12,
-    padding: 16,
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 24,
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   logoutText: {
-    fontSize: 16,
-    color: '#ef4444',
-    fontWeight: '600',
+    fontSize: typography.base,
+    color: colors.error,
+    fontWeight: typography.medium,
   },
   version: {
     textAlign: 'center',
-    color: '#666',
-    fontSize: 12,
-    marginBottom: 32,
+    color: colors.textTertiary,
+    fontSize: typography.xs,
+    marginTop: spacing.lg,
   },
 });

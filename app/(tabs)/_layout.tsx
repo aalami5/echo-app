@@ -1,59 +1,100 @@
 import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Tabs } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { StyleSheet, View, Platform } from 'react-native';
+import { colors } from '../../src/constants/theme';
 
-import Colors from '@/constants/Colors';
-import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
-
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
+function TabBarIcon({ 
+  name, 
+  color, 
+  focused 
+}: { 
+  name: React.ComponentProps<typeof Ionicons>['name']; 
   color: string;
+  focused: boolean;
 }) {
-  return <FontAwesome size={28} style={{ marginBottom: -3 }} {...props} />;
+  return (
+    <View style={[styles.iconContainer, focused && styles.iconContainerFocused]}>
+      <Ionicons name={name} size={24} color={color} />
+    </View>
+  );
 }
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
-        headerShown: useClientOnlyValue(false, true),
-      }}>
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
+        tabBarStyle: styles.tabBar,
+        tabBarBackground: () => (
+          Platform.OS === 'ios' ? (
+            <BlurView intensity={80} tint="dark" style={StyleSheet.absoluteFill} />
+          ) : (
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.surface }]} />
+          )
+        ),
+        tabBarLabelStyle: styles.tabBarLabel,
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginRight: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+          title: 'Chat',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon 
+              name={focused ? 'chatbubble' : 'chatbubble-outline'} 
+              color={color} 
+              focused={focused}
+            />
           ),
         }}
       />
       <Tabs.Screen
+        name="explore"
+        options={{
+          title: 'Settings',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon 
+              name={focused ? 'settings' : 'settings-outline'} 
+              color={color}
+              focused={focused}
+            />
+          ),
+        }}
+      />
+      {/* Hide the default "two" tab from the template */}
+      <Tabs.Screen
         name="two"
         options={{
-          title: 'Tab Two',
-          tabBarIcon: ({ color }) => <TabBarIcon name="code" color={color} />,
+          href: null,
         }}
       />
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  tabBar: {
+    position: 'absolute',
+    borderTopWidth: 0,
+    backgroundColor: 'transparent',
+    elevation: 0,
+    height: Platform.OS === 'ios' ? 85 : 65,
+    paddingTop: 8,
+  },
+  tabBarLabel: {
+    fontSize: 11,
+    fontWeight: '500',
+    marginTop: 4,
+  },
+  iconContainer: {
+    padding: 4,
+    borderRadius: 12,
+  },
+  iconContainerFocused: {
+    backgroundColor: colors.primarySubtle,
+  },
+});

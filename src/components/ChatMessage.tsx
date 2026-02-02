@@ -1,6 +1,8 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, Animated } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import type { Message } from '../types';
+import { colors, spacing, borderRadius, typography } from '../constants/theme';
 
 interface ChatMessageProps {
   message: Message;
@@ -11,15 +13,28 @@ export function ChatMessage({ message }: ChatMessageProps) {
 
   return (
     <View style={[styles.container, isFromMe ? styles.fromMe : styles.fromEcho]}>
-      <View style={[styles.bubble, isFromMe ? styles.bubbleFromMe : styles.bubbleFromEcho]}>
-        <Text style={[styles.text, isFromMe ? styles.textFromMe : styles.textFromEcho]}>
-          {message.text}
-        </Text>
-        {message.streaming && (
-          <Text style={styles.streaming}>●●●</Text>
+      <View style={[
+        styles.bubble,
+        isFromMe ? styles.bubbleFromMe : styles.bubbleFromEcho
+      ]}>
+        {isFromMe ? (
+          <LinearGradient
+            colors={['#1E3A5F', '#162D4D']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.gradientBubble}
+          >
+            <Text style={styles.text}>{message.text}</Text>
+            {message.streaming && <StreamingIndicator />}
+          </LinearGradient>
+        ) : (
+          <View style={styles.echoBubble}>
+            <Text style={styles.text}>{message.text}</Text>
+            {message.streaming && <StreamingIndicator />}
+          </View>
         )}
       </View>
-      <Text style={styles.timestamp}>
+      <Text style={[styles.timestamp, isFromMe && styles.timestampRight]}>
         {new Date(message.timestamp).toLocaleTimeString([], { 
           hour: '2-digit', 
           minute: '2-digit' 
@@ -29,10 +44,20 @@ export function ChatMessage({ message }: ChatMessageProps) {
   );
 }
 
+function StreamingIndicator() {
+  return (
+    <View style={styles.streamingContainer}>
+      <View style={[styles.dot, styles.dot1]} />
+      <View style={[styles.dot, styles.dot2]} />
+      <View style={[styles.dot, styles.dot3]} />
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
-    marginVertical: 4,
-    maxWidth: '80%',
+    marginVertical: spacing.xs,
+    maxWidth: '85%',
   },
   fromMe: {
     alignSelf: 'flex-end',
@@ -43,35 +68,62 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
   },
   bubble: {
-    borderRadius: 18,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
   },
   bubbleFromMe: {
-    backgroundColor: '#6366f1',
+    borderBottomRightRadius: borderRadius.sm,
   },
   bubbleFromEcho: {
-    backgroundColor: '#2a2a2a',
+    borderBottomLeftRadius: borderRadius.sm,
+  },
+  gradientBubble: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+  },
+  echoBubble: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.xl,
+    borderBottomLeftRadius: borderRadius.sm,
   },
   text: {
-    fontSize: 16,
+    fontSize: typography.base,
     lineHeight: 22,
-  },
-  textFromMe: {
-    color: '#fff',
-  },
-  textFromEcho: {
-    color: '#fff',
+    color: colors.textPrimary,
   },
   timestamp: {
-    fontSize: 11,
-    color: '#666',
-    marginTop: 4,
-    marginHorizontal: 4,
+    fontSize: typography.xs,
+    color: colors.textTertiary,
+    marginTop: spacing.xs,
+    marginHorizontal: spacing.xs,
   },
-  streaming: {
-    color: '#888',
-    fontSize: 12,
-    marginTop: 4,
+  timestampRight: {
+    textAlign: 'right',
+  },
+  streamingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: spacing.xs,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+    opacity: 0.6,
+  },
+  dot1: {
+    opacity: 0.4,
+  },
+  dot2: {
+    opacity: 0.6,
+  },
+  dot3: {
+    opacity: 0.8,
   },
 });
