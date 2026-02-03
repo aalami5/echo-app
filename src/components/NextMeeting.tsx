@@ -265,13 +265,13 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
 const styles = StyleSheet.create({
   container: {
     marginTop: spacing.sm,
-    marginHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    width: '90%',
   },
   glowBackground: {
     ...StyleSheet.absoluteFillObject,
