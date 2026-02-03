@@ -21,10 +21,20 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
 
   const startRecording = useCallback(async () => {
     try {
+      // Clean up any existing recording first
+      if (recording.current) {
+        try {
+          await recording.current.stopAndUnloadAsync();
+        } catch (e) {
+          // Ignore cleanup errors
+        }
+        recording.current = null;
+      }
+
       // Request permissions
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
-        console.error('Audio permission not granted');
+        console.log('Audio permission not granted');
         return;
       }
 
@@ -75,7 +85,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       }, 100); // Update 10 times per second for smooth animation
 
     } catch (error) {
-      console.error('Failed to start recording:', error);
+      console.log('Failed to start recording:', error);
     }
   }, []);
 
@@ -112,7 +122,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
 
       return uri;
     } catch (error) {
-      console.error('Failed to stop recording:', error);
+      console.log('Failed to stop recording:', error);
       return null;
     }
   }, []);
@@ -146,7 +156,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
         allowsRecordingIOS: false,
       });
     } catch (error) {
-      console.error('Failed to cancel recording:', error);
+      console.log('Failed to cancel recording:', error);
     }
   }, []);
 
