@@ -110,7 +110,7 @@ export function MeetingDetail({ event, visible, onClose }: MeetingDetailProps) {
           activeOpacity={1} 
           onPress={handleClose}
         >
-          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+          <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={styles.modalWrapper}>
             <View style={styles.container}>
               {/* Header */}
               <View style={styles.header}>
@@ -235,12 +235,16 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: spacing.sm,
+    paddingHorizontal: 12,
+    paddingVertical: spacing.lg,
+  },
+  modalWrapper: {
+    width: '100%',
   },
   container: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.xl,
-    width: '95%',
+    width: '100%',
     maxHeight: '85%',
     borderWidth: 1,
     borderColor: colors.border,
