@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, Animated } from 'react-native';
+import { StyleSheet, View, Text } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Message } from '../types';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
@@ -9,32 +9,32 @@ interface ChatMessageProps {
 }
 
 export function ChatMessage({ message }: ChatMessageProps) {
-  const isFromMe = message.isFromMe;
+  const isFromUser = message.role === 'user';
 
   return (
-    <View style={[styles.container, isFromMe ? styles.fromMe : styles.fromEcho]}>
+    <View style={[styles.container, isFromUser ? styles.fromUser : styles.fromEcho]}>
       <View style={[
         styles.bubble,
-        isFromMe ? styles.bubbleFromMe : styles.bubbleFromEcho
+        isFromUser ? styles.bubbleFromUser : styles.bubbleFromEcho
       ]}>
-        {isFromMe ? (
+        {isFromUser ? (
           <LinearGradient
             colors={['#1E3A5F', '#162D4D']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradientBubble}
           >
-            <Text style={styles.text}>{message.text}</Text>
+            <Text style={styles.text}>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </LinearGradient>
         ) : (
           <View style={styles.echoBubble}>
-            <Text style={styles.text}>{message.text}</Text>
+            <Text style={styles.text}>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </View>
         )}
       </View>
-      <Text style={[styles.timestamp, isFromMe && styles.timestampRight]}>
+      <Text style={[styles.timestamp, isFromUser && styles.timestampRight]}>
         {new Date(message.timestamp).toLocaleTimeString([], { 
           hour: '2-digit', 
           minute: '2-digit' 
@@ -59,7 +59,7 @@ const styles = StyleSheet.create({
     marginVertical: spacing.xs,
     maxWidth: '85%',
   },
-  fromMe: {
+  fromUser: {
     alignSelf: 'flex-end',
     alignItems: 'flex-end',
   },
@@ -71,7 +71,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     overflow: 'hidden',
   },
-  bubbleFromMe: {
+  bubbleFromUser: {
     borderBottomRightRadius: borderRadius.sm,
   },
   bubbleFromEcho: {

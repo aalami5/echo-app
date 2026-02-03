@@ -1,29 +1,45 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import {
   StyleSheet,
   View,
   FlatList,
+  Text,
+  TouchableOpacity,
+  TextInput,
   KeyboardAvoidingView,
   Platform,
-  Text,
+  Keyboard,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { useChatStore } from '../../src/stores/chatStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { Avatar } from '../../src/components/Avatar';
 import { ChatMessage } from '../../src/components/ChatMessage';
-import { ChatInput } from '../../src/components/ChatInput';
 import { useWebSocket } from '../../src/lib/websocket';
-import { colors, spacing, typography } from '../../src/constants/theme';
+import { useVoiceRecording } from '../../src/hooks/useVoiceRecording';
+import { colors, spacing, typography, borderRadius } from '../../src/constants/theme';
 import type { Message } from '../../src/types';
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const flatListRef = useRef<FlatList>(null);
-  const { messages, avatarState, isConnected } = useChatStore();
+  const [showTextInput, setShowTextInput] = useState(false);
+  const [textMessage, setTextMessage] = useState('');
+  
+  const { messages, avatarState, isConnected, setAvatarState } = useChatStore();
   const { accessToken } = useAuthStore();
-  const { sendMessage } = useWebSocket(accessToken);
+  const { sendMessage, retryConnection } = useWebSocket(accessToken);
+  const { 
+    isRecording, 
+    duration, 
+    audioLevel,
+    startRecording, 
+    stopRecording, 
+    cancelRecording 
+  } = useVoiceRecording();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -34,14 +50,46 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
-  const handleSendText = (text: string) => {
-    sendMessage(text);
+  const handleAvatarPress = async () => {
+    if (isRecording) {
+      // Stop recording and send
+      const uri = await stopRecording();
+      if (uri) {
+        setAvatarState('thinking');
+        sendMessage('[Voice message]', uri);
+      }
+    } else {
+      // Start recording
+      await startRecording();
+    }
   };
 
-  const handleSendAudio = async (uri: string) => {
-    // TODO: Upload audio and send transcription or audio URL
-    console.log('Audio recorded:', uri);
-    sendMessage('[Voice message]', uri);
+  const handleCancelRecording = async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    cancelRecording();
+  };
+
+  const handleSendText = async () => {
+    if (textMessage.trim()) {
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      sendMessage(textMessage.trim());
+      setTextMessage('');
+      setShowTextInput(false);
+      Keyboard.dismiss();
+    }
+  };
+
+  const toggleTextInput = () => {
+    setShowTextInput(!showTextInput);
+    if (!showTextInput) {
+      // Will show input
+    }
+  };
+
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
@@ -50,9 +98,8 @@ export default function ChatScreen() {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>Welcome back</Text>
       <Text style={styles.emptySubtitle}>
-        Send a message or tap the mic to talk
+        Tap the avatar to start talking
       </Text>
     </View>
   );
@@ -63,23 +110,46 @@ export default function ChatScreen() {
         colors={[colors.background, '#0D1526', colors.background]}
         style={StyleSheet.absoluteFill}
       />
+      
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        keyboardVerticalOffset={90}
       >
-        {/* Header with Avatar */}
+        {/* Header with Interactive Avatar */}
         <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
-          <Avatar state={avatarState} size={80} />
-          <View style={styles.statusContainer}>
-            <View style={[
-              styles.statusDot,
-              { backgroundColor: isConnected ? colors.success : colors.textTertiary }
-            ]} />
-            <Text style={styles.statusText}>
-              {isConnected ? 'Online' : 'Connecting...'}
-            </Text>
-          </View>
+          <Avatar 
+            state={isRecording ? 'listening' : avatarState} 
+            size={100}
+            onPress={handleAvatarPress}
+            isRecording={isRecording}
+            audioLevel={audioLevel}
+          />
+          
+          {/* Status / Recording info */}
+          {isRecording ? (
+            <View style={styles.recordingStatus}>
+              <Text style={styles.recordingTime}>{formatDuration(duration)}</Text>
+              <TouchableOpacity onPress={handleCancelRecording} style={styles.cancelButton}>
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.statusContainer}>
+              <View style={[
+                styles.statusDot,
+                { backgroundColor: isConnected ? colors.success : colors.textTertiary }
+              ]} />
+              <Text style={styles.statusText}>
+                {isConnected ? 'Online' : 'Offline'}
+              </Text>
+              {!isConnected && (
+                <TouchableOpacity onPress={retryConnection} style={styles.retryButton}>
+                  <Text style={styles.retryText}>Retry</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
         </View>
 
         {/* Messages */}
@@ -97,12 +167,44 @@ export default function ChatScreen() {
           ListEmptyComponent={renderEmptyState}
         />
 
-        {/* Input - Always visible at bottom */}
-        <View style={[styles.inputWrapper, { paddingBottom: insets.bottom }]}>
-          <ChatInput
-            onSendText={handleSendText}
-            onSendAudio={handleSendAudio}
-          />
+        {/* Text input toggle / input area */}
+        <View style={styles.bottomBar}>
+          {showTextInput ? (
+            <View style={styles.textInputContainer}>
+              <TextInput
+                style={styles.textInput}
+                placeholder="Type a message..."
+                placeholderTextColor={colors.textTertiary}
+                value={textMessage}
+                onChangeText={setTextMessage}
+                multiline
+                maxLength={2000}
+                autoFocus
+              />
+              <TouchableOpacity 
+                onPress={handleSendText}
+                style={[
+                  styles.sendButton,
+                  !textMessage.trim() && styles.sendButtonDisabled
+                ]}
+                disabled={!textMessage.trim()}
+              >
+                <Ionicons 
+                  name="arrow-up" 
+                  size={20} 
+                  color={textMessage.trim() ? colors.textInverse : colors.textTertiary} 
+                />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleTextInput} style={styles.closeButton}>
+                <Ionicons name="close" size={20} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={toggleTextInput} style={styles.keyboardToggle}>
+              <Ionicons name="keypad-outline" size={22} color={colors.textSecondary} />
+              <Text style={styles.keyboardToggleText}>Type instead</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </KeyboardAvoidingView>
     </View>
@@ -138,6 +240,40 @@ const styles = StyleSheet.create({
     fontSize: typography.sm,
     color: colors.textSecondary,
   },
+  retryButton: {
+    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.sm,
+  },
+  retryText: {
+    fontSize: typography.sm,
+    color: colors.primary,
+    fontWeight: '500',
+  },
+  recordingStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginTop: spacing.sm,
+  },
+  recordingTime: {
+    fontSize: typography.xl,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    fontVariant: ['tabular-nums'],
+  },
+  cancelButton: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+    backgroundColor: colors.error + '20',
+    borderRadius: borderRadius.md,
+  },
+  cancelText: {
+    color: colors.error,
+    fontWeight: '500',
+  },
   messageList: {
     flex: 1,
   },
@@ -153,18 +289,64 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xl,
   },
-  emptyTitle: {
-    fontSize: typography.xl,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginBottom: spacing.xs,
-  },
   emptySubtitle: {
     fontSize: typography.base,
     color: colors.textSecondary,
     textAlign: 'center',
   },
-  inputWrapper: {
+  bottomBar: {
+    padding: spacing.md,
+    paddingBottom: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
     backgroundColor: colors.background,
+  },
+  keyboardToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+  },
+  keyboardToggleText: {
+    color: colors.textSecondary,
+    fontSize: typography.sm,
+  },
+  textInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.borderFocused,
+    paddingLeft: spacing.md,
+    paddingRight: spacing.xs,
+    paddingVertical: spacing.xs,
+  },
+  textInput: {
+    flex: 1,
+    fontSize: typography.base,
+    color: colors.textPrimary,
+    maxHeight: 100,
+    paddingVertical: spacing.sm,
+  },
+  sendButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.sm,
+  },
+  sendButtonDisabled: {
+    backgroundColor: colors.surface,
+  },
+  closeButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.xs,
   },
 });

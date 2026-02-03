@@ -10,13 +10,12 @@ export interface User {
 
 export interface Message {
   id: string;
-  text: string;
-  isFromMe: boolean;
-  timestamp: number;
-  audioUrl?: string;
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+  audioUri?: string;
   imageUrl?: string;
   card?: RichCard;
-  avatarState?: AvatarState;
   streaming?: boolean;
 }
 
@@ -50,15 +49,8 @@ export interface ChatState {
 }
 
 export interface WebSocketMessage {
-  type: 'message' | 'typing' | 'status' | 'pong';
-  id: string;
-  timestamp: number;
-  payload: {
-    text?: string;
-    audio?: string;
-    card?: RichCard;
-    state?: AvatarState;
-  };
-  streaming?: boolean;
-  final?: boolean;
+  type: 'message' | 'typing' | 'status' | 'pong' | 'avatar_state' | 'done';
+  id?: string;
+  content?: string;
+  state?: AvatarState;
 }

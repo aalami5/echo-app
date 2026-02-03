@@ -1,10 +1,11 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
 
 interface UseVoiceRecordingResult {
   isRecording: boolean;
   duration: number;
+  audioLevel: number; // 0-1 for audio reactivity
   startRecording: () => Promise<void>;
   stopRecording: () => Promise<string | null>;
   cancelRecording: () => Promise<void>;
@@ -13,8 +14,10 @@ interface UseVoiceRecordingResult {
 export function useVoiceRecording(): UseVoiceRecordingResult {
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
+  const [audioLevel, setAudioLevel] = useState(0);
   const recording = useRef<Audio.Recording | null>(null);
   const durationInterval = useRef<NodeJS.Timeout | null>(null);
+  const meteringInterval = useRef<NodeJS.Timeout | null>(null);
 
   const startRecording = useCallback(async () => {
     try {
@@ -32,21 +35,44 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       });
 
       // Haptic feedback
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
-      // Start recording
+      // Start recording with metering enabled
       const { recording: newRecording } = await Audio.Recording.createAsync(
-        Audio.RecordingOptionsPresets.HIGH_QUALITY
+        {
+          ...Audio.RecordingOptionsPresets.HIGH_QUALITY,
+          isMeteringEnabled: true,
+        }
       );
       
       recording.current = newRecording;
       setIsRecording(true);
       setDuration(0);
+      setAudioLevel(0);
 
       // Track duration
       durationInterval.current = setInterval(() => {
         setDuration((prev) => prev + 1);
       }, 1000);
+
+      // Track audio levels for reactive animations
+      meteringInterval.current = setInterval(async () => {
+        if (recording.current) {
+          try {
+            const status = await recording.current.getStatusAsync();
+            if (status.isRecording && status.metering !== undefined) {
+              // Convert dB to 0-1 scale
+              // Metering is typically -160 to 0 dB
+              // -60 to 0 is the usable range for voice
+              const db = status.metering;
+              const normalized = Math.max(0, Math.min(1, (db + 60) / 60));
+              setAudioLevel(normalized);
+            }
+          } catch (e) {
+            // Ignore metering errors
+          }
+        }
+      }, 100); // Update 10 times per second for smooth animation
 
     } catch (error) {
       console.error('Failed to start recording:', error);
@@ -57,14 +83,18 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
     try {
       if (!recording.current) return null;
 
-      // Stop duration tracking
+      // Stop tracking
       if (durationInterval.current) {
         clearInterval(durationInterval.current);
         durationInterval.current = null;
       }
+      if (meteringInterval.current) {
+        clearInterval(meteringInterval.current);
+        meteringInterval.current = null;
+      }
 
       // Haptic feedback
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
       // Stop and get URI
       await recording.current.stopAndUnloadAsync();
@@ -73,6 +103,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       recording.current = null;
       setIsRecording(false);
       setDuration(0);
+      setAudioLevel(0);
 
       // Reset audio mode
       await Audio.setAudioModeAsync({
@@ -90,10 +121,14 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
     try {
       if (!recording.current) return;
 
-      // Stop duration tracking
+      // Stop tracking
       if (durationInterval.current) {
         clearInterval(durationInterval.current);
         durationInterval.current = null;
+      }
+      if (meteringInterval.current) {
+        clearInterval(meteringInterval.current);
+        meteringInterval.current = null;
       }
 
       // Haptic feedback
@@ -104,6 +139,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       recording.current = null;
       setIsRecording(false);
       setDuration(0);
+      setAudioLevel(0);
 
       // Reset audio mode
       await Audio.setAudioModeAsync({
@@ -114,9 +150,18 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
     }
   }, []);
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (durationInterval.current) clearInterval(durationInterval.current);
+      if (meteringInterval.current) clearInterval(meteringInterval.current);
+    };
+  }, []);
+
   return {
     isRecording,
     duration,
+    audioLevel,
     startRecording,
     stopRecording,
     cancelRecording,
