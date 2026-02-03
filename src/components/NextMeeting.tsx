@@ -324,14 +324,15 @@ const styles = StyleSheet.create({
   expandedTime: {
     fontSize: typography.xs,
     color: colors.textTertiary,
-    width: 65,
+    width: 60,
     flexShrink: 0,
+    marginRight: spacing.sm,
   },
   expandedTitle: {
     flex: 1,
     fontSize: typography.xs,
     color: colors.textSecondary,
-    flexShrink: 1,
+    minWidth: 80,
   },
   noMoreText: {
     fontSize: typography.xs,
