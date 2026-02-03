@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Message } from '../types';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
@@ -24,11 +24,17 @@ export function ChatMessage({ message }: ChatMessageProps) {
             end={{ x: 1, y: 1 }}
             style={styles.gradientBubble}
           >
+            {message.imageUrl && (
+              <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
+            )}
             <Text style={styles.text}>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </LinearGradient>
         ) : (
           <View style={styles.echoBubble}>
+            {message.imageUrl && (
+              <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
+            )}
             <Text style={styles.text}>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </View>
@@ -94,6 +100,12 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     lineHeight: 22,
     color: colors.textPrimary,
+  },
+  messageImage: {
+    width: 200,
+    height: 200,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing.sm,
   },
   timestamp: {
     fontSize: typography.xs,

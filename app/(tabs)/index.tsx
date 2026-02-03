@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Keyboard,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,6 +19,7 @@ import { useChatStore } from '../../src/stores/chatStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { Avatar } from '../../src/components/Avatar';
 import { ChatMessage } from '../../src/components/ChatMessage';
+import { ImagePickerModal } from '../../src/components/ImagePicker';
 import { useWebSocket } from '../../src/lib/websocket';
 import { useVoiceRecording } from '../../src/hooks/useVoiceRecording';
 import { colors, spacing, typography, borderRadius } from '../../src/constants/theme';
@@ -28,8 +30,9 @@ export default function ChatScreen() {
   const flatListRef = useRef<FlatList>(null);
   const [showTextInput, setShowTextInput] = useState(false);
   const [textMessage, setTextMessage] = useState('');
+  const [showImagePicker, setShowImagePicker] = useState(false);
   
-  const { messages, avatarState, isConnected, setAvatarState } = useChatStore();
+  const { messages, avatarState, isConnected, setAvatarState, addMessage } = useChatStore();
   const { accessToken } = useAuthStore();
   const { sendMessage, retryConnection } = useWebSocket(accessToken);
   const { 
@@ -84,6 +87,28 @@ export default function ChatScreen() {
     if (!showTextInput) {
       // Will show input
     }
+  };
+
+  const handleImageSelected = (uri: string, base64?: string) => {
+    setShowImagePicker(false);
+    // Add image message to chat
+    const imageMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content: '[Photo for analysis]',
+      timestamp: new Date().toISOString(),
+      imageUrl: uri,
+    };
+    addMessage(imageMessage);
+    
+    // When connected, send for analysis
+    // For now just add locally
+    setAvatarState('thinking');
+    
+    // Simulate Echo response about analyzing
+    setTimeout(() => {
+      setAvatarState('idle');
+    }, 1500);
   };
 
   const formatDuration = (seconds: number) => {
@@ -200,13 +225,30 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity onPress={toggleTextInput} style={styles.keyboardToggle}>
-              <Ionicons name="keypad-outline" size={22} color={colors.textSecondary} />
-              <Text style={styles.keyboardToggleText}>Type instead</Text>
-            </TouchableOpacity>
+            <View style={styles.actionBar}>
+              <TouchableOpacity 
+                onPress={() => setShowImagePicker(true)} 
+                style={styles.actionButton}
+              >
+                <Ionicons name="image-outline" size={22} color={colors.textSecondary} />
+                <Text style={styles.actionButtonText}>Photo</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={toggleTextInput} style={styles.actionButton}>
+                <Ionicons name="keypad-outline" size={22} color={colors.textSecondary} />
+                <Text style={styles.actionButtonText}>Type</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       </KeyboardAvoidingView>
+
+      {/* Image Picker Modal */}
+      {showImagePicker && (
+        <ImagePickerModal
+          onImageSelected={handleImageSelected}
+          onCancel={() => setShowImagePicker(false)}
+        />
+      )}
     </View>
   );
 }
@@ -301,16 +343,21 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     backgroundColor: colors.background,
   },
-  keyboardToggle: {
+  actionBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
+    gap: spacing.xl,
     padding: spacing.sm,
   },
-  keyboardToggleText: {
+  actionButton: {
+    alignItems: 'center',
+    gap: spacing.xs,
+    padding: spacing.sm,
+  },
+  actionButtonText: {
     color: colors.textSecondary,
-    fontSize: typography.sm,
+    fontSize: typography.xs,
   },
   textInputContainer: {
     flexDirection: 'row',

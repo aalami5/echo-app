@@ -53,6 +53,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="today"
+        options={{
+          title: 'Today',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon 
+              name={focused ? 'calendar' : 'calendar-outline'} 
+              color={color}
+              focused={focused}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="explore"
         options={{
           title: 'Settings',
@@ -65,7 +78,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      {/* Hide the default "two" tab from the template */}
+      {/* Hide unused template screens */}
       <Tabs.Screen
         name="two"
         options={{
