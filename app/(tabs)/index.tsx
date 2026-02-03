@@ -167,8 +167,8 @@ export default function ChatScreen() {
           ListEmptyComponent={renderEmptyState}
         />
 
-        {/* Text input toggle / input area */}
-        <View style={styles.bottomBar}>
+        {/* Text input toggle / input area - above tab bar */}
+        <View style={[styles.bottomBar, { marginBottom: 85 }]}>
           {showTextInput ? (
             <View style={styles.textInputContainer}>
               <TextInput
