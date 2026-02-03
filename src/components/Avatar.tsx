@@ -17,10 +17,8 @@ interface AvatarProps {
   size?: number;
   onPress?: () => void;
   isRecording?: boolean;
-  audioLevel?: number; // 0-1 for audio reactivity
+  audioLevel?: number;
 }
-
-const RING_COUNT = 4;
 
 export function Avatar({ 
   state, 
@@ -29,13 +27,12 @@ export function Avatar({
   isRecording = false,
   audioLevel = 0 
 }: AvatarProps) {
-  // Animation values - all use native driver for consistency
+  // Use separate animated values - some for native, some for JS
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const glowAnim = useRef(new Animated.Value(0.3)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const ringAnims = useRef(
-    Array.from({ length: RING_COUNT }, () => new Animated.Value(1))
-  ).current;
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const ring1Scale = useRef(new Animated.Value(1)).current;
+  const ring2Scale = useRef(new Animated.Value(1)).current;
+  const ring3Scale = useRef(new Animated.Value(1)).current;
 
   // Idle animation - gentle pulse
   useEffect(() => {
@@ -59,96 +56,139 @@ export function Avatar({
       pulse.start();
       return () => pulse.stop();
     }
-  }, [state, isRecording]);
+  }, [state, isRecording, pulseAnim]);
 
-  // Recording animation - intense pulsing rings
+  // Recording animation - expanding rings
   useEffect(() => {
     if (isRecording) {
-      // Intense glow - use native driver consistently
-      Animated.loop(
+      // Main pulse
+      const mainPulse = Animated.loop(
         Animated.sequence([
-          Animated.timing(glowAnim, {
-            toValue: 1,
-            duration: 300,
+          Animated.timing(scaleAnim, {
+            toValue: 1.1,
+            duration: 400,
             useNativeDriver: true,
           }),
-          Animated.timing(glowAnim, {
-            toValue: 0.5,
-            duration: 300,
+          Animated.timing(scaleAnim, {
+            toValue: 1,
+            duration: 400,
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
 
-      // Expanding rings
-      ringAnims.forEach((anim, i) => {
-        Animated.loop(
-          Animated.sequence([
-            Animated.timing(anim, {
-              toValue: 1.5 + (i * 0.15),
-              duration: 800 + (i * 200),
-              easing: Easing.out(Easing.ease),
-              useNativeDriver: true,
-            }),
-            Animated.timing(anim, {
-              toValue: 1,
-              duration: 400,
-              useNativeDriver: true,
-            }),
-          ])
-        ).start();
-      });
+      // Ring 1
+      const ring1 = Animated.loop(
+        Animated.sequence([
+          Animated.timing(ring1Scale, {
+            toValue: 1.4,
+            duration: 800,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring1Scale, {
+            toValue: 1,
+            duration: 400,
+            useNativeDriver: true,
+          }),
+        ])
+      );
 
-      // Slow rotation
-      Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 8000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      ).start();
-    } else {
-      // Reset animations
-      glowAnim.setValue(0.3);
-      rotateAnim.setValue(0);
-      ringAnims.forEach(anim => anim.setValue(1));
+      // Ring 2
+      const ring2 = Animated.loop(
+        Animated.sequence([
+          Animated.timing(ring2Scale, {
+            toValue: 1.5,
+            duration: 1000,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring2Scale, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      // Ring 3
+      const ring3 = Animated.loop(
+        Animated.sequence([
+          Animated.timing(ring3Scale, {
+            toValue: 1.6,
+            duration: 1200,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring3Scale, {
+            toValue: 1,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+
+      mainPulse.start();
+      ring1.start();
+      ring2.start();
+      ring3.start();
+
+      return () => {
+        mainPulse.stop();
+        ring1.stop();
+        ring2.stop();
+        ring3.stop();
+        scaleAnim.setValue(1);
+        ring1Scale.setValue(1);
+        ring2Scale.setValue(1);
+        ring3Scale.setValue(1);
+      };
     }
-  }, [isRecording]);
+  }, [isRecording, scaleAnim, ring1Scale, ring2Scale, ring3Scale]);
 
   // Thinking animation
   useEffect(() => {
-    if (state === 'thinking') {
-      Animated.loop(
-        Animated.timing(rotateAnim, {
-          toValue: 1,
-          duration: 3000,
-          easing: Easing.linear,
-          useNativeDriver: true,
-        })
-      ).start();
+    if (state === 'thinking' && !isRecording) {
+      const think = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.08,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0.95,
+            duration: 600,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      think.start();
+      return () => think.stop();
     }
-  }, [state]);
+  }, [state, isRecording, pulseAnim]);
 
   // Speaking animation
   useEffect(() => {
     if (state === 'speaking') {
-      Animated.loop(
+      const speak = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.1,
-            duration: 200,
+            toValue: 1.12,
+            duration: 150,
             useNativeDriver: true,
           }),
           Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 200,
+            duration: 150,
             useNativeDriver: true,
           }),
         ])
-      ).start();
+      );
+      speak.start();
+      return () => speak.stop();
     }
-  }, [state]);
+  }, [state, pulseAnim]);
 
   const handlePress = async () => {
     await Haptics.impactAsync(
@@ -159,13 +199,8 @@ export function Avatar({
     onPress?.();
   };
 
-  const rotation = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  // Audio-reactive scale (when recording)
-  const audioScale = 1 + (audioLevel * 0.3);
+  // Combine pulse with audio level for recording
+  const activeScale = isRecording ? scaleAnim : pulseAnim;
 
   return (
     <TouchableOpacity
@@ -174,48 +209,71 @@ export function Avatar({
       disabled={!onPress}
     >
       <View style={[styles.container, { width: size * 2, height: size * 2 }]}>
-        {/* Outer glow rings (recording) */}
-        {isRecording && ringAnims.map((anim, i) => (
-          <Animated.View
-            key={`ring-${i}`}
-            style={[
-              styles.glowRing,
-              {
-                width: size * 1.8,
-                height: size * 1.8,
-                borderRadius: size,
-                transform: [{ scale: anim }],
-                opacity: 0.4 - (i * 0.08),
-                borderColor: colors.primary,
-                borderWidth: 2 - (i * 0.3),
-              },
-            ]}
-          />
-        ))}
+        {/* Outer glow rings (recording only) */}
+        {isRecording && (
+          <>
+            <Animated.View
+              style={[
+                styles.glowRing,
+                {
+                  width: size * 1.6,
+                  height: size * 1.6,
+                  borderRadius: size * 0.8,
+                  transform: [{ scale: ring3Scale }],
+                  borderColor: colors.primary,
+                  opacity: 0.15,
+                },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.glowRing,
+                {
+                  width: size * 1.4,
+                  height: size * 1.4,
+                  borderRadius: size * 0.7,
+                  transform: [{ scale: ring2Scale }],
+                  borderColor: colors.primary,
+                  opacity: 0.25,
+                },
+              ]}
+            />
+            <Animated.View
+              style={[
+                styles.glowRing,
+                {
+                  width: size * 1.2,
+                  height: size * 1.2,
+                  borderRadius: size * 0.6,
+                  transform: [{ scale: ring1Scale }],
+                  borderColor: colors.primary,
+                  opacity: 0.35,
+                },
+              ]}
+            />
+          </>
+        )}
 
-        {/* Main avatar container */}
+        {/* Main avatar */}
         <Animated.View
           style={[
             styles.avatarWrapper,
             {
               width: size,
               height: size,
-              transform: [
-                { scale: isRecording ? audioScale : pulseAnim },
-                { rotate: rotation },
-              ],
+              transform: [{ scale: activeScale }],
             },
           ]}
         >
           {/* Glow effect */}
-          <Animated.View
+          <View
             style={[
               styles.glow,
               {
-                width: size * 1.4,
-                height: size * 1.4,
-                borderRadius: size * 0.7,
-                opacity: glowAnim,
+                width: size * 1.3,
+                height: size * 1.3,
+                borderRadius: size * 0.65,
+                opacity: isRecording ? 0.6 : 0.3,
                 backgroundColor: isRecording ? colors.primary : colors.glow,
               },
             ]}
@@ -284,7 +342,7 @@ export function Avatar({
           </View>
         </Animated.View>
 
-        {/* Recording indicator text */}
+        {/* Recording indicator */}
         {isRecording && (
           <View style={styles.recordingIndicator}>
             <View style={styles.recordingDot} />
@@ -292,7 +350,7 @@ export function Avatar({
           </View>
         )}
 
-        {/* Tap hint (when idle and interactive) */}
+        {/* Tap hint */}
         {!isRecording && onPress && state === 'idle' && (
           <Text style={styles.tapHint}>Tap to talk</Text>
         )}
@@ -327,6 +385,7 @@ const styles = StyleSheet.create({
   },
   glowRing: {
     position: 'absolute',
+    borderWidth: 2,
     borderStyle: 'solid',
   },
   recordingIndicator: {
