@@ -17,9 +17,11 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useChatStore } from '../../src/stores/chatStore';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useCalendarStore } from '../../src/stores/calendarStore';
 import { Avatar } from '../../src/components/Avatar';
 import { ChatMessage } from '../../src/components/ChatMessage';
 import { ImagePickerModal } from '../../src/components/ImagePicker';
+import { NextMeeting } from '../../src/components/NextMeeting';
 import { useWebSocket } from '../../src/lib/websocket';
 import { useVoiceRecording } from '../../src/hooks/useVoiceRecording';
 import { colors, spacing, typography, borderRadius } from '../../src/constants/theme';
@@ -34,7 +36,34 @@ export default function ChatScreen() {
   
   const { messages, avatarState, isConnected, setAvatarState, addMessage } = useChatStore();
   const { accessToken } = useAuthStore();
+  const { setEvents } = useCalendarStore();
   const { sendMessage, retryConnection } = useWebSocket(accessToken);
+
+  // Initialize mock calendar data for testing
+  useEffect(() => {
+    const now = new Date();
+    const mockEvents = [
+      {
+        id: '1',
+        title: 'Cardiovascular Dept Meeting',
+        startTime: new Date(now.getTime() + 12 * 60 * 1000), // 12 min from now
+        endTime: new Date(now.getTime() + 72 * 60 * 1000),
+      },
+      {
+        id: '2', 
+        title: 'SPARC Office Hours',
+        startTime: new Date(now.getTime() + 3 * 60 * 60 * 1000), // 3 hours from now
+        endTime: new Date(now.getTime() + 4 * 60 * 60 * 1000),
+      },
+      {
+        id: '3',
+        title: 'Stanford Biodesign Review',
+        startTime: new Date(now.getTime() + 5 * 60 * 60 * 1000), // 5 hours from now
+        endTime: new Date(now.getTime() + 6 * 60 * 60 * 1000),
+      },
+    ];
+    setEvents(mockEvents);
+  }, [setEvents]);
   const { 
     isRecording, 
     duration, 
@@ -174,6 +203,14 @@ export default function ChatScreen() {
                 </TouchableOpacity>
               )}
             </View>
+          )}
+          
+          {/* Next Meeting - single line below avatar */}
+          {!isRecording && (
+            <>
+              <Text style={{ color: '#5CFFFA', marginTop: 8, fontSize: 12 }}>DEBUG: Calendar section</Text>
+              <NextMeeting />
+            </>
           )}
         </View>
 
