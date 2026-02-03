@@ -155,7 +155,7 @@ export function MeetingDetail({ event, visible, onClose }: MeetingDetailProps) {
                 {event.videoLink && (
                   <TouchableOpacity style={styles.actionRow} onPress={handleJoinVideo}>
                     <View style={[styles.actionIcon, styles.videoIcon]}>
-                      <Ionicons name={getVideoIcon()} size={20} color="#fff" />
+                      <Ionicons name={getVideoIcon()} size={20} color="#1a1a2e" />
                     </View>
                     <View style={styles.actionContent}>
                       <Text style={styles.actionLabel}>{getVideoLabel()}</Text>
