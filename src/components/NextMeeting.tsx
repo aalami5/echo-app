@@ -11,6 +11,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import { useCalendarStore, CalendarEvent } from '../stores/calendarStore';
+import { MeetingDetail } from './MeetingDetail';
 
 interface NextMeetingProps {
   onExpand?: () => void;
@@ -22,6 +23,8 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
   const { events } = useCalendarStore();
   const [expanded, setExpanded] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
   
   // Animation for urgent pulse
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -171,6 +174,17 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
     onExpand?.();
   };
 
+  const handleMeetingTap = async (event: CalendarEvent) => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setSelectedEvent(event);
+    setShowDetail(true);
+  };
+
+  const handleCloseDetail = () => {
+    setShowDetail(false);
+    setSelectedEvent(null);
+  };
+
   const getTodayEvents = (): CalendarEvent[] => {
     if (!events || events.length === 0) return [];
     
@@ -225,9 +239,15 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
             {formatTimeDisplay()}
           </Text>
           <Text style={styles.separator}>·</Text>
-          <Text style={styles.titleText} numberOfLines={1} ellipsizeMode="tail">
-            {nextEvent?.title || 'No title'}
-          </Text>
+          <TouchableOpacity 
+            style={styles.titleTouchable} 
+            onPress={() => nextEvent && handleMeetingTap(nextEvent)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.titleText} numberOfLines={1} ellipsizeMode="tail">
+              {nextEvent?.title || 'No title'}
+            </Text>
+          </TouchableOpacity>
           <Ionicons 
             name={expanded ? 'chevron-up' : 'chevron-down'} 
             size={14} 
@@ -240,14 +260,20 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
         {expanded && todayEvents.length > 1 && (
           <View style={styles.expandedContainer}>
             {todayEvents.slice(1).map((event) => (
-              <View key={event.id} style={styles.expandedRow}>
+              <TouchableOpacity 
+                key={event.id} 
+                style={styles.expandedRow}
+                onPress={() => handleMeetingTap(event)}
+                activeOpacity={0.7}
+              >
                 <Text style={styles.expandedTime}>
                   {formatTime(toDate(event.startTime))}
                 </Text>
                 <Text style={styles.expandedTitle} numberOfLines={1}>
                   {event.title}
                 </Text>
-              </View>
+                <Ionicons name="chevron-forward" size={14} color={colors.textTertiary} />
+              </TouchableOpacity>
             ))}
           </View>
         )}
@@ -258,6 +284,15 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
           </View>
         )}
       </Animated.View>
+
+      {/* Meeting Detail Modal */}
+      {selectedEvent && (
+        <MeetingDetail
+          event={selectedEvent}
+          visible={showDetail}
+          onClose={handleCloseDetail}
+        />
+      )}
     </TouchableOpacity>
   );
 }
@@ -294,11 +329,13 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     marginHorizontal: spacing.xs,
   },
-  titleText: {
+  titleTouchable: {
     flex: 1,
+    minWidth: 100,
+  },
+  titleText: {
     fontSize: typography.sm,
     color: colors.textPrimary,
-    minWidth: 100,
   },
   chevron: {
     marginLeft: spacing.xs,

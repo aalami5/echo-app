@@ -5,8 +5,19 @@ export interface CalendarEvent {
   title: string;
   startTime: Date;
   endTime?: Date;
+  // Location
   location?: string;
+  locationUrl?: string;        // Google Maps link
+  // Video conferencing
+  videoLink?: string;          // Zoom/Teams/Meet URL
+  videoProvider?: 'zoom' | 'teams' | 'meet' | 'webex' | 'other';
+  // Dial-in
+  dialIn?: string;             // Phone number
+  dialInCode?: string;         // Meeting ID/passcode
+  // Details
   description?: string;
+  attendees?: string[];        // List of attendee names
+  organizer?: string;
 }
 
 interface CalendarStore {

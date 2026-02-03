@@ -48,18 +48,33 @@ export default function ChatScreen() {
         title: 'Cardiovascular Dept Meeting',
         startTime: new Date(now.getTime() + 12 * 60 * 1000), // 12 min from now
         endTime: new Date(now.getTime() + 72 * 60 * 1000),
+        location: 'Sequoia Hospital, 4th Floor Conference Room',
+        videoLink: 'https://teams.microsoft.com/meet/296573611616555',
+        videoProvider: 'teams' as const,
+        dialIn: '+1 916-562-0855',
+        dialInCode: '921443547',
+        attendees: ['Dr. Dirk Baumann', 'Dr. Sara Wartman', 'Dr. Esther Bae', 'Dr. George Lee'],
+        organizer: 'Grace Estevez',
       },
       {
         id: '2', 
         title: 'SPARC Office Hours',
         startTime: new Date(now.getTime() + 3 * 60 * 60 * 1000), // 3 hours from now
         endTime: new Date(now.getTime() + 4 * 60 * 60 * 1000),
+        videoLink: 'https://stanford.zoom.us/j/4322086984',
+        videoProvider: 'zoom' as const,
+        dialIn: '+1 650-724-9799',
+        dialInCode: '4322086984',
+        description: 'Open office hours for SPARC project questions and updates.',
       },
       {
         id: '3',
         title: 'Stanford Biodesign Review',
         startTime: new Date(now.getTime() + 5 * 60 * 60 * 1000), // 5 hours from now
         endTime: new Date(now.getTime() + 6 * 60 * 60 * 1000),
+        location: '318 Campus Drive, E100, Stanford, CA 94305',
+        attendees: ['Dr. Aydin Zahedivash', 'Dr. Vishnu Ravi', 'Paul Schmiedmayer'],
+        description: 'Quarterly review of digital health initiatives and student projects.',
       },
     ];
     setEvents(mockEvents);
