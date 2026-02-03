@@ -224,7 +224,7 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
           <Text style={[styles.timeText, { color: getStatusColor() }]}>
             {formatTimeDisplay()}
           </Text>
-          <Text style={styles.separator}> · </Text>
+          <Text style={styles.separator}>·</Text>
           <Text style={styles.titleText} numberOfLines={1} ellipsizeMode="tail">
             {nextEvent?.title || 'No title'}
           </Text>
@@ -292,6 +292,7 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     fontSize: typography.sm,
     flexShrink: 0,
+    marginHorizontal: spacing.xs,
   },
   titleText: {
     flex: 1,
