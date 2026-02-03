@@ -29,14 +29,13 @@ export function Avatar({
   isRecording = false,
   audioLevel = 0 
 }: AvatarProps) {
-  // Animation values
+  // Animation values - all use native driver for consistency
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const glowAnim = useRef(new Animated.Value(0.3)).current;
   const rotateAnim = useRef(new Animated.Value(0)).current;
   const ringAnims = useRef(
     Array.from({ length: RING_COUNT }, () => new Animated.Value(1))
   ).current;
-  const colorAnim = useRef(new Animated.Value(0)).current;
 
   // Idle animation - gentle pulse
   useEffect(() => {
@@ -65,18 +64,18 @@ export function Avatar({
   // Recording animation - intense pulsing rings
   useEffect(() => {
     if (isRecording) {
-      // Intense glow
+      // Intense glow - use native driver consistently
       Animated.loop(
         Animated.sequence([
           Animated.timing(glowAnim, {
             toValue: 1,
             duration: 300,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
           Animated.timing(glowAnim, {
             toValue: 0.5,
             duration: 300,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }),
         ])
       ).start();
@@ -100,22 +99,6 @@ export function Avatar({
         ).start();
       });
 
-      // Color shift towards brighter cyan/white
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(colorAnim, {
-            toValue: 1,
-            duration: 500,
-            useNativeDriver: false,
-          }),
-          Animated.timing(colorAnim, {
-            toValue: 0,
-            duration: 500,
-            useNativeDriver: false,
-          }),
-        ])
-      ).start();
-
       // Slow rotation
       Animated.loop(
         Animated.timing(rotateAnim, {
@@ -128,7 +111,6 @@ export function Avatar({
     } else {
       // Reset animations
       glowAnim.setValue(0.3);
-      colorAnim.setValue(0);
       rotateAnim.setValue(0);
       ringAnims.forEach(anim => anim.setValue(1));
     }
@@ -182,17 +164,6 @@ export function Avatar({
     outputRange: ['0deg', '360deg'],
   });
 
-  // Interpolate colors for recording state
-  const coreColor = colorAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.primary, '#FFFFFF'],
-  });
-
-  const glowColor = colorAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [colors.glow, '#5CFFFA'],
-  });
-
   // Audio-reactive scale (when recording)
   const audioScale = 1 + (audioLevel * 0.3);
 
@@ -214,10 +185,7 @@ export function Avatar({
                 height: size * 1.8,
                 borderRadius: size,
                 transform: [{ scale: anim }],
-                opacity: glowAnim.interpolate({
-                  inputRange: [0.3, 1],
-                  outputRange: [0.1, 0.4 - (i * 0.08)],
-                }),
+                opacity: 0.4 - (i * 0.08),
                 borderColor: colors.primary,
                 borderWidth: 2 - (i * 0.3),
               },
@@ -247,7 +215,7 @@ export function Avatar({
                 width: size * 1.4,
                 height: size * 1.4,
                 borderRadius: size * 0.7,
-                opacity: isRecording ? glowAnim : 0.3,
+                opacity: glowAnim,
                 backgroundColor: isRecording ? colors.primary : colors.glow,
               },
             ]}
