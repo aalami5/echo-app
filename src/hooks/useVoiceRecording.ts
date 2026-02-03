@@ -20,6 +20,12 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
   const meteringInterval = useRef<NodeJS.Timeout | null>(null);
 
   const startRecording = useCallback(async () => {
+    // Prevent double-starts
+    if (isRecording) {
+      console.log('Already recording, ignoring start request');
+      return;
+    }
+
     try {
       // Clean up any existing recording first
       if (recording.current) {
@@ -29,6 +35,16 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
           // Ignore cleanup errors
         }
         recording.current = null;
+      }
+
+      // Clear any existing intervals
+      if (durationInterval.current) {
+        clearInterval(durationInterval.current);
+        durationInterval.current = null;
+      }
+      if (meteringInterval.current) {
+        clearInterval(meteringInterval.current);
+        meteringInterval.current = null;
       }
 
       // Request permissions
@@ -90,18 +106,23 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
   }, []);
 
   const stopRecording = useCallback(async (): Promise<string | null> => {
+    // Stop tracking first
+    if (durationInterval.current) {
+      clearInterval(durationInterval.current);
+      durationInterval.current = null;
+    }
+    if (meteringInterval.current) {
+      clearInterval(meteringInterval.current);
+      meteringInterval.current = null;
+    }
+
+    // Update state immediately
+    setIsRecording(false);
+    setDuration(0);
+    setAudioLevel(0);
+
     try {
       if (!recording.current) return null;
-
-      // Stop tracking
-      if (durationInterval.current) {
-        clearInterval(durationInterval.current);
-        durationInterval.current = null;
-      }
-      if (meteringInterval.current) {
-        clearInterval(meteringInterval.current);
-        meteringInterval.current = null;
-      }
 
       // Haptic feedback
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -111,9 +132,6 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       const uri = recording.current.getURI();
       
       recording.current = null;
-      setIsRecording(false);
-      setDuration(0);
-      setAudioLevel(0);
 
       // Reset audio mode
       await Audio.setAudioModeAsync({
@@ -123,6 +141,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       return uri;
     } catch (error) {
       console.log('Failed to stop recording:', error);
+      recording.current = null;
       return null;
     }
   }, []);
