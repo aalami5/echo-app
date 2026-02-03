@@ -206,12 +206,7 @@ export default function ChatScreen() {
           )}
           
           {/* Next Meeting - single line below avatar */}
-          {!isRecording && (
-            <>
-              <Text style={{ color: '#5CFFFA', marginTop: 8, fontSize: 12 }}>DEBUG: Calendar section</Text>
-              <NextMeeting />
-            </>
-          )}
+          {!isRecording && <NextMeeting />}
         </View>
 
         {/* Messages */}
