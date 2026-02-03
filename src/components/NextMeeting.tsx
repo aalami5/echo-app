@@ -225,8 +225,8 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
             {formatTimeDisplay()}
           </Text>
           <Text style={styles.separator}> · </Text>
-          <Text style={styles.titleText} numberOfLines={1}>
-            {nextEvent?.title}
+          <Text style={styles.titleText} numberOfLines={1} ellipsizeMode="tail">
+            {nextEvent?.title || 'No title'}
           </Text>
           <Ionicons 
             name={expanded ? 'chevron-up' : 'chevron-down'} 
@@ -265,14 +265,13 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
 const styles = StyleSheet.create({
   container: {
     marginTop: spacing.sm,
-    marginHorizontal: spacing.lg,
+    marginHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     backgroundColor: colors.surface,
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
-    overflow: 'hidden',
   },
   glowBackground: {
     ...StyleSheet.absoluteFillObject,
