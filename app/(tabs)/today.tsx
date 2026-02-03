@@ -19,27 +19,36 @@ function getMockMeetings(): CalendarEvent[] {
   return [
     {
       id: '1',
-      title: 'ACS Talk',
-      startTime: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 8, 30),
-      location: 'Orlando Convention Center',
+      title: 'Cardiovascular Dept Meeting',
+      startTime: new Date(now.getTime() + 12 * 60 * 1000), // 12 min from now
+      endTime: new Date(now.getTime() + 72 * 60 * 1000),
+      location: 'Sequoia Hospital, 4th Floor Conference Room',
+      videoLink: 'https://teams.microsoft.com/meet/296573611616555',
+      videoProvider: 'teams' as const,
+      dialIn: '+1 916-562-0855',
+      dialInCode: '921443547',
+      attendees: ['Dr. Dirk Baumann', 'Dr. Sara Wartman', 'Dr. Esther Bae', 'Dr. George Lee'],
+      organizer: 'Grace Estevez',
     },
     {
       id: '2', 
-      title: 'Cardiovascular Dept. Meeting',
-      startTime: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 10, 30),
-      location: 'Virtual',
+      title: 'SPARC Office Hours',
+      startTime: new Date(now.getTime() + 3 * 60 * 60 * 1000), // 3 hours from now
+      endTime: new Date(now.getTime() + 4 * 60 * 60 * 1000),
+      videoLink: 'https://stanford.zoom.us/j/4322086984',
+      videoProvider: 'zoom' as const,
+      dialIn: '+1 650-724-9799',
+      dialInCode: '4322086984',
+      description: 'Open office hours for SPARC project questions and updates.',
     },
     {
       id: '3',
-      title: 'Flight to San Francisco',
-      startTime: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 16, 17),
-      location: 'MCO → SFO (AS 369)',
-    },
-    {
-      id: '4',
-      title: 'SPARC Plug-in Office Hours',
-      startTime: new Date(now.getFullYear(), now.getMonth(), now.getDate(), 17, 0),
-      location: 'Virtual',
+      title: 'Stanford Biodesign Review',
+      startTime: new Date(now.getTime() + 5 * 60 * 60 * 1000), // 5 hours from now
+      endTime: new Date(now.getTime() + 6 * 60 * 60 * 1000),
+      location: '318 Campus Drive, E100, Stanford, CA 94305',
+      attendees: ['Dr. Aydin Zahedivash', 'Dr. Vishnu Ravi', 'Paul Schmiedmayer'],
+      description: 'Quarterly review of digital health initiatives and student projects.',
     },
   ];
 }
@@ -66,14 +75,6 @@ export default function TodayScreen() {
   }, []);
 
   const todayEvents = getTodayEvents(events);
-  
-  // Convert to the format MeetingCountdown expects
-  const meetings = todayEvents.map(event => ({
-    id: event.id,
-    title: event.title,
-    startTime: event.startTime,
-    location: event.location,
-  }));
 
   return (
     <View style={styles.container}>
@@ -98,7 +99,7 @@ export default function TodayScreen() {
       >
         <Text style={styles.title}>Today</Text>
         
-        <MeetingCountdown meetings={meetings} />
+        <MeetingCountdown meetings={todayEvents} />
         
         <View style={styles.footer}>
           <Text style={styles.footerText}>

@@ -5,20 +5,17 @@ import {
   Text,
   Animated,
   Easing,
+  TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
-
-interface Meeting {
-  id: string;
-  title: string;
-  startTime: Date;
-  location?: string;
-}
+import { CalendarEvent } from '../stores/calendarStore';
+import { MeetingDetail } from './MeetingDetail';
 
 interface MeetingCountdownProps {
-  meetings: Meeting[];
+  meetings: CalendarEvent[];
 }
 
 interface CountdownValues {
@@ -49,18 +46,19 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function MeetingItem({ meeting }: { meeting: Meeting }) {
-  const [countdown, setCountdown] = useState<CountdownValues>(getCountdown(meeting.startTime));
+function MeetingItem({ meeting, onPress }: { meeting: CalendarEvent; onPress: () => void }) {
+  const startTime = meeting.startTime instanceof Date ? meeting.startTime : new Date(meeting.startTime);
+  const [countdown, setCountdown] = useState<CountdownValues>(getCountdown(startTime));
   const pulseAnim = useRef(new Animated.Value(1)).current;
   
   // Update countdown every second
   useEffect(() => {
     const interval = setInterval(() => {
-      setCountdown(getCountdown(meeting.startTime));
+      setCountdown(getCountdown(startTime));
     }, 1000);
     
     return () => clearInterval(interval);
-  }, [meeting.startTime]);
+  }, [startTime]);
   
   // Pulse animation for imminent meetings
   useEffect(() => {
@@ -91,68 +89,79 @@ function MeetingItem({ meeting }: { meeting: Meeting }) {
   }
   
   const pad = (n: number) => n.toString().padStart(2, '0');
+
+  const handlePress = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    onPress();
+  };
   
   return (
-    <Animated.View style={[
-      styles.meetingItem,
-      countdown.isImminent && styles.meetingItemImminent,
-      { transform: [{ scale: pulseAnim }] }
-    ]}>
-      <View style={styles.meetingInfo}>
-        <Text style={styles.meetingTitle} numberOfLines={1}>
-          {meeting.title}
-        </Text>
-        <View style={styles.meetingMeta}>
-          <Text style={styles.meetingTime}>
-            {formatTime(meeting.startTime)}
+    <TouchableOpacity onPress={handlePress} activeOpacity={0.8}>
+      <Animated.View style={[
+        styles.meetingItem,
+        countdown.isImminent && styles.meetingItemImminent,
+        { transform: [{ scale: pulseAnim }] }
+      ]}>
+        <View style={styles.meetingInfo}>
+          <Text style={styles.meetingTitle} numberOfLines={1}>
+            {meeting.title}
           </Text>
-          {meeting.location && (
+          <View style={styles.meetingMeta}>
+            <Text style={styles.meetingTime}>
+              {formatTime(startTime)}
+            </Text>
+            {meeting.location && (
+              <>
+                <Text style={styles.metaSeparator}>•</Text>
+                <Text style={styles.meetingLocation} numberOfLines={1}>
+                  {meeting.location}
+                </Text>
+              </>
+            )}
+          </View>
+        </View>
+        
+        <View style={styles.countdownContainer}>
+          {countdown.hours > 0 && (
             <>
-              <Text style={styles.metaSeparator}>•</Text>
-              <Text style={styles.meetingLocation} numberOfLines={1}>
-                {meeting.location}
-              </Text>
+              <View style={styles.countdownUnit}>
+                <Text style={[styles.countdownNumber, countdown.isImminent && styles.countdownNumberImminent]}>
+                  {countdown.hours}
+                </Text>
+                <Text style={styles.countdownLabel}>h</Text>
+              </View>
+              <Text style={styles.countdownSeparator}>:</Text>
             </>
           )}
+          <View style={styles.countdownUnit}>
+            <Text style={[styles.countdownNumber, countdown.isImminent && styles.countdownNumberImminent]}>
+              {pad(countdown.minutes)}
+            </Text>
+            <Text style={styles.countdownLabel}>m</Text>
+          </View>
+          <Text style={styles.countdownSeparator}>:</Text>
+          <View style={styles.countdownUnit}>
+            <Text style={[
+              styles.countdownNumber, 
+              styles.countdownSeconds,
+              countdown.isImminent && styles.countdownNumberImminent
+            ]}>
+              {pad(countdown.seconds)}
+            </Text>
+            <Text style={styles.countdownLabel}>s</Text>
+          </View>
         </View>
-      </View>
-      
-      <View style={styles.countdownContainer}>
-        {countdown.hours > 0 && (
-          <>
-            <View style={styles.countdownUnit}>
-              <Text style={[styles.countdownNumber, countdown.isImminent && styles.countdownNumberImminent]}>
-                {countdown.hours}
-              </Text>
-              <Text style={styles.countdownLabel}>h</Text>
-            </View>
-            <Text style={styles.countdownSeparator}>:</Text>
-          </>
-        )}
-        <View style={styles.countdownUnit}>
-          <Text style={[styles.countdownNumber, countdown.isImminent && styles.countdownNumberImminent]}>
-            {pad(countdown.minutes)}
-          </Text>
-          <Text style={styles.countdownLabel}>m</Text>
-        </View>
-        <Text style={styles.countdownSeparator}>:</Text>
-        <View style={styles.countdownUnit}>
-          <Text style={[
-            styles.countdownNumber, 
-            styles.countdownSeconds,
-            countdown.isImminent && styles.countdownNumberImminent
-          ]}>
-            {pad(countdown.seconds)}
-          </Text>
-          <Text style={styles.countdownLabel}>s</Text>
-        </View>
-      </View>
-    </Animated.View>
+        
+        <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} style={styles.chevron} />
+      </Animated.View>
+    </TouchableOpacity>
   );
 }
 
 export function MeetingCountdown({ meetings }: MeetingCountdownProps) {
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
+  const [showDetail, setShowDetail] = useState(false);
   
   // Update current time every second for header
   useEffect(() => {
@@ -161,13 +170,24 @@ export function MeetingCountdown({ meetings }: MeetingCountdownProps) {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  const handleMeetingPress = (meeting: CalendarEvent) => {
+    setSelectedEvent(meeting);
+    setShowDetail(true);
+  };
+
+  const handleCloseDetail = () => {
+    setShowDetail(false);
+    setSelectedEvent(null);
+  };
   
   // Filter out past meetings
-  const upcomingMeetings = meetings.filter(m => m.startTime > new Date());
+  const toDate = (d: Date | string): Date => d instanceof Date ? d : new Date(d);
+  const upcomingMeetings = meetings.filter(m => toDate(m.startTime) > new Date());
   
   // Sort by start time
   const sortedMeetings = [...upcomingMeetings].sort(
-    (a, b) => a.startTime.getTime() - b.startTime.getTime()
+    (a, b) => toDate(a.startTime).getTime() - toDate(b.startTime).getTime()
   );
   
   const formatDate = (date: Date) => {
@@ -210,7 +230,11 @@ export function MeetingCountdown({ meetings }: MeetingCountdownProps) {
       
       <View style={styles.meetingsList}>
         {sortedMeetings.slice(0, 5).map((meeting) => (
-          <MeetingItem key={meeting.id} meeting={meeting} />
+          <MeetingItem 
+            key={meeting.id} 
+            meeting={meeting} 
+            onPress={() => handleMeetingPress(meeting)}
+          />
         ))}
         {sortedMeetings.length > 5 && (
           <Text style={styles.moreText}>
@@ -218,6 +242,15 @@ export function MeetingCountdown({ meetings }: MeetingCountdownProps) {
           </Text>
         )}
       </View>
+
+      {/* Meeting Detail Modal */}
+      {selectedEvent && (
+        <MeetingDetail
+          event={selectedEvent}
+          visible={showDetail}
+          onClose={handleCloseDetail}
+        />
+      )}
     </View>
   );
 }
@@ -336,5 +369,8 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
     textAlign: 'center',
     marginTop: spacing.xs,
+  },
+  chevron: {
+    marginLeft: spacing.sm,
   },
 });
