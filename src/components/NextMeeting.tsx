@@ -282,14 +282,17 @@ const styles = StyleSheet.create({
   mainLine: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
   },
   timeText: {
     fontSize: typography.sm,
     fontWeight: '600',
+    flexShrink: 0,
   },
   separator: {
     color: colors.textTertiary,
     fontSize: typography.sm,
+    flexShrink: 0,
   },
   titleText: {
     flex: 1,
@@ -299,6 +302,7 @@ const styles = StyleSheet.create({
   },
   chevron: {
     marginLeft: spacing.xs,
+    flexShrink: 0,
   },
   freeText: {
     fontSize: typography.sm,
@@ -315,16 +319,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.xs,
+    width: '100%',
   },
   expandedTime: {
     fontSize: typography.xs,
     color: colors.textTertiary,
-    width: 70,
+    width: 65,
+    flexShrink: 0,
   },
   expandedTitle: {
     flex: 1,
     fontSize: typography.xs,
     color: colors.textSecondary,
+    flexShrink: 1,
   },
   noMoreText: {
     fontSize: typography.xs,
