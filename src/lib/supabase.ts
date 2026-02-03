@@ -1,9 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import * as SecureStore from 'expo-secure-store';
 
-// TODO: Replace with actual Supabase credentials
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://your-project.supabase.co';
-const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'your-anon-key';
+// Supabase credentials (from .env or fallback)
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || 'https://mshgthoogedzdoqgcgcj.supabase.co';
+const SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zaGd0aG9vZ2VkemRvcWdjZ2NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwODA5MTUsImV4cCI6MjA4NTY1NjkxNX0.BWkcIYjX4KsUDzUDbhrO2ieH-2bTXvMa7MOgc47-f6Y';
 
 // Custom storage adapter for React Native
 const ExpoSecureStoreAdapter = {
