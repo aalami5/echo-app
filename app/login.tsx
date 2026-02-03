@@ -8,47 +8,49 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
-import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuthStore } from '../src/stores/authStore';
 import { Avatar } from '../src/components/Avatar';
 import { colors, spacing, borderRadius, typography } from '../src/constants/theme';
 
 export default function LoginScreen() {
-  const router = useRouter();
-  const { login } = useAuthStore();
-  
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [isFocused, setIsFocused] = useState<'email' | 'password' | null>(null);
+  const [isSignUp, setIsSignUp] = useState(false);
+  const { login, signUp } = useAuthStore();
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      setError('Please enter email and password');
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+  const handleSubmit = async () => {
+    if (!email.trim() || !password.trim()) {
+      Alert.alert('Missing Fields', 'Please enter both email and password.');
       return;
     }
 
     setIsLoading(true);
-    setError('');
-
+    
     try {
-      const success = await login(email, password);
-      if (success) {
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace('/(tabs)');
-      } else {
-        setError('Invalid credentials');
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const result = isSignUp 
+        ? await signUp(email.trim(), password)
+        : await login(email.trim(), password);
+
+      if (!result.success) {
+        Alert.alert(
+          isSignUp ? 'Sign Up Failed' : 'Login Failed',
+          result.error || 'Please check your credentials and try again.'
+        );
+      } else if (isSignUp) {
+        Alert.alert(
+          'Account Created',
+          'Please check your email to verify your account, then log in.',
+          [{ text: 'OK', onPress: () => setIsSignUp(false) }]
+        );
       }
-    } catch (err) {
-      setError('Login failed. Please try again.');
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } catch (error) {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -63,82 +65,79 @@ export default function LoginScreen() {
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <View style={styles.content}>
-          {/* Avatar */}
-          <View style={styles.avatarContainer}>
+        <View style={[styles.content, { paddingTop: insets.top + spacing.xl }]}>
+          {/* Logo / Avatar */}
+          <View style={styles.logoContainer}>
             <Avatar state="idle" size={100} />
             <Text style={styles.title}>Echo</Text>
-            <Text style={styles.subtitle}>Your AI Assistant</Text>
+            <Text style={styles.subtitle}>Your AI companion</Text>
           </View>
 
-          {/* Login Form */}
+          {/* Form */}
           <View style={styles.form}>
-            <View style={[
-              styles.inputContainer,
-              isFocused === 'email' && styles.inputFocused
-            ]}>
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Email</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Email"
+                placeholder="you@example.com"
                 placeholderTextColor={colors.textTertiary}
                 value={email}
                 onChangeText={setEmail}
-                onFocus={() => setIsFocused('email')}
-                onBlur={() => setIsFocused(null)}
                 autoCapitalize="none"
+                autoCorrect={false}
                 keyboardType="email-address"
-                autoComplete="email"
+                textContentType="emailAddress"
               />
             </View>
-            
-            <View style={[
-              styles.inputContainer,
-              isFocused === 'password' && styles.inputFocused
-            ]}>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Password</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Password"
+                placeholder="••••••••"
                 placeholderTextColor={colors.textTertiary}
                 value={password}
                 onChangeText={setPassword}
-                onFocus={() => setIsFocused('password')}
-                onBlur={() => setIsFocused(null)}
                 secureTextEntry
-                autoComplete="password"
+                textContentType="password"
               />
             </View>
 
-            {error ? (
-              <View style={styles.errorContainer}>
-                <Text style={styles.error}>{error}</Text>
-              </View>
-            ) : null}
-
             <TouchableOpacity
-              style={[styles.button, isLoading && styles.buttonDisabled]}
-              onPress={handleLogin}
+              onPress={handleSubmit}
               disabled={isLoading}
               activeOpacity={0.8}
             >
               <LinearGradient
                 colors={[colors.primary, colors.primaryMuted]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.buttonGradient}
+                style={styles.submitButton}
               >
                 {isLoading ? (
                   <ActivityIndicator color={colors.textInverse} />
                 ) : (
-                  <Text style={styles.buttonText}>Sign In</Text>
+                  <Text style={styles.submitButtonText}>
+                    {isSignUp ? 'Create Account' : 'Sign In'}
+                  </Text>
                 )}
               </LinearGradient>
             </TouchableOpacity>
 
-            {/* Biometric hint */}
-            <Text style={styles.biometricHint}>
-              Face ID will be enabled after setup
-            </Text>
+            <TouchableOpacity
+              onPress={() => setIsSignUp(!isSignUp)}
+              style={styles.switchModeButton}
+            >
+              <Text style={styles.switchModeText}>
+                {isSignUp
+                  ? 'Already have an account? Sign In'
+                  : "Don't have an account? Sign Up"}
+              </Text>
+            </TouchableOpacity>
           </View>
+
+          {/* Version */}
+          <Text style={[styles.version, { paddingBottom: insets.bottom + spacing.md }]}>
+            v0.1.0
+          </Text>
         </View>
       </KeyboardAvoidingView>
     </LinearGradient>
@@ -154,19 +153,18 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
+    padding: spacing.lg,
+    justifyContent: 'space-between',
   },
-  avatarContainer: {
+  logoContainer: {
     alignItems: 'center',
-    marginBottom: spacing.xxl,
+    marginTop: spacing.xl,
   },
   title: {
-    fontSize: typography['3xl'],
-    fontWeight: typography.bold,
+    fontSize: 36,
+    fontWeight: '700',
     color: colors.textPrimary,
     marginTop: spacing.md,
-    letterSpacing: 1,
   },
   subtitle: {
     fontSize: typography.base,
@@ -177,50 +175,45 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   inputContainer: {
+    gap: spacing.xs,
+  },
+  label: {
+    fontSize: typography.sm,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    marginLeft: spacing.xs,
+  },
+  input: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  inputFocused: {
-    borderColor: colors.borderFocused,
-  },
-  input: {
     padding: spacing.md,
     fontSize: typography.base,
     color: colors.textPrimary,
   },
-  errorContainer: {
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
+  submitButton: {
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    marginTop: spacing.sm,
   },
-  error: {
-    color: colors.error,
+  submitButtonText: {
+    fontSize: typography.base,
+    fontWeight: '600',
+    color: colors.textInverse,
+  },
+  switchModeButton: {
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  switchModeText: {
+    fontSize: typography.sm,
+    color: colors.primary,
+  },
+  version: {
     textAlign: 'center',
     fontSize: typography.sm,
-  },
-  button: {
-    marginTop: spacing.sm,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonGradient: {
-    padding: spacing.md,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: colors.textInverse,
-    fontSize: typography.lg,
-    fontWeight: typography.semibold,
-  },
-  biometricHint: {
     color: colors.textTertiary,
-    textAlign: 'center',
-    fontSize: typography.xs,
-    marginTop: spacing.md,
   },
 });

@@ -184,7 +184,7 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
 const styles = StyleSheet.create({
   container: {
     padding: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.sm,
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,

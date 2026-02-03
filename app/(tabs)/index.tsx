@@ -58,14 +58,15 @@ export default function ChatScreen() {
   );
 
   return (
-    <LinearGradient
-      colors={[colors.background, '#0D1526', colors.background]}
-      style={styles.container}
-    >
+    <View style={styles.container}>
+      <LinearGradient
+        colors={[colors.background, '#0D1526', colors.background]}
+        style={StyleSheet.absoluteFill}
+      />
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
         {/* Header with Avatar */}
         <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
@@ -96,19 +97,22 @@ export default function ChatScreen() {
           ListEmptyComponent={renderEmptyState}
         />
 
-        {/* Input */}
-        <ChatInput
-          onSendText={handleSendText}
-          onSendAudio={handleSendAudio}
-        />
+        {/* Input - Always visible at bottom */}
+        <View style={[styles.inputWrapper, { paddingBottom: insets.bottom }]}>
+          <ChatInput
+            onSendText={handleSendText}
+            onSendAudio={handleSendAudio}
+          />
+        </View>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: colors.background,
   },
   keyboardView: {
     flex: 1,
@@ -151,7 +155,7 @@ const styles = StyleSheet.create({
   },
   emptyTitle: {
     fontSize: typography.xl,
-    fontWeight: typography.semibold,
+    fontWeight: '600',
     color: colors.textPrimary,
     marginBottom: spacing.xs,
   },
@@ -159,5 +163,8 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     color: colors.textSecondary,
     textAlign: 'center',
+  },
+  inputWrapper: {
+    backgroundColor: colors.background,
   },
 });
