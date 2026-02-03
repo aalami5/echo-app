@@ -1,5 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useChatStore } from '../stores/chatStore';
+import { useCalendarStore } from '../stores/calendarStore';
+import { useWebSocketStore } from '../stores/websocketStore';
 import type { Message, AvatarState } from '../types';
 
 // Gateway WebSocket URL - will be configurable later
@@ -14,6 +16,8 @@ export function useWebSocket(token: string | null) {
   const reconnectAttempts = useRef(0);
   const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
   const { addMessage, setAvatarState, setConnected } = useChatStore();
+  const { setEvents } = useCalendarStore();
+  const { setConnected: setWsConnected, setConnecting, setLastMessageTime, setError } = useWebSocketStore();
 
   const connect = useCallback(() => {
     if (!token) {
@@ -42,12 +46,14 @@ export function useWebSocket(token: string | null) {
       ws.current.onopen = () => {
         console.log('[WS] Connected!');
         setConnected(true);
+        setWsConnected(true);
         reconnectAttempts.current = 0; // Reset on successful connection
       };
 
       ws.current.onclose = (event) => {
         console.log('[WS] Disconnected:', event.code, event.reason || '(no reason)');
         setConnected(false);
+        setWsConnected(false);
         ws.current = null;
 
         // Only auto-reconnect a few times
@@ -69,6 +75,7 @@ export function useWebSocket(token: string | null) {
         try {
           const data = JSON.parse(event.data);
           console.log('[WS] Message:', data.type);
+          setLastMessageTime(new Date());
 
           switch (data.type) {
             case 'message':
@@ -92,6 +99,25 @@ export function useWebSocket(token: string | null) {
             case 'done':
               setAvatarState('idle');
               break;
+
+            case 'calendar.update':
+              // Receive calendar events from Gateway
+              if (data.events && Array.isArray(data.events)) {
+                console.log('[WS] Calendar update:', data.events.length, 'events');
+                // Convert ISO strings back to Date objects
+                const events = data.events.map((e: any) => ({
+                  ...e,
+                  startTime: new Date(e.startTime),
+                  endTime: e.endTime ? new Date(e.endTime) : undefined,
+                }));
+                setEvents(events);
+              }
+              break;
+
+            case 'calendar.sync':
+              // Gateway is requesting calendar sync
+              console.log('[WS] Calendar sync requested');
+              break;
           }
         } catch (e) {
           console.log('[WS] Failed to parse message');
@@ -113,6 +139,17 @@ export function useWebSocket(token: string | null) {
       ws.current = null;
     }
     reconnectAttempts.current = 0;
+  }, []);
+
+  const requestCalendarSync = useCallback(() => {
+    if (ws.current?.readyState === WebSocket.OPEN) {
+      console.log('[WS] Requesting calendar sync');
+      ws.current.send(JSON.stringify({
+        type: 'calendar.sync',
+      }));
+    } else {
+      console.log('[WS] Not connected, cannot request calendar sync');
+    }
   }, []);
 
   const sendMessage = useCallback((text: string, audioUri?: string) => {
@@ -154,6 +191,7 @@ export function useWebSocket(token: string | null) {
     sendMessage, 
     disconnect, 
     retryConnection,
+    requestCalendarSync,
     isConnected: ws.current?.readyState === WebSocket.OPEN 
   };
 }
