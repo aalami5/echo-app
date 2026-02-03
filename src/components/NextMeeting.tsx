@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.sm,
     color: colors.textPrimary,
-    flexShrink: 1,
+    minWidth: 100,
   },
   chevron: {
     marginLeft: spacing.xs,
