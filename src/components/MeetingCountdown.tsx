@@ -214,8 +214,12 @@ export function MeetingCountdown({ meetings }: MeetingCountdownProps) {
           <Text style={styles.timeText}>{formatCurrentTime(currentTime)}</Text>
         </View>
         <View style={styles.emptyState}>
-          <Ionicons name="calendar-outline" size={32} color={colors.textTertiary} />
-          <Text style={styles.emptyText}>No upcoming meetings today</Text>
+          <View style={styles.emptyIconContainer}>
+            <Ionicons name="sunny-outline" size={40} color={colors.primary} />
+          </View>
+          <Text style={styles.emptyTitle}>You're free today!</Text>
+          <Text style={styles.emptySubtitle}>No meetings on the calendar</Text>
+          <Text style={styles.emptyHint}>Enjoy your unstructured time ✨</Text>
         </View>
       </View>
     );
@@ -358,11 +362,32 @@ const styles = StyleSheet.create({
   emptyState: {
     alignItems: 'center',
     padding: spacing.xl,
-    gap: spacing.sm,
+    paddingVertical: spacing.xl * 2,
   },
-  emptyText: {
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.primarySubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
+  },
+  emptyTitle: {
+    fontSize: typography.lg,
+    fontWeight: '600',
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  emptySubtitle: {
     fontSize: typography.base,
+    color: colors.textSecondary,
+    marginBottom: spacing.sm,
+  },
+  emptyHint: {
+    fontSize: typography.sm,
     color: colors.textTertiary,
+    fontStyle: 'italic',
   },
   moreText: {
     fontSize: typography.sm,

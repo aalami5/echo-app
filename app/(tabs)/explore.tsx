@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   Switch,
+  ActivityIndicator,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,14 +14,22 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../src/stores/authStore';
+import { useWebSocketStore } from '../../src/stores/websocketStore';
 import { colors, spacing, borderRadius, typography } from '../../src/constants/theme';
+
+type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
 
 export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const { isConnected, lastMessageTime } = useWebSocketStore();
   const [voiceEnabled, setVoiceEnabled] = useState(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [calendarSyncing, setCalendarSyncing] = useState(false);
+  const [lastCalendarSync, setLastCalendarSync] = useState<Date | null>(null);
+
+  const connectionStatus: ConnectionStatus = isConnected ? 'connected' : 'disconnected';
 
   const handleLogout = async () => {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -31,6 +40,44 @@ export default function SettingsScreen() {
   const handleToggle = async (setter: (value: boolean) => void, value: boolean) => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setter(value);
+  };
+
+  const handleSyncCalendar = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCalendarSyncing(true);
+    // Simulate sync - in production this would call the Gateway
+    setTimeout(() => {
+      setCalendarSyncing(false);
+      setLastCalendarSync(new Date());
+    }, 2000);
+  };
+
+  const formatLastSync = (date: Date | null) => {
+    if (!date) return 'Never';
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diff < 60) return 'Just now';
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  const getStatusColor = (status: ConnectionStatus) => {
+    switch (status) {
+      case 'connected': return colors.success;
+      case 'connecting': return colors.warning;
+      case 'disconnected': return colors.textTertiary;
+      case 'error': return colors.error;
+    }
+  };
+
+  const getStatusText = (status: ConnectionStatus) => {
+    switch (status) {
+      case 'connected': return 'Connected';
+      case 'connecting': return 'Connecting...';
+      case 'disconnected': return 'Offline';
+      case 'error': return 'Connection Error';
+    }
   };
 
   return (
@@ -44,28 +91,75 @@ export default function SettingsScreen() {
       >
         <Text style={styles.title}>Settings</Text>
 
+        {/* Connection Status Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>CONNECTION</Text>
+          <View style={styles.card}>
+            <View style={styles.statusRow}>
+              <View style={styles.statusLeft}>
+                <View style={[styles.statusDot, { backgroundColor: getStatusColor(connectionStatus) }]} />
+                <View>
+                  <Text style={styles.statusLabel}>Echo Gateway</Text>
+                  <Text style={styles.statusValue}>{getStatusText(connectionStatus)}</Text>
+                </View>
+              </View>
+              {connectionStatus === 'disconnected' && (
+                <TouchableOpacity style={styles.retryButton} activeOpacity={0.7}>
+                  <Text style={styles.retryButtonText}>Retry</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <Divider full />
+            <SettingsRow 
+              icon="sync-outline"
+              label="Calendar Sync"
+              trailing={
+                <TouchableOpacity 
+                  style={styles.syncButton}
+                  onPress={handleSyncCalendar}
+                  disabled={calendarSyncing}
+                  activeOpacity={0.7}
+                >
+                  {calendarSyncing ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <>
+                      <Ionicons name="refresh" size={16} color={colors.primary} />
+                      <Text style={styles.syncButtonText}>Sync</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              }
+            />
+            <Divider />
+            <SettingsRow 
+              icon="time-outline"
+              label="Last Synced" 
+              value={formatLastSync(lastCalendarSync)} 
+            />
+          </View>
+        </View>
+
         {/* Account Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>ACCOUNT</Text>
           <View style={styles.card}>
             <SettingsRow 
-              icon="mail-outline"
-              label="Email" 
-              value={user?.email || 'Not signed in'} 
+              icon="person-outline"
+              label="Name" 
+              value={user?.name || 'Oliver Aalami'} 
             />
             <Divider />
             <SettingsRow 
-              icon="shield-checkmark-outline"
-              label="Two-Factor Auth" 
-              value="Set up" 
-              showChevron 
+              icon="mail-outline"
+              label="Email" 
+              value={user?.email || 'aalami@gmail.com'} 
             />
             <Divider />
             <SettingsRow 
               icon="phone-portrait-outline"
-              label="Active Sessions" 
-              value="1" 
-              showChevron 
+              label="Device" 
+              value="iPhone" 
             />
           </View>
         </View>
@@ -121,10 +215,43 @@ export default function SettingsScreen() {
             />
             <Divider />
             <SettingsRow 
-              icon="moon-outline"
-              label="Focus Mode Behavior" 
-              value="Respect" 
+              icon="alarm-outline"
+              label="Meeting Reminders" 
+              value="15 min before" 
               showChevron 
+            />
+            <Divider />
+            <SettingsRow 
+              icon="moon-outline"
+              label="Quiet Hours" 
+              value="11pm - 8am" 
+              showChevron 
+            />
+          </View>
+        </View>
+
+        {/* Calendar Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>CALENDARS</Text>
+          <View style={styles.card}>
+            <SettingsRow 
+              icon="logo-google"
+              label="Google Calendar" 
+              value="Connected"
+              valueColor={colors.success}
+            />
+            <Divider />
+            <SettingsRow 
+              icon="calendar-outline"
+              label="Show All-Day Events" 
+              trailing={
+                <Switch
+                  value={false}
+                  onValueChange={() => {}}
+                  trackColor={{ false: colors.surfaceElevated, true: colors.primaryMuted }}
+                  thumbColor={colors.textTertiary}
+                />
+              }
             />
           </View>
         </View>
@@ -166,7 +293,8 @@ export default function SettingsScreen() {
 
         {/* Version */}
         <Text style={styles.version}>Echo App v0.1.0</Text>
-        <View style={{ height: insets.bottom + spacing.xl }} />
+        <Text style={styles.versionSub}>Gateway: Mac mini • Channel: WhatsApp</Text>
+        <View style={{ height: insets.bottom + spacing.xl + 60 }} />
       </ScrollView>
     </LinearGradient>
   );
@@ -177,6 +305,7 @@ interface SettingsRowProps {
   label: string;
   value?: string;
   labelColor?: string;
+  valueColor?: string;
   showChevron?: boolean;
   trailing?: React.ReactNode;
   onPress?: () => void;
@@ -187,6 +316,7 @@ function SettingsRow({
   label, 
   value, 
   labelColor,
+  valueColor,
   showChevron, 
   trailing,
   onPress 
@@ -206,7 +336,11 @@ function SettingsRow({
       <View style={styles.rowRight}>
         {trailing || (
           <>
-            {value && <Text style={styles.value}>{value}</Text>}
+            {value && (
+              <Text style={[styles.value, valueColor && { color: valueColor }]}>
+                {value}
+              </Text>
+            )}
             {showChevron && (
               <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
             )}
@@ -227,8 +361,15 @@ function SettingsRow({
   return content;
 }
 
-function Divider() {
-  return <View style={styles.divider} />;
+function Divider({ full = false }: { full?: boolean }) {
+  return (
+    <View 
+      style={[
+        styles.divider, 
+        full && { marginLeft: 0 }
+      ]} 
+    />
+  );
 }
 
 const styles = StyleSheet.create({
@@ -240,8 +381,8 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   title: {
-    fontSize: typography['3xl'],
-    fontWeight: typography.bold,
+    fontSize: 32,
+    fontWeight: '700',
     color: colors.textPrimary,
     marginBottom: spacing.lg,
   },
@@ -250,7 +391,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: typography.xs,
-    fontWeight: typography.semibold,
+    fontWeight: '600',
     color: colors.textTertiary,
     marginBottom: spacing.sm,
     marginLeft: spacing.xs,
@@ -262,6 +403,57 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     overflow: 'hidden',
+  },
+  statusRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  statusLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  statusLabel: {
+    fontSize: typography.base,
+    fontWeight: '500',
+    color: colors.textPrimary,
+  },
+  statusValue: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  retryButton: {
+    backgroundColor: colors.primarySubtle,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+  },
+  retryButtonText: {
+    fontSize: typography.sm,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  syncButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primarySubtle,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  syncButtonText: {
+    fontSize: typography.sm,
+    fontWeight: '600',
+    color: colors.primary,
   },
   row: {
     flexDirection: 'row',
@@ -306,12 +498,19 @@ const styles = StyleSheet.create({
   logoutText: {
     fontSize: typography.base,
     color: colors.error,
-    fontWeight: typography.medium,
+    fontWeight: '500',
   },
   version: {
     textAlign: 'center',
     color: colors.textTertiary,
     fontSize: typography.xs,
     marginTop: spacing.lg,
+  },
+  versionSub: {
+    textAlign: 'center',
+    color: colors.textTertiary,
+    fontSize: typography.xs,
+    marginTop: spacing.xs,
+    opacity: 0.7,
   },
 });
