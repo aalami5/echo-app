@@ -31,11 +31,15 @@ export default function SettingsScreen() {
   const { 
     openaiApiKey, 
     elevenlabsApiKey, 
+    gatewayUrl,
+    gatewayToken,
     voiceName,
     voiceEnabled,
     autoPlayResponses,
     setOpenAIKey, 
     setElevenLabsKey,
+    setGatewayUrl,
+    setGatewayToken,
     setVoiceName,
     setVoiceEnabled,
     setAutoPlayResponses,
@@ -223,6 +227,48 @@ export default function SettingsScreen() {
                   );
                 } else {
                   Alert.alert('API Key', 'Please configure API keys in settings file on Android');
+                }
+              }}
+            />
+            <Divider />
+            <SettingsRow 
+              icon="globe-outline"
+              label="Gateway URL"
+              value={gatewayUrl ? gatewayUrl.replace(/^https?:\/\//, '').slice(0, 25) + '...' : 'Not set'}
+              valueColor={gatewayUrl ? colors.success : colors.textTertiary}
+              showChevron
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  Alert.prompt(
+                    'Gateway URL',
+                    'Enter the OpenClaw Gateway URL (e.g., https://your-tunnel.trycloudflare.com)',
+                    (url) => { if (url) setGatewayUrl(url); },
+                    'plain-text',
+                    gatewayUrl || ''
+                  );
+                } else {
+                  Alert.alert('Gateway URL', 'Please configure Gateway URL in settings file on Android');
+                }
+              }}
+            />
+            <Divider />
+            <SettingsRow 
+              icon="lock-closed-outline"
+              label="Gateway Token"
+              value={gatewayToken ? '••••••••' + gatewayToken.slice(-4) : 'Not set'}
+              valueColor={gatewayToken ? colors.success : colors.textTertiary}
+              showChevron
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  Alert.prompt(
+                    'Gateway Token',
+                    'Enter your Gateway authentication token',
+                    (token) => { if (token) setGatewayToken(token); },
+                    'plain-text',
+                    gatewayToken || ''
+                  );
+                } else {
+                  Alert.alert('Gateway Token', 'Please configure Gateway token in settings file on Android');
                 }
               }}
             />

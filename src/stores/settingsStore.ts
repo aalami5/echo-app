@@ -25,6 +25,7 @@ interface SettingsState {
   
   // Gateway settings
   gatewayUrl: string;
+  gatewayToken: string | null;
   
   // Actions
   setOpenAIKey: (key: string | null) => void;
@@ -34,6 +35,7 @@ interface SettingsState {
   setAutoPlayResponses: (enabled: boolean) => void;
   setHapticFeedback: (enabled: boolean) => void;
   setGatewayUrl: (url: string) => void;
+  setGatewayToken: (token: string | null) => void;
   clearAllKeys: () => void;
 }
 
@@ -73,7 +75,8 @@ export const useSettingsStore = create<SettingsState>()(
       voiceEnabled: true,
       autoPlayResponses: true,
       hapticFeedback: true,
-      gatewayUrl: process.env.EXPO_PUBLIC_GATEWAY_URL || 'ws://localhost:8765',
+      gatewayUrl: process.env.EXPO_PUBLIC_GATEWAY_URL || 'https://compare-horse-those-some.trycloudflare.com',
+      gatewayToken: null,
       
       // Actions
       setOpenAIKey: (key) => set({ openaiApiKey: key }),
@@ -83,6 +86,7 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoPlayResponses: (enabled) => set({ autoPlayResponses: enabled }),
       setHapticFeedback: (enabled) => set({ hapticFeedback: enabled }),
       setGatewayUrl: (url) => set({ gatewayUrl: url }),
+      setGatewayToken: (token) => set({ gatewayToken: token }),
       
       clearAllKeys: () => set({
         openaiApiKey: null,
@@ -101,6 +105,7 @@ export const useSettingsStore = create<SettingsState>()(
         autoPlayResponses: state.autoPlayResponses,
         hapticFeedback: state.hapticFeedback,
         gatewayUrl: state.gatewayUrl,
+        gatewayToken: state.gatewayToken,
       }),
     }
   )

@@ -22,7 +22,7 @@ import { Avatar } from '../../src/components/Avatar';
 import { ChatMessage } from '../../src/components/ChatMessage';
 import { ImagePickerModal } from '../../src/components/ImagePicker';
 import { NextMeeting } from '../../src/components/NextMeeting';
-import { useWebSocket } from '../../src/lib/websocket';
+import { useGateway } from '../../src/hooks/useGateway';
 import { useVoiceChat } from '../../src/hooks/useVoiceChat';
 import { colors, spacing, typography, borderRadius } from '../../src/constants/theme';
 import type { Message } from '../../src/types';
@@ -34,10 +34,15 @@ export default function ChatScreen() {
   const [textMessage, setTextMessage] = useState('');
   const [showImagePicker, setShowImagePicker] = useState(false);
   
-  const { messages, avatarState, isConnected, setAvatarState, addMessage } = useChatStore();
+  const { messages, avatarState, isConnected: storeConnected, setAvatarState, addMessage, setConnected } = useChatStore();
   const { accessToken } = useAuthStore();
   const { setEvents } = useCalendarStore();
-  const { sendMessage, retryConnection } = useWebSocket(accessToken);
+  const { isConnected, isLoading: gatewayLoading, sendMessage: gatewaySend, checkConnection } = useGateway();
+  
+  // Sync connection status to store
+  useEffect(() => {
+    setConnected(isConnected);
+  }, [isConnected, setConnected]);
 
   // Initialize mock calendar data for testing
   useEffect(() => {
@@ -99,14 +104,43 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
+  const sendMessageToGateway = async (content: string) => {
+    // Add user message to chat
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: 'user',
+      content,
+      timestamp: new Date().toISOString(),
+    };
+    addMessage(userMessage);
+    
+    setAvatarState('thinking');
+    
+    // Send to Gateway and get response
+    const response = await gatewaySend(content);
+    
+    if (response) {
+      // Add assistant response to chat
+      const assistantMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: response,
+        timestamp: new Date().toISOString(),
+      };
+      addMessage(assistantMessage);
+    }
+    
+    setAvatarState('idle');
+  };
+
   const handleAvatarPress = async () => {
     if (isRecording) {
       // Stop recording and transcribe with Whisper
       setAvatarState('thinking');
       const transcribedText = await stopRecording();
       if (transcribedText && transcribedText.trim()) {
-        // Send the transcribed text
-        sendMessage(transcribedText);
+        // Send the transcribed text to Gateway
+        await sendMessageToGateway(transcribedText);
       } else {
         setAvatarState('idle');
       }
@@ -129,10 +163,11 @@ export default function ChatScreen() {
   const handleSendText = async () => {
     if (textMessage.trim()) {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      sendMessage(textMessage.trim());
+      const message = textMessage.trim();
       setTextMessage('');
       setShowTextInput(false);
       Keyboard.dismiss();
+      await sendMessageToGateway(message);
     }
   };
 
@@ -217,6 +252,10 @@ export default function ChatScreen() {
             <View style={styles.statusContainer}>
               <Text style={styles.statusText}>Transcribing...</Text>
             </View>
+          ) : gatewayLoading ? (
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusText}>Thinking...</Text>
+            </View>
           ) : (
             <View style={styles.statusContainer}>
               <View style={[
@@ -227,7 +266,7 @@ export default function ChatScreen() {
                 {isConnected ? 'Online' : 'Offline'}
               </Text>
               {!isConnected && (
-                <TouchableOpacity onPress={retryConnection} style={styles.retryButton}>
+                <TouchableOpacity onPress={checkConnection} style={styles.retryButton}>
                   <Text style={styles.retryText}>Retry</Text>
                 </TouchableOpacity>
               )}
