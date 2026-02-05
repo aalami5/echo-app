@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Switch,
   ActivityIndicator,
+  Alert,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,6 +17,8 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useWebSocketStore } from '../../src/stores/websocketStore';
+import { useSettingsStore } from '../../src/stores/settingsStore';
+import { VOICES, VoiceName } from '../../src/services/elevenlabs';
 import { colors, spacing, borderRadius, typography } from '../../src/constants/theme';
 
 type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
@@ -24,10 +28,23 @@ export default function SettingsScreen() {
   const router = useRouter();
   const { user, logout } = useAuthStore();
   const { isConnected, lastMessageTime } = useWebSocketStore();
-  const [voiceEnabled, setVoiceEnabled] = useState(true);
+  const { 
+    openaiApiKey, 
+    elevenlabsApiKey, 
+    voiceName,
+    voiceEnabled,
+    autoPlayResponses,
+    setOpenAIKey, 
+    setElevenLabsKey,
+    setVoiceName,
+    setVoiceEnabled,
+    setAutoPlayResponses,
+  } = useSettingsStore();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [calendarSyncing, setCalendarSyncing] = useState(false);
   const [lastCalendarSync, setLastCalendarSync] = useState<Date | null>(null);
+  const [showOpenAIKey, setShowOpenAIKey] = useState(false);
+  const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
 
   const connectionStatus: ConnectionStatus = isConnected ? 'connected' : 'disconnected';
 
@@ -164,17 +181,68 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* API Keys Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>API KEYS</Text>
+          <View style={styles.card}>
+            <SettingsRow 
+              icon="key-outline"
+              label="OpenAI (Whisper)"
+              value={openaiApiKey ? '••••••••' + openaiApiKey.slice(-4) : 'Not set'}
+              valueColor={openaiApiKey ? colors.success : colors.textTertiary}
+              showChevron
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  Alert.prompt(
+                    'OpenAI API Key',
+                    'Enter your OpenAI API key for Whisper speech-to-text',
+                    (key) => { if (key) setOpenAIKey(key); },
+                    'plain-text',
+                    openaiApiKey || ''
+                  );
+                } else {
+                  Alert.alert('API Key', 'Please configure API keys in settings file on Android');
+                }
+              }}
+            />
+            <Divider />
+            <SettingsRow 
+              icon="musical-notes-outline"
+              label="ElevenLabs (TTS)"
+              value={elevenlabsApiKey ? '••••••••' + elevenlabsApiKey.slice(-4) : 'Not set'}
+              valueColor={elevenlabsApiKey ? colors.success : colors.textTertiary}
+              showChevron
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  Alert.prompt(
+                    'ElevenLabs API Key',
+                    'Enter your ElevenLabs API key for text-to-speech',
+                    (key) => { if (key) setElevenLabsKey(key); },
+                    'plain-text',
+                    elevenlabsApiKey || ''
+                  );
+                } else {
+                  Alert.alert('API Key', 'Please configure API keys in settings file on Android');
+                }
+              }}
+            />
+          </View>
+          <Text style={styles.sectionHint}>
+            API keys are stored securely on your device
+          </Text>
+        </View>
+
         {/* Voice Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>VOICE</Text>
           <View style={styles.card}>
             <SettingsRow 
               icon="volume-high-outline"
-              label="Voice Output"
+              label="Voice Responses"
               trailing={
                 <Switch
                   value={voiceEnabled}
-                  onValueChange={(v) => handleToggle(setVoiceEnabled, v)}
+                  onValueChange={(v) => setVoiceEnabled(v)}
                   trackColor={{ false: colors.surfaceElevated, true: colors.primaryMuted }}
                   thumbColor={voiceEnabled ? colors.primary : colors.textTertiary}
                 />
@@ -182,16 +250,22 @@ export default function SettingsScreen() {
             />
             <Divider />
             <SettingsRow 
-              icon="mic-outline"
-              label="Echo's Voice" 
-              value="Nova" 
-              showChevron 
+              icon="play-outline"
+              label="Auto-play Responses"
+              trailing={
+                <Switch
+                  value={autoPlayResponses}
+                  onValueChange={(v) => setAutoPlayResponses(v)}
+                  trackColor={{ false: colors.surfaceElevated, true: colors.primaryMuted }}
+                  thumbColor={autoPlayResponses ? colors.primary : colors.textTertiary}
+                />
+              }
             />
             <Divider />
             <SettingsRow 
-              icon="speedometer-outline"
-              label="Speed" 
-              value="Normal" 
+              icon="mic-outline"
+              label="Echo's Voice" 
+              value={voiceName.charAt(0).toUpperCase() + voiceName.slice(1)}
               showChevron 
             />
           </View>
@@ -396,6 +470,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     marginLeft: spacing.xs,
     letterSpacing: 0.5,
+  },
+  sectionHint: {
+    fontSize: typography.xs,
+    color: colors.textTertiary,
+    marginTop: spacing.sm,
+    marginLeft: spacing.xs,
   },
   card: {
     backgroundColor: colors.surface,
