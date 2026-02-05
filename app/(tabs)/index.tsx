@@ -23,7 +23,7 @@ import { ChatMessage } from '../../src/components/ChatMessage';
 import { ImagePickerModal } from '../../src/components/ImagePicker';
 import { NextMeeting } from '../../src/components/NextMeeting';
 import { useWebSocket } from '../../src/lib/websocket';
-import { useVoiceRecording } from '../../src/hooks/useVoiceRecording';
+import { useVoiceChat } from '../../src/hooks/useVoiceChat';
 import { colors, spacing, typography, borderRadius } from '../../src/constants/theme';
 import type { Message } from '../../src/types';
 
@@ -81,12 +81,14 @@ export default function ChatScreen() {
   }, [setEvents]);
   const { 
     isRecording, 
-    duration, 
+    recordingDuration: duration, 
     audioLevel,
+    isTranscribing,
     startRecording, 
     stopRecording, 
-    cancelRecording 
-  } = useVoiceRecording();
+    cancelRecording,
+    isConfigured: voiceConfigured,
+  } = useVoiceChat();
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -99,14 +101,22 @@ export default function ChatScreen() {
 
   const handleAvatarPress = async () => {
     if (isRecording) {
-      // Stop recording and send
-      const uri = await stopRecording();
-      if (uri) {
-        setAvatarState('thinking');
-        sendMessage('[Voice message]', uri);
+      // Stop recording and transcribe with Whisper
+      setAvatarState('thinking');
+      const transcribedText = await stopRecording();
+      if (transcribedText && transcribedText.trim()) {
+        // Send the transcribed text
+        sendMessage(transcribedText);
+      } else {
+        setAvatarState('idle');
       }
     } else {
       // Start recording
+      if (!voiceConfigured) {
+        // Show alert if API keys not configured
+        alert('Please add your OpenAI API key in Settings to use voice input.');
+        return;
+      }
       await startRecording();
     }
   };
@@ -202,6 +212,10 @@ export default function ChatScreen() {
               <TouchableOpacity onPress={handleCancelRecording} style={styles.cancelButton}>
                 <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
+            </View>
+          ) : isTranscribing ? (
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusText}>Transcribing...</Text>
             </View>
           ) : (
             <View style={styles.statusContainer}>
