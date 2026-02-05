@@ -5,8 +5,6 @@
  * Cost: ~$0.006 per minute of audio
  */
 
-import * as FileSystem from 'expo-file-system';
-
 const WHISPER_API_URL = 'https://api.openai.com/v1/audio/transcriptions';
 
 interface TranscriptionResult {
@@ -37,12 +35,6 @@ export async function transcribeAudio(
 
   if (!apiKey) {
     throw new Error('OpenAI API key is required for Whisper transcription');
-  }
-
-  // Read the audio file
-  const fileInfo = await FileSystem.getInfoAsync(audioUri);
-  if (!fileInfo.exists) {
-    throw new Error('Audio file not found');
   }
 
   // Create form data for the API request
