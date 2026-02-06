@@ -109,8 +109,17 @@ export class GatewayService {
     console.log('[Gateway] Token length:', this.config.token?.length || 0);
     
     try {
+      // Test if ANY external HTTPS works
+      console.log('[Gateway] Testing external HTTPS (httpbin.org)...');
+      try {
+        const extTest = await fetch('https://httpbin.org/get', { method: 'GET' });
+        console.log('[Gateway] httpbin.org status:', extTest.status);
+      } catch (extErr) {
+        console.log('[Gateway] httpbin.org FAILED:', extErr instanceof Error ? extErr.message : String(extErr));
+      }
+      
       // First try a simple GET to test basic connectivity
-      console.log('[Gateway] Testing basic connectivity with GET...');
+      console.log('[Gateway] Testing our domain with GET...');
       const testResponse = await fetch(url, { method: 'GET' });
       console.log('[Gateway] GET test status:', testResponse.status);
       
