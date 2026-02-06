@@ -5,6 +5,8 @@
  * for sending messages and receiving responses.
  */
 
+import axios from 'axios';
+
 interface GatewayConfig {
   baseUrl: string;
   token: string;
@@ -110,51 +112,35 @@ export class GatewayService {
     console.log('[Gateway] Token length:', this.config.token?.length || 0);
     
     try {
-      // Test if ANY external HTTPS works
-      console.log('[Gateway] Testing external HTTPS (httpbin.org)...');
-      try {
-        const extTest = await fetch('https://httpbin.org/get', { method: 'GET' });
-        console.log('[Gateway] httpbin.org status:', extTest.status);
-      } catch (extErr) {
-        console.log('[Gateway] httpbin.org FAILED:', extErr instanceof Error ? extErr.message : String(extErr));
-      }
+      // Test using axios instead of fetch (different HTTP implementation)
+      console.log('[Gateway] Testing with axios to:', fullUrl);
       
-      // First try a simple GET to test basic connectivity (with browser UA)
-      console.log('[Gateway] Testing our domain with GET...');
-      const testResponse = await fetch(url, { 
-        method: 'GET',
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
-        }
-      });
-      console.log('[Gateway] GET test status:', testResponse.status);
-      
-      // Now try the actual POST
-      console.log('[Gateway] Attempting POST to', fullUrl);
-      const response = await fetch(fullUrl, {
-        method: 'POST',
+      const axiosResponse = await axios.post(fullUrl, {
+        model: 'openclaw:main',
+        messages: [{ role: 'user', content: 'ping' }],
+        stream: false,
+      }, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.config.token}`,
-          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
         },
-        body: JSON.stringify({
-          model: 'openclaw:main',
-          messages: [{ role: 'user', content: 'ping' }],
-          stream: false,
-        }),
+        timeout: 15000,
       });
-      
-      console.log('[Gateway] Health check response status:', response.status);
-      // Accept any response as "connected" - even errors mean we reached the server
-      return response.status < 500;
-    } catch (error) {
+      console.log('[Gateway] Axios health check status:', axiosResponse.status);
+      return axiosResponse.status < 500;
+    } catch (error: any) {
       // Log detailed error info
       console.error('[Gateway] Health check failed');
-      console.error('[Gateway] Error name:', error instanceof Error ? error.name : 'unknown');
-      console.error('[Gateway] Error message:', error instanceof Error ? error.message : String(error));
-      console.error('[Gateway] Full URL was:', `${url}/v1/chat/completions`);
-      console.error('[Gateway] Token present:', !!this.config.token);
+      console.error('[Gateway] Error name:', error?.name || 'unknown');
+      console.error('[Gateway] Error message:', error?.message || String(error));
+      if (error?.response) {
+        console.error('[Gateway] Response status:', error.response.status);
+        console.error('[Gateway] Response data:', JSON.stringify(error.response.data));
+      }
+      if (error?.code) {
+        console.error('[Gateway] Error code:', error.code);
+      }
+      console.error('[Gateway] Full URL was:', fullUrl);
       return false;
     }
   }
