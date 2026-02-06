@@ -99,7 +99,11 @@ export class GatewayService {
    */
   async healthCheck(): Promise<boolean> {
     const url = this.config.baseUrl;
-    console.log('[Gateway] Health check starting, URL:', url);
+    const fullUrl = `${url}/v1/chat/completions`;
+    console.log('[Gateway] Health check starting');
+    console.log('[Gateway] Base URL:', url);
+    console.log('[Gateway] Full URL:', fullUrl);
+    console.log('[Gateway] Token length:', this.config.token?.length || 0);
     
     try {
       // Use a simple HEAD request or try the API endpoint
@@ -120,9 +124,11 @@ export class GatewayService {
       // Accept any response as "connected" - even errors mean we reached the server
       return response.status < 500;
     } catch (error) {
-      console.error('[Gateway] Health check failed:', error);
-      // Log more details about the URL being used
-      console.error('[Gateway] URL was:', url);
+      // Log detailed error info
+      console.error('[Gateway] Health check failed');
+      console.error('[Gateway] Error name:', error instanceof Error ? error.name : 'unknown');
+      console.error('[Gateway] Error message:', error instanceof Error ? error.message : String(error));
+      console.error('[Gateway] Full URL was:', `${url}/v1/chat/completions`);
       console.error('[Gateway] Token present:', !!this.config.token);
       return false;
     }
