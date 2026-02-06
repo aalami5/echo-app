@@ -33,6 +33,7 @@ import {
   Patient,
   CallDay 
 } from '../../src/stores/patientsStore';
+import { usePatientVoiceInput } from '../../src/hooks/usePatientVoiceInput';
 
 // Hospital order for display
 const HOSPITAL_ORDER: Hospital[] = ['SEQ', 'ECH', 'SMCMC', 'SSC', 'OTHER'];
@@ -52,11 +53,30 @@ export default function PatientsScreen() {
     getPatientsByHospital,
     searchPatients,
     exportToCSV,
+    getRecentComplaints,
+    getCommonComplaints,
   } = usePatientsStore();
+  
+  // Voice input for chief complaint
+  const {
+    isRecording,
+    isTranscribing,
+    audioLevel,
+    duration,
+    error: voiceError,
+    startRecording: startVoice,
+    stopAndTranscribe,
+    cancelRecording: cancelVoice,
+  } = usePatientVoiceInput();
   
   const [showAddModal, setShowAddModal] = useState(false);
   const [expandedCallDays, setExpandedCallDays] = useState<Set<string>>(new Set());
   const [isSearching, setIsSearching] = useState(false);
+  const [showQuickComplaints, setShowQuickComplaints] = useState(false);
+  
+  // Get quick complaints data
+  const recentComplaints = useMemo(() => getRecentComplaints(5), [patients]);
+  const commonComplaints = useMemo(() => getCommonComplaints(), []);
   
   // Quick Add form state
   const [newPatient, setNewPatient] = useState({
@@ -144,6 +164,33 @@ export default function PatientsScreen() {
       console.error('Export error:', error);
     }
   }, [exportToCSV]);
+  
+  // Handle voice input for chief complaint
+  const handleVoiceInput = useCallback(async () => {
+    if (isRecording) {
+      // Stop and transcribe
+      const text = await stopAndTranscribe();
+      if (text) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setNewPatient(prev => ({ 
+          ...prev, 
+          chiefComplaint: prev.chiefComplaint 
+            ? `${prev.chiefComplaint} ${text}` 
+            : text 
+        }));
+      }
+    } else {
+      // Start recording
+      await startVoice();
+    }
+  }, [isRecording, stopAndTranscribe, startVoice]);
+  
+  // Select quick complaint
+  const selectQuickComplaint = useCallback((complaint: string) => {
+    Haptics.selectionAsync();
+    setNewPatient(prev => ({ ...prev, chiefComplaint: complaint }));
+    setShowQuickComplaints(false);
+  }, []);
   
   // Toggle search
   const toggleSearch = useCallback(() => {
@@ -434,16 +481,96 @@ export default function PatientsScreen() {
               />
               
               {/* Chief Complaint */}
-              <Text style={styles.formLabel}>Chief Complaint</Text>
-              <TextInput
-                style={[styles.formInput, styles.formInputMultiline]}
-                placeholder="e.g., DVT consult, LE bypass evaluation"
-                placeholderTextColor={colors.textTertiary}
-                value={newPatient.chiefComplaint}
-                onChangeText={(text) => setNewPatient(prev => ({ ...prev, chiefComplaint: text }))}
-                multiline
-                numberOfLines={2}
-              />
+              <View style={styles.formLabelRow}>
+                <Text style={styles.formLabel}>Chief Complaint</Text>
+                <TouchableOpacity 
+                  style={styles.quickComplaintsToggle}
+                  onPress={() => setShowQuickComplaints(!showQuickComplaints)}
+                >
+                  <Ionicons 
+                    name={showQuickComplaints ? 'chevron-up' : 'flash'} 
+                    size={16} 
+                    color={colors.primary} 
+                  />
+                  <Text style={styles.quickComplaintsToggleText}>Quick</Text>
+                </TouchableOpacity>
+              </View>
+              
+              {/* Quick Complaints Picker */}
+              {showQuickComplaints && (
+                <View style={styles.quickComplaintsContainer}>
+                  {recentComplaints.length > 0 && (
+                    <>
+                      <Text style={styles.quickComplaintsSection}>Recent</Text>
+                      <View style={styles.quickComplaintsList}>
+                        {recentComplaints.map((complaint, idx) => (
+                          <TouchableOpacity
+                            key={`recent-${idx}`}
+                            style={styles.quickComplaintChip}
+                            onPress={() => selectQuickComplaint(complaint)}
+                          >
+                            <Text style={styles.quickComplaintText}>{complaint}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </>
+                  )}
+                  <Text style={styles.quickComplaintsSection}>Common</Text>
+                  <View style={styles.quickComplaintsList}>
+                    {commonComplaints.slice(0, 10).map((complaint, idx) => (
+                      <TouchableOpacity
+                        key={`common-${idx}`}
+                        style={styles.quickComplaintChip}
+                        onPress={() => selectQuickComplaint(complaint)}
+                      >
+                        <Text style={styles.quickComplaintText}>{complaint}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+              
+              {/* Chief Complaint Input with Voice Button */}
+              <View style={styles.voiceInputContainer}>
+                <TextInput
+                  style={[styles.formInput, styles.formInputMultiline, styles.voiceInput]}
+                  placeholder="e.g., DVT consult, LE bypass evaluation"
+                  placeholderTextColor={colors.textTertiary}
+                  value={newPatient.chiefComplaint}
+                  onChangeText={(text) => setNewPatient(prev => ({ ...prev, chiefComplaint: text }))}
+                  multiline
+                  numberOfLines={2}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.voiceButton,
+                    isRecording && styles.voiceButtonRecording,
+                    isTranscribing && styles.voiceButtonTranscribing,
+                  ]}
+                  onPress={handleVoiceInput}
+                  onLongPress={cancelVoice}
+                  disabled={isTranscribing}
+                >
+                  {isTranscribing ? (
+                    <Ionicons name="hourglass" size={20} color={colors.textInverse} />
+                  ) : (
+                    <Ionicons 
+                      name={isRecording ? 'stop' : 'mic'} 
+                      size={20} 
+                      color={isRecording ? colors.error : colors.primary} 
+                    />
+                  )}
+                </TouchableOpacity>
+              </View>
+              {isRecording && (
+                <View style={styles.recordingIndicator}>
+                  <View style={[styles.recordingDot, { opacity: 0.5 + audioLevel * 0.5 }]} />
+                  <Text style={styles.recordingText}>Recording... {duration}s</Text>
+                </View>
+              )}
+              {voiceError && (
+                <Text style={styles.voiceError}>{voiceError}</Text>
+              )}
             </ScrollView>
           </View>
         </KeyboardAvoidingView>
@@ -758,5 +885,108 @@ const styles = StyleSheet.create({
   },
   hospitalOptionTextSelected: {
     color: colors.primary,
+  },
+  // Voice input styles
+  formLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+    marginTop: spacing.md,
+  },
+  quickComplaintsToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    backgroundColor: colors.primarySubtle,
+    borderRadius: borderRadius.sm,
+  },
+  quickComplaintsToggleText: {
+    fontSize: typography.xs,
+    color: colors.primary,
+    fontWeight: typography.medium,
+  },
+  quickComplaintsContainer: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickComplaintsSection: {
+    fontSize: typography.xs,
+    fontWeight: typography.semibold,
+    color: colors.textTertiary,
+    marginBottom: spacing.xs,
+    marginTop: spacing.sm,
+  },
+  quickComplaintsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.xs,
+  },
+  quickComplaintChip: {
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickComplaintText: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+  },
+  voiceInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  voiceInput: {
+    flex: 1,
+    marginBottom: 0,
+  },
+  voiceButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
+    marginTop: 0,
+  },
+  voiceButtonRecording: {
+    backgroundColor: colors.errorSubtle,
+    borderColor: colors.error,
+  },
+  voiceButtonTranscribing: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  recordingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.error,
+  },
+  recordingText: {
+    fontSize: typography.sm,
+    color: colors.error,
+  },
+  voiceError: {
+    fontSize: typography.sm,
+    color: colors.error,
+    marginTop: spacing.xs,
   },
 });

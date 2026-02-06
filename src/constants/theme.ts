@@ -30,9 +30,13 @@ export const colors = {
   
   // Semantic
   success: '#10B981',         // Green
+  successSubtle: '#064E3B',   // Dark green subtle
   warning: '#F59E0B',         // Amber
+  warningSubtle: '#451A03',   // Dark amber subtle
   error: '#EF4444',           // Red
+  errorSubtle: '#3D1A1A',     // Dark red subtle
   info: '#3B82F6',            // Blue
+  infoSubtle: '#1E3A8A',      // Dark blue subtle
   
   // Avatar states
   avatarIdle: '#22D3EE',

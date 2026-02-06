@@ -78,6 +78,10 @@ interface PatientsState {
   
   // Export
   exportToCSV: () => string;
+  
+  // Quick add helpers
+  getRecentComplaints: (limit?: number) => string[];
+  getCommonComplaints: () => string[];
 }
 
 // Helper to format date for display
@@ -294,6 +298,50 @@ export const usePatientsStore = create<PatientsState>()(
         const state = get();
         const today = getISODate(new Date());
         return Object.values(state.callDays).find(cd => cd.date === today) || null;
+      },
+      
+      // Quick add helpers
+      getRecentComplaints: (limit = 10) => {
+        const state = get();
+        const complaints = Object.values(state.patients)
+          .filter(p => p.chiefComplaint && p.chiefComplaint.trim())
+          .sort((a, b) => new Date(b.timeSeen).getTime() - new Date(a.timeSeen).getTime())
+          .map(p => p.chiefComplaint.trim())
+          .slice(0, limit * 2); // Get more to filter duplicates
+        
+        // Return unique complaints, preserving order
+        const seen = new Set<string>();
+        const unique: string[] = [];
+        for (const c of complaints) {
+          const lower = c.toLowerCase();
+          if (!seen.has(lower)) {
+            seen.add(lower);
+            unique.push(c);
+          }
+          if (unique.length >= limit) break;
+        }
+        return unique;
+      },
+      
+      getCommonComplaints: () => {
+        // Common vascular surgery chief complaints
+        return [
+          'DVT consult',
+          'PE consult',
+          'LE bypass evaluation',
+          'Carotid stenosis',
+          'AAA evaluation',
+          'Claudication',
+          'Critical limb ischemia',
+          'Wound care',
+          'Dialysis access',
+          'AV fistula evaluation',
+          'Varicose veins',
+          'Chronic venous insufficiency',
+          'Acute limb ischemia',
+          'Mesenteric ischemia',
+          'Aortic dissection',
+        ];
       },
       
       // Export
