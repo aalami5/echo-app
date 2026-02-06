@@ -98,16 +98,32 @@ export class GatewayService {
    * Check if the Gateway is reachable
    */
   async healthCheck(): Promise<boolean> {
+    const url = this.config.baseUrl;
+    console.log('[Gateway] Health check starting, URL:', url);
+    
     try {
-      const response = await fetch(this.config.baseUrl, {
-        method: 'GET',
+      // Use a simple HEAD request or try the API endpoint
+      const response = await fetch(`${url}/v1/chat/completions`, {
+        method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.config.token}`,
         },
+        body: JSON.stringify({
+          model: 'openclaw:main',
+          messages: [{ role: 'user', content: 'ping' }],
+          stream: false,
+        }),
       });
-      return response.ok;
+      
+      console.log('[Gateway] Health check response status:', response.status);
+      // Accept any response as "connected" - even errors mean we reached the server
+      return response.status < 500;
     } catch (error) {
       console.error('[Gateway] Health check failed:', error);
+      // Log more details about the URL being used
+      console.error('[Gateway] URL was:', url);
+      console.error('[Gateway] Token present:', !!this.config.token);
       return false;
     }
   }

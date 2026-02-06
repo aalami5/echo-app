@@ -27,7 +27,10 @@ export function useGateway(): UseGatewayReturn {
 
   // Initialize or update the service when settings change
   useEffect(() => {
+    console.log('[useGateway] Settings changed - URL:', gatewayUrl, 'Token:', gatewayToken ? 'present' : 'missing');
+    
     if (gatewayUrl && gatewayToken) {
+      console.log('[useGateway] Creating GatewayService...');
       serviceRef.current = new GatewayService({
         baseUrl: gatewayUrl,
         token: gatewayToken,
@@ -36,6 +39,7 @@ export function useGateway(): UseGatewayReturn {
       // Check connection on init
       checkConnection();
     } else {
+      console.log('[useGateway] Missing URL or token, service not created');
       serviceRef.current = null;
       setIsConnected(false);
     }
