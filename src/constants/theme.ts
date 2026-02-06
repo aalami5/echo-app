@@ -37,7 +37,8 @@ export const colors = {
   // Avatar states
   avatarIdle: '#22D3EE',
   avatarListening: '#5CFFFA',
-  avatarThinking: '#818CF8',   // Purple tint for thinking
+  avatarThinking: '#FACC15',   // Warm neon yellow for thinking
+  avatarThinkingGlow: 'rgba(250, 204, 21, 0.4)', // Yellow glow
   avatarSpeaking: '#5CFFFA',
   avatarAlert: '#F59E0B',
   

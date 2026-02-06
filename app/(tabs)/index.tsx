@@ -17,7 +17,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useChatStore } from '../../src/stores/chatStore';
 import { useAuthStore } from '../../src/stores/authStore';
-import { useCalendarStore } from '../../src/stores/calendarStore';
+import { useSettingsStore } from '../../src/stores/settingsStore';
+import { useCalendar } from '../../src/hooks/useCalendar';
 import { Avatar } from '../../src/components/Avatar';
 import { ChatMessage } from '../../src/components/ChatMessage';
 import { ImagePickerModal } from '../../src/components/ImagePicker';
@@ -36,7 +37,7 @@ export default function ChatScreen() {
   
   const { messages, avatarState, isConnected: storeConnected, setAvatarState, addMessage, setConnected } = useChatStore();
   const { accessToken } = useAuthStore();
-  const { setEvents } = useCalendarStore();
+  const { refresh: refreshCalendar } = useCalendar();
   const { isConnected, isLoading: gatewayLoading, sendMessage: gatewaySend, checkConnection } = useGateway();
   
   // Sync connection status to store
@@ -44,56 +45,34 @@ export default function ChatScreen() {
     setConnected(isConnected);
   }, [isConnected, setConnected]);
 
-  // Initialize mock calendar data for testing
+  // Fetch real calendar data when connected
   useEffect(() => {
-    const now = new Date();
-    const mockEvents = [
-      {
-        id: '1',
-        title: 'Cardiovascular Dept Meeting',
-        startTime: new Date(now.getTime() + 12 * 60 * 1000), // 12 min from now
-        endTime: new Date(now.getTime() + 72 * 60 * 1000),
-        location: 'Sequoia Hospital, 4th Floor Conference Room',
-        videoLink: 'https://teams.microsoft.com/meet/296573611616555',
-        videoProvider: 'teams' as const,
-        dialIn: '+1 916-562-0855',
-        dialInCode: '921443547',
-        attendees: ['Dr. Dirk Baumann', 'Dr. Sara Wartman', 'Dr. Esther Bae', 'Dr. George Lee'],
-        organizer: 'Grace Estevez',
-      },
-      {
-        id: '2', 
-        title: 'SPARC Office Hours',
-        startTime: new Date(now.getTime() + 3 * 60 * 60 * 1000), // 3 hours from now
-        endTime: new Date(now.getTime() + 4 * 60 * 60 * 1000),
-        videoLink: 'https://stanford.zoom.us/j/4322086984',
-        videoProvider: 'zoom' as const,
-        dialIn: '+1 650-724-9799',
-        dialInCode: '4322086984',
-        description: 'Open office hours for SPARC project questions and updates.',
-      },
-      {
-        id: '3',
-        title: 'Stanford Biodesign Review',
-        startTime: new Date(now.getTime() + 5 * 60 * 60 * 1000), // 5 hours from now
-        endTime: new Date(now.getTime() + 6 * 60 * 60 * 1000),
-        location: '318 Campus Drive, E100, Stanford, CA 94305',
-        attendees: ['Dr. Aydin Zahedivash', 'Dr. Vishnu Ravi', 'Paul Schmiedmayer'],
-        description: 'Quarterly review of digital health initiatives and student projects.',
-      },
-    ];
-    setEvents(mockEvents);
-  }, [setEvents]);
+    if (isConnected) {
+      refreshCalendar();
+    }
+  }, [isConnected]);
+
+  const { voiceEnabled, autoPlayResponses } = useSettingsStore();
   const { 
     isRecording, 
     recordingDuration: duration, 
     audioLevel,
     isTranscribing,
+    isSpeaking,
     startRecording, 
     stopRecording, 
     cancelRecording,
+    speak,
+    stopSpeaking,
     isConfigured: voiceConfigured,
   } = useVoiceChat();
+
+  // Update avatar state when speaking ends
+  useEffect(() => {
+    if (!isSpeaking && avatarState === 'speaking') {
+      setAvatarState('idle');
+    }
+  }, [isSpeaking, avatarState, setAvatarState]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -133,6 +112,18 @@ export default function ChatScreen() {
       };
       addMessage(assistantMessage);
       console.log('[Chat] Added assistant message to chat');
+      
+      // Speak the response if voice is enabled
+      if (voiceEnabled && autoPlayResponses) {
+        setAvatarState('speaking');
+        try {
+          await speak(response);
+          // Don't set idle here - useEffect handles it when speaking ends
+          return;
+        } catch (e) {
+          console.error('[Chat] TTS error:', e);
+        }
+      }
     } else {
       console.log('[Chat] No response received from Gateway');
     }

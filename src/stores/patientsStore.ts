@@ -1,0 +1,355 @@
+/**
+ * Patients Store
+ * 
+ * Stores patient list data for on-call tracking.
+ * Data is stored locally only (PHI security).
+ * Organized by call day, grouped by hospital.
+ */
+
+import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import * as SecureStore from 'expo-secure-store';
+
+// Simple UUID generator (no external dependency)
+const generateUUID = (): string => {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+};
+
+// Hospital codes matching Oliver's clinical locations
+export type Hospital = 'SEQ' | 'ECH' | 'SMCMC' | 'SSC' | 'OTHER';
+
+export const HOSPITAL_NAMES: Record<Hospital, string> = {
+  SEQ: 'Sequoia Hospital',
+  ECH: 'El Camino Hospital',
+  SMCMC: 'San Mateo County Medical Center',
+  SSC: 'Sutter Santa Clara',
+  OTHER: 'Other',
+};
+
+export interface Patient {
+  id: string;
+  name: string;
+  mrn: string;              // Medical Record Number
+  dob: string;              // Date of Birth (MM/DD/YYYY)
+  hospital: Hospital;
+  chiefComplaint: string;
+  timeSeen: string;         // ISO timestamp when added
+  callDayId: string;        // Reference to call day
+}
+
+export interface CallDay {
+  id: string;
+  date: string;             // ISO date string (YYYY-MM-DD)
+  displayDate: string;      // Human readable (e.g., "Feb 6, 2026")
+  dayOfWeek: string;        // e.g., "Thursday"
+  patientIds: string[];     // Patient IDs for this call day
+}
+
+interface PatientsState {
+  // Data
+  patients: Record<string, Patient>;      // Indexed by patient ID
+  callDays: Record<string, CallDay>;      // Indexed by call day ID
+  callDayOrder: string[];                 // Ordered list of call day IDs (newest first)
+  
+  // UI State
+  searchQuery: string;
+  activeCallDayId: string | null;         // Currently selected call day for adding
+  
+  // Actions
+  addPatient: (patient: Omit<Patient, 'id' | 'timeSeen' | 'callDayId'>, callDayId?: string) => string;
+  updatePatient: (id: string, updates: Partial<Patient>) => void;
+  deletePatient: (id: string) => void;
+  
+  createCallDay: (date?: Date) => string;
+  deleteCallDay: (id: string) => void;
+  
+  setSearchQuery: (query: string) => void;
+  setActiveCallDay: (id: string | null) => void;
+  
+  // Getters
+  getPatientsByCallDay: (callDayId: string) => Patient[];
+  getPatientsByHospital: (callDayId: string, hospital: Hospital) => Patient[];
+  searchPatients: (query: string) => Patient[];
+  getTodayCallDay: () => CallDay | null;
+  
+  // Export
+  exportToCSV: () => string;
+}
+
+// Helper to format date for display
+const formatDisplayDate = (date: Date): string => {
+  return date.toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+};
+
+const getDayOfWeek = (date: Date): string => {
+  return date.toLocaleDateString('en-US', { weekday: 'long' });
+};
+
+const getISODate = (date: Date): string => {
+  return date.toISOString().split('T')[0];
+};
+
+// Custom storage adapter using SecureStore for persistence (PHI security)
+const secureStorage = {
+  getItem: async (name: string): Promise<string | null> => {
+    try {
+      return await SecureStore.getItemAsync(name);
+    } catch (e) {
+      console.log('[Patients] SecureStore get error:', e);
+      return null;
+    }
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    try {
+      await SecureStore.setItemAsync(name, value);
+    } catch (e) {
+      console.log('[Patients] SecureStore set error:', e);
+    }
+  },
+  removeItem: async (name: string): Promise<void> => {
+    try {
+      await SecureStore.deleteItemAsync(name);
+    } catch (e) {
+      console.log('[Patients] SecureStore remove error:', e);
+    }
+  },
+};
+
+export const usePatientsStore = create<PatientsState>()(
+  persist(
+    (set, get) => ({
+      // Initial state
+      patients: {},
+      callDays: {},
+      callDayOrder: [],
+      searchQuery: '',
+      activeCallDayId: null,
+      
+      // Actions
+      addPatient: (patientData, callDayId) => {
+        const state = get();
+        
+        // Use provided call day or create today's call day
+        let targetCallDayId = callDayId || state.activeCallDayId;
+        if (!targetCallDayId) {
+          // Check if today's call day exists
+          const today = getISODate(new Date());
+          const existingToday = Object.values(state.callDays).find(cd => cd.date === today);
+          if (existingToday) {
+            targetCallDayId = existingToday.id;
+          } else {
+            // Create new call day for today
+            targetCallDayId = get().createCallDay();
+          }
+        }
+        
+        const patientId = generateUUID();
+        const newPatient: Patient = {
+          ...patientData,
+          id: patientId,
+          timeSeen: new Date().toISOString(),
+          callDayId: targetCallDayId,
+        };
+        
+        set((state) => ({
+          patients: {
+            ...state.patients,
+            [patientId]: newPatient,
+          },
+          callDays: {
+            ...state.callDays,
+            [targetCallDayId!]: {
+              ...state.callDays[targetCallDayId!],
+              patientIds: [...state.callDays[targetCallDayId!].patientIds, patientId],
+            },
+          },
+          activeCallDayId: targetCallDayId,
+        }));
+        
+        return patientId;
+      },
+      
+      updatePatient: (id, updates) => {
+        set((state) => ({
+          patients: {
+            ...state.patients,
+            [id]: {
+              ...state.patients[id],
+              ...updates,
+            },
+          },
+        }));
+      },
+      
+      deletePatient: (id) => {
+        const patient = get().patients[id];
+        if (!patient) return;
+        
+        set((state) => {
+          const { [id]: removed, ...remainingPatients } = state.patients;
+          const callDay = state.callDays[patient.callDayId];
+          
+          return {
+            patients: remainingPatients,
+            callDays: callDay ? {
+              ...state.callDays,
+              [patient.callDayId]: {
+                ...callDay,
+                patientIds: callDay.patientIds.filter(pid => pid !== id),
+              },
+            } : state.callDays,
+          };
+        });
+      },
+      
+      createCallDay: (date = new Date()) => {
+        const callDayId = generateUUID();
+        const isoDate = getISODate(date);
+        
+        // Check if call day already exists for this date
+        const existing = Object.values(get().callDays).find(cd => cd.date === isoDate);
+        if (existing) {
+          return existing.id;
+        }
+        
+        const newCallDay: CallDay = {
+          id: callDayId,
+          date: isoDate,
+          displayDate: formatDisplayDate(date),
+          dayOfWeek: getDayOfWeek(date),
+          patientIds: [],
+        };
+        
+        set((state) => ({
+          callDays: {
+            ...state.callDays,
+            [callDayId]: newCallDay,
+          },
+          callDayOrder: [callDayId, ...state.callDayOrder],
+          activeCallDayId: callDayId,
+        }));
+        
+        return callDayId;
+      },
+      
+      deleteCallDay: (id) => {
+        const callDay = get().callDays[id];
+        if (!callDay) return;
+        
+        set((state) => {
+          const { [id]: removed, ...remainingCallDays } = state.callDays;
+          
+          // Remove all patients from this call day
+          const remainingPatients = { ...state.patients };
+          callDay.patientIds.forEach(pid => {
+            delete remainingPatients[pid];
+          });
+          
+          return {
+            callDays: remainingCallDays,
+            callDayOrder: state.callDayOrder.filter(cdId => cdId !== id),
+            patients: remainingPatients,
+            activeCallDayId: state.activeCallDayId === id ? null : state.activeCallDayId,
+          };
+        });
+      },
+      
+      setSearchQuery: (query) => set({ searchQuery: query }),
+      
+      setActiveCallDay: (id) => set({ activeCallDayId: id }),
+      
+      // Getters
+      getPatientsByCallDay: (callDayId) => {
+        const state = get();
+        const callDay = state.callDays[callDayId];
+        if (!callDay) return [];
+        return callDay.patientIds.map(id => state.patients[id]).filter(Boolean);
+      },
+      
+      getPatientsByHospital: (callDayId, hospital) => {
+        return get().getPatientsByCallDay(callDayId).filter(p => p.hospital === hospital);
+      },
+      
+      searchPatients: (query) => {
+        const state = get();
+        const normalizedQuery = query.toLowerCase().trim();
+        if (!normalizedQuery) return [];
+        
+        return Object.values(state.patients).filter(patient => 
+          patient.name.toLowerCase().includes(normalizedQuery) ||
+          patient.mrn.toLowerCase().includes(normalizedQuery) ||
+          patient.chiefComplaint.toLowerCase().includes(normalizedQuery)
+        );
+      },
+      
+      getTodayCallDay: () => {
+        const state = get();
+        const today = getISODate(new Date());
+        return Object.values(state.callDays).find(cd => cd.date === today) || null;
+      },
+      
+      // Export
+      exportToCSV: () => {
+        const state = get();
+        const headers = ['Call Date', 'Day', 'Hospital', 'Patient Name', 'MRN', 'DOB', 'Chief Complaint', 'Time Seen'];
+        const rows: string[][] = [headers];
+        
+        // Sort call days by date (newest first)
+        const sortedCallDays = [...state.callDayOrder]
+          .map(id => state.callDays[id])
+          .filter(Boolean);
+        
+        sortedCallDays.forEach(callDay => {
+          const patients = get().getPatientsByCallDay(callDay.id);
+          
+          // Sort patients by hospital, then by time seen
+          const sortedPatients = [...patients].sort((a, b) => {
+            if (a.hospital !== b.hospital) {
+              return a.hospital.localeCompare(b.hospital);
+            }
+            return new Date(a.timeSeen).getTime() - new Date(b.timeSeen).getTime();
+          });
+          
+          sortedPatients.forEach(patient => {
+            rows.push([
+              callDay.displayDate,
+              callDay.dayOfWeek,
+              HOSPITAL_NAMES[patient.hospital],
+              patient.name,
+              patient.mrn,
+              patient.dob,
+              patient.chiefComplaint,
+              new Date(patient.timeSeen).toLocaleTimeString('en-US', { 
+                hour: 'numeric', 
+                minute: '2-digit',
+                hour12: true 
+              }),
+            ]);
+          });
+        });
+        
+        // Convert to CSV string
+        return rows.map(row => 
+          row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')
+        ).join('\n');
+      },
+    }),
+    {
+      name: 'echo-patients',
+      storage: createJSONStorage(() => secureStorage),
+      partialize: (state) => ({
+        patients: state.patients,
+        callDays: state.callDays,
+        callDayOrder: state.callDayOrder,
+      }),
+    }
+  )
+);

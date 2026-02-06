@@ -273,8 +273,12 @@ export function Avatar({
                 width: size * 1.3,
                 height: size * 1.3,
                 borderRadius: size * 0.65,
-                opacity: isRecording ? 0.6 : 0.3,
-                backgroundColor: isRecording ? colors.primary : colors.glow,
+                opacity: isRecording ? 0.6 : state === 'thinking' ? 0.5 : 0.3,
+                backgroundColor: isRecording 
+                  ? colors.primary 
+                  : state === 'thinking' 
+                    ? colors.avatarThinkingGlow 
+                    : colors.primaryGlow,
               },
             ]}
           />
@@ -289,9 +293,17 @@ export function Avatar({
                   width: size,
                   height: size,
                   borderRadius: size / 2,
-                  backgroundColor: isRecording ? colors.primaryMuted : colors.surfaceElevated,
-                  borderWidth: isRecording ? 3 : 2,
-                  borderColor: isRecording ? colors.primary : colors.primaryMuted,
+                  backgroundColor: isRecording 
+                    ? colors.primaryMuted 
+                    : state === 'thinking'
+                      ? colors.avatarThinking + '20'
+                      : colors.surfaceElevated,
+                  borderWidth: isRecording || state === 'thinking' ? 3 : 2,
+                  borderColor: isRecording 
+                    ? colors.primary 
+                    : state === 'thinking'
+                      ? colors.avatarThinking
+                      : colors.primaryMuted,
                 },
               ]}
             />
@@ -304,9 +316,17 @@ export function Avatar({
                   width: size * 0.75,
                   height: size * 0.75,
                   borderRadius: (size * 0.75) / 2,
-                  backgroundColor: isRecording ? colors.primary + '40' : colors.primarySubtle,
-                  borderWidth: isRecording ? 2 : 1,
-                  borderColor: isRecording ? colors.primary : colors.primaryMuted,
+                  backgroundColor: isRecording 
+                    ? colors.primary + '40' 
+                    : state === 'thinking'
+                      ? colors.avatarThinking + '30'
+                      : colors.primarySubtle,
+                  borderWidth: isRecording || state === 'thinking' ? 2 : 1,
+                  borderColor: isRecording 
+                    ? colors.primary 
+                    : state === 'thinking'
+                      ? colors.avatarThinking
+                      : colors.primaryMuted,
                 },
               ]}
             />
@@ -319,7 +339,11 @@ export function Avatar({
                   width: size * 0.5,
                   height: size * 0.5,
                   borderRadius: (size * 0.5) / 2,
-                  backgroundColor: isRecording ? colors.primary + '60' : colors.primaryMuted,
+                  backgroundColor: isRecording 
+                    ? colors.primary + '60' 
+                    : state === 'thinking'
+                      ? colors.avatarThinking + '50'
+                      : colors.primaryMuted,
                 },
               ]}
             />
@@ -328,7 +352,9 @@ export function Avatar({
             <LinearGradient
               colors={isRecording 
                 ? [colors.primary, '#FFFFFF', colors.primary]
-                : [colors.primary, colors.glow]
+                : state === 'thinking'
+                  ? [colors.avatarThinking, '#FFFDE7', colors.avatarThinking]
+                  : [colors.primary, colors.primaryGlow]
               }
               style={[
                 styles.core,

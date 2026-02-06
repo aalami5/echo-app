@@ -102,45 +102,50 @@ export class GatewayService {
    * Check if the Gateway is reachable
    */
   async healthCheck(): Promise<boolean> {
-    // Trim URL to remove any whitespace that might have been entered
-    const url = this.config.baseUrl.trim();
-    const fullUrl = `${url}/v1/chat/completions`;
+    // Trim URL and remove any trailing slashes
+    const url = this.config.baseUrl.trim().replace(/\/+$/, '');
     console.log('[Gateway] Health check starting');
-    console.log('[Gateway] Base URL:', url);
-    console.log('[Gateway] Base URL length:', url.length);
-    console.log('[Gateway] Full URL:', fullUrl);
+    console.log('[Gateway] Base URL:', JSON.stringify(url));
     console.log('[Gateway] Token length:', this.config.token?.length || 0);
     
     try {
-      // Test using axios instead of fetch (different HTTP implementation)
-      console.log('[Gateway] Testing with axios to:', fullUrl);
+      // Use simple fetch GET to /ping endpoint (avoids CORS preflight)
+      const pingUrl = url + '/ping';
+      console.log('[Gateway] Pinging:', JSON.stringify(pingUrl));
       
-      const axiosResponse = await axios.post(fullUrl, {
-        model: 'openclaw:main',
-        messages: [{ role: 'user', content: 'ping' }],
-        stream: false,
-      }, {
+      const response = await fetch(pingUrl, {
+        method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.token}`,
+          'Accept': 'text/plain',
         },
-        timeout: 15000,
       });
-      console.log('[Gateway] Axios health check status:', axiosResponse.status);
-      return axiosResponse.status < 500;
+      
+      console.log('[Gateway] Ping response status:', response.status);
+      
+      if (response.ok) {
+        return true;
+      }
+      
+      // If /ping doesn't exist, try the base URL
+      console.log('[Gateway] Trying base URL...');
+      const baseResponse = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Accept': 'text/html,application/json',
+        },
+      });
+      
+      console.log('[Gateway] Base URL response status:', baseResponse.status);
+      return baseResponse.ok;
     } catch (error: any) {
       // Log detailed error info
       console.error('[Gateway] Health check failed');
       console.error('[Gateway] Error name:', error?.name || 'unknown');
       console.error('[Gateway] Error message:', error?.message || String(error));
-      if (error?.response) {
-        console.error('[Gateway] Response status:', error.response.status);
-        console.error('[Gateway] Response data:', JSON.stringify(error.response.data));
-      }
       if (error?.code) {
         console.error('[Gateway] Error code:', error.code);
       }
-      console.error('[Gateway] Full URL was:', fullUrl);
+      console.error('[Gateway] Base URL was:', url);
       return false;
     }
   }

@@ -16,8 +16,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../src/stores/authStore';
-import { useWebSocketStore } from '../../src/stores/websocketStore';
+import { useChatStore } from '../../src/stores/chatStore';
 import { useSettingsStore } from '../../src/stores/settingsStore';
+import { useCalendar } from '../../src/hooks/useCalendar';
 import { VOICES, VoiceName } from '../../src/services/elevenlabs';
 import { colors, spacing, borderRadius, typography } from '../../src/constants/theme';
 
@@ -27,7 +28,7 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const { isConnected, lastMessageTime } = useWebSocketStore();
+  const { isConnected } = useChatStore();
   const { 
     openaiApiKey, 
     elevenlabsApiKey, 
@@ -44,9 +45,8 @@ export default function SettingsScreen() {
     setVoiceEnabled,
     setAutoPlayResponses,
   } = useSettingsStore();
+  const { isLoading: calendarSyncing, lastFetched: lastCalendarSync, refresh: refreshCalendar, error: calendarError } = useCalendar();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [calendarSyncing, setCalendarSyncing] = useState(false);
-  const [lastCalendarSync, setLastCalendarSync] = useState<Date | null>(null);
   const [showOpenAIKey, setShowOpenAIKey] = useState(false);
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
 
@@ -65,12 +65,10 @@ export default function SettingsScreen() {
 
   const handleSyncCalendar = async () => {
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setCalendarSyncing(true);
-    // Simulate sync - in production this would call the Gateway
-    setTimeout(() => {
-      setCalendarSyncing(false);
-      setLastCalendarSync(new Date());
-    }, 2000);
+    await refreshCalendar();
+    if (calendarError) {
+      Alert.alert('Sync Error', calendarError);
+    }
   };
 
   const formatLastSync = (date: Date | null) => {
