@@ -1123,6 +1123,7 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
   },
   hospitalPicker: {
+    flex: 1,
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
@@ -1268,7 +1269,7 @@ const styles = StyleSheet.create({
   // Hospital picker with scan button
   hospitalPickerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
   },
   scanButton: {
