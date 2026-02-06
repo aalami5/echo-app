@@ -75,7 +75,7 @@ export const useSettingsStore = create<SettingsState>()(
       voiceEnabled: true,
       autoPlayResponses: true,
       hapticFeedback: true,
-      gatewayUrl: process.env.EXPO_PUBLIC_GATEWAY_URL || 'https://compare-horse-those-some.trycloudflare.com',
+      gatewayUrl: process.env.EXPO_PUBLIC_GATEWAY_URL || 'https://echo.oppersmedical.com',
       gatewayToken: null,
       
       // Actions

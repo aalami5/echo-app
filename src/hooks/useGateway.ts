@@ -9,6 +9,21 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import { GatewayService } from '../services/gateway';
 
+// Wait for Zustand store to hydrate from SecureStore
+const waitForHydration = (): Promise<void> => {
+  return new Promise((resolve) => {
+    const unsubscribe = useSettingsStore.persist.onFinishHydration(() => {
+      unsubscribe();
+      resolve();
+    });
+    // Check if already hydrated
+    if (useSettingsStore.persist.hasHydrated()) {
+      unsubscribe();
+      resolve();
+    }
+  });
+};
+
 interface UseGatewayReturn {
   isConnected: boolean;
   isLoading: boolean;
@@ -27,22 +42,39 @@ export function useGateway(): UseGatewayReturn {
 
   // Initialize or update the service when settings change
   useEffect(() => {
-    console.log('[useGateway] Settings changed - URL:', gatewayUrl, 'Token:', gatewayToken ? 'present' : 'missing');
+    let mounted = true;
     
-    if (gatewayUrl && gatewayToken) {
-      console.log('[useGateway] Creating GatewayService...');
-      serviceRef.current = new GatewayService({
-        baseUrl: gatewayUrl,
-        token: gatewayToken,
-        userId: 'echo-app-oliver',
-      });
-      // Check connection on init
-      checkConnection();
-    } else {
-      console.log('[useGateway] Missing URL or token, service not created');
-      serviceRef.current = null;
-      setIsConnected(false);
-    }
+    const initService = async () => {
+      // Wait for settings to load from SecureStore
+      await waitForHydration();
+      
+      if (!mounted) return;
+      
+      // Get fresh values after hydration
+      const { gatewayUrl: url, gatewayToken: token } = useSettingsStore.getState();
+      console.log('[useGateway] After hydration - URL:', url, 'Token:', token ? 'present' : 'missing');
+      
+      if (url && token) {
+        console.log('[useGateway] Creating GatewayService...');
+        serviceRef.current = new GatewayService({
+          baseUrl: url,
+          token: token,
+          userId: 'echo-app-oliver',
+        });
+        // Check connection on init
+        checkConnection();
+      } else {
+        console.log('[useGateway] Missing URL or token, service not created');
+        serviceRef.current = null;
+        setIsConnected(false);
+      }
+    };
+    
+    initService();
+    
+    return () => {
+      mounted = false;
+    };
   }, [gatewayUrl, gatewayToken]);
 
   const checkConnection = useCallback(async (): Promise<boolean> => {
