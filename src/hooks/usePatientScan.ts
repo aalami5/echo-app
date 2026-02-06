@@ -7,7 +7,7 @@
 
 import { useState, useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import * as FileSystem from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system';
 import { useSettingsStore } from '../stores/settingsStore';
 import { Hospital } from '../stores/patientsStore';
 
@@ -72,8 +72,8 @@ export function usePatientScan(): UsePatientScanResult {
     
     try {
       // Read image as base64
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
+      const base64 = await readAsStringAsync(uri, {
+        encoding: 'base64',
       });
       
       // Determine MIME type from URI
