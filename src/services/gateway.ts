@@ -68,6 +68,7 @@ export class GatewayService {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
       },
       body: JSON.stringify({
         model: `openclaw:${agentId}`,
@@ -118,9 +119,14 @@ export class GatewayService {
         console.log('[Gateway] httpbin.org FAILED:', extErr instanceof Error ? extErr.message : String(extErr));
       }
       
-      // First try a simple GET to test basic connectivity
+      // First try a simple GET to test basic connectivity (with browser UA)
       console.log('[Gateway] Testing our domain with GET...');
-      const testResponse = await fetch(url, { method: 'GET' });
+      const testResponse = await fetch(url, { 
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+        }
+      });
       console.log('[Gateway] GET test status:', testResponse.status);
       
       // Now try the actual POST
@@ -130,6 +136,7 @@ export class GatewayService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${this.config.token}`,
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
         },
         body: JSON.stringify({
           model: 'openclaw:main',
