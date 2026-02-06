@@ -36,7 +36,7 @@ import {
 import { usePatientVoiceInput } from '../../src/hooks/usePatientVoiceInput';
 
 // Hospital order for display
-const HOSPITAL_ORDER: Hospital[] = ['SEQ', 'ECH', 'SMCMC', 'SSC', 'OTHER'];
+const HOSPITAL_ORDER: Hospital[] = ['SEQ', 'ECH', 'SMCMC', 'Mills', 'OTHER'];
 
 export default function PatientsScreen() {
   const {
@@ -585,7 +585,7 @@ function getHospitalColor(hospital: Hospital): string {
     SEQ: '#10B981',    // Green
     ECH: '#3B82F6',    // Blue
     SMCMC: '#F59E0B',  // Amber
-    SSC: '#8B5CF6',    // Purple
+    Mills: '#8B5CF6',  // Purple
     OTHER: '#6B7280',  // Gray
   };
   return hospitalColors[hospital];

@@ -20,13 +20,13 @@ const generateUUID = (): string => {
 };
 
 // Hospital codes matching Oliver's clinical locations
-export type Hospital = 'SEQ' | 'ECH' | 'SMCMC' | 'SSC' | 'OTHER';
+export type Hospital = 'SEQ' | 'ECH' | 'SMCMC' | 'Mills' | 'OTHER';
 
 export const HOSPITAL_NAMES: Record<Hospital, string> = {
   SEQ: 'Sequoia Hospital',
   ECH: 'El Camino Hospital',
   SMCMC: 'San Mateo County Medical Center',
-  SSC: 'Sutter Santa Clara',
+  Mills: 'Mills Peninsula',
   OTHER: 'Other',
 };
 
