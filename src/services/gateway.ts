@@ -54,6 +54,9 @@ export class GatewayService {
   async sendMessage(content: string, history: ChatMessage[] = []): Promise<string> {
     const { baseUrl, token, agentId, userId } = this.config;
     
+    console.log('[Gateway] Sending message:', content);
+    console.log('[Gateway] URL:', `${baseUrl}/v1/chat/completions`);
+    
     const messages: ChatMessage[] = [
       ...history,
       { role: 'user', content }
@@ -80,12 +83,15 @@ export class GatewayService {
     }
 
     const result: ChatCompletionResponse = await response.json();
+    console.log('[Gateway] Response received:', JSON.stringify(result).slice(0, 200));
     
     if (!result.choices || result.choices.length === 0) {
       throw new Error('No response from Gateway');
     }
 
-    return result.choices[0].message.content;
+    const responseText = result.choices[0].message.content;
+    console.log('[Gateway] Assistant response:', responseText);
+    return responseText;
   }
 
   /**

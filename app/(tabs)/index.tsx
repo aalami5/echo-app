@@ -105,6 +105,8 @@ export default function ChatScreen() {
   }, [messages.length]);
 
   const sendMessageToGateway = async (content: string) => {
+    console.log('[Chat] sendMessageToGateway called with:', content);
+    
     // Add user message to chat
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -117,7 +119,9 @@ export default function ChatScreen() {
     setAvatarState('thinking');
     
     // Send to Gateway and get response
+    console.log('[Chat] Calling gatewaySend...');
     const response = await gatewaySend(content);
+    console.log('[Chat] Gateway response:', response);
     
     if (response) {
       // Add assistant response to chat
@@ -128,6 +132,9 @@ export default function ChatScreen() {
         timestamp: new Date().toISOString(),
       };
       addMessage(assistantMessage);
+      console.log('[Chat] Added assistant message to chat');
+    } else {
+      console.log('[Chat] No response received from Gateway');
     }
     
     setAvatarState('idle');
