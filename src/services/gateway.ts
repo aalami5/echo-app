@@ -52,7 +52,8 @@ export class GatewayService {
    * Send a message to the Gateway and get a response
    */
   async sendMessage(content: string, history: ChatMessage[] = []): Promise<string> {
-    const { baseUrl, token, agentId, userId } = this.config;
+    const { baseUrl: rawUrl, token, agentId, userId } = this.config;
+    const baseUrl = rawUrl.trim();
     
     console.log('[Gateway] Sending message:', content);
     console.log('[Gateway] URL:', `${baseUrl}/v1/chat/completions`);
@@ -98,16 +99,24 @@ export class GatewayService {
    * Check if the Gateway is reachable
    */
   async healthCheck(): Promise<boolean> {
-    const url = this.config.baseUrl;
+    // Trim URL to remove any whitespace that might have been entered
+    const url = this.config.baseUrl.trim();
     const fullUrl = `${url}/v1/chat/completions`;
     console.log('[Gateway] Health check starting');
     console.log('[Gateway] Base URL:', url);
+    console.log('[Gateway] Base URL length:', url.length);
     console.log('[Gateway] Full URL:', fullUrl);
     console.log('[Gateway] Token length:', this.config.token?.length || 0);
     
     try {
-      // Use a simple HEAD request or try the API endpoint
-      const response = await fetch(`${url}/v1/chat/completions`, {
+      // First try a simple GET to test basic connectivity
+      console.log('[Gateway] Testing basic connectivity with GET...');
+      const testResponse = await fetch(url, { method: 'GET' });
+      console.log('[Gateway] GET test status:', testResponse.status);
+      
+      // Now try the actual POST
+      console.log('[Gateway] Attempting POST to', fullUrl);
+      const response = await fetch(fullUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

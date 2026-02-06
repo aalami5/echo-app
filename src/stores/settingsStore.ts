@@ -85,7 +85,7 @@ export const useSettingsStore = create<SettingsState>()(
       setVoiceEnabled: (enabled) => set({ voiceEnabled: enabled }),
       setAutoPlayResponses: (enabled) => set({ autoPlayResponses: enabled }),
       setHapticFeedback: (enabled) => set({ hapticFeedback: enabled }),
-      setGatewayUrl: (url) => set({ gatewayUrl: url }),
+      setGatewayUrl: (url) => set({ gatewayUrl: url.trim() }),
       setGatewayToken: (token) => set({ gatewayToken: token }),
       
       clearAllKeys: () => set({
