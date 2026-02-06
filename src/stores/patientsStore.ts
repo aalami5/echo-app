@@ -35,6 +35,7 @@ export interface Patient {
   name: string;
   mrn: string;              // Medical Record Number
   dob: string;              // Date of Birth (MM/DD/YYYY)
+  room: string;             // Room/Bed (e.g., "CSU 2516-1")
   hospital: Hospital;
   chiefComplaint: string;
   timeSeen: string;         // ISO timestamp when added
@@ -347,7 +348,7 @@ export const usePatientsStore = create<PatientsState>()(
       // Export
       exportToCSV: () => {
         const state = get();
-        const headers = ['Call Date', 'Day', 'Hospital', 'Patient Name', 'MRN', 'DOB', 'Chief Complaint', 'Time Seen'];
+        const headers = ['Call Date', 'Day', 'Hospital', 'Room', 'Patient Name', 'MRN', 'DOB', 'Chief Complaint', 'Time Seen'];
         const rows: string[][] = [headers];
         
         // Sort call days by date (newest first)
@@ -371,6 +372,7 @@ export const usePatientsStore = create<PatientsState>()(
               callDay.displayDate,
               callDay.dayOfWeek,
               HOSPITAL_NAMES[patient.hospital],
+              patient.room || '',
               patient.name,
               patient.mrn,
               patient.dob,

@@ -20,6 +20,8 @@ import {
   Share,
   Animated,
   Keyboard,
+  Image,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,6 +36,7 @@ import {
   CallDay 
 } from '../../src/stores/patientsStore';
 import { usePatientVoiceInput } from '../../src/hooks/usePatientVoiceInput';
+import { usePatientScan, ScannedPatientData } from '../../src/hooks/usePatientScan';
 
 // Hospital order for display
 const HOSPITAL_ORDER: Hospital[] = ['SEQ', 'ECH', 'SMCMC', 'Mills', 'OTHER'];
@@ -69,7 +72,22 @@ export default function PatientsScreen() {
     cancelRecording: cancelVoice,
   } = usePatientVoiceInput();
   
+  // Image scan for patient details
+  const {
+    isScanning,
+    isProcessing,
+    error: scanError,
+    scannedData,
+    imageUri: scannedImageUri,
+    scanFromCamera,
+    scanFromLibrary,
+    clearScan,
+  } = usePatientScan();
+  
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showScanModal, setShowScanModal] = useState(false);
+  const [showScanConfirmModal, setShowScanConfirmModal] = useState(false);
+  const [pendingScanData, setPendingScanData] = useState<ScannedPatientData | null>(null);
   const [expandedCallDays, setExpandedCallDays] = useState<Set<string>>(new Set());
   const [isSearching, setIsSearching] = useState(false);
   const [showQuickComplaints, setShowQuickComplaints] = useState(false);
@@ -83,6 +101,7 @@ export default function PatientsScreen() {
     name: '',
     mrn: '',
     dob: '',
+    room: '',
     hospital: 'SEQ' as Hospital,
     chiefComplaint: '',
   });
@@ -125,6 +144,7 @@ export default function PatientsScreen() {
       name: '',
       mrn: '',
       dob: '',
+      room: '',
       hospital: 'SEQ',
       chiefComplaint: '',
     });
@@ -192,6 +212,53 @@ export default function PatientsScreen() {
     setShowQuickComplaints(false);
   }, []);
   
+  // Handle scan from camera
+  const handleScanCamera = useCallback(async () => {
+    setShowScanModal(false);
+    const data = await scanFromCamera();
+    if (data) {
+      setPendingScanData(data);
+      setShowScanConfirmModal(true);
+    }
+  }, [scanFromCamera]);
+  
+  // Handle scan from library
+  const handleScanLibrary = useCallback(async () => {
+    setShowScanModal(false);
+    const data = await scanFromLibrary();
+    if (data) {
+      setPendingScanData(data);
+      setShowScanConfirmModal(true);
+    }
+  }, [scanFromLibrary]);
+  
+  // Apply scanned data to form
+  const handleApplyScanData = useCallback(() => {
+    if (!pendingScanData) return;
+    
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    setNewPatient(prev => ({
+      ...prev,
+      name: pendingScanData.name || prev.name,
+      mrn: pendingScanData.mrn || prev.mrn,
+      dob: pendingScanData.dob || prev.dob,
+      room: pendingScanData.room || prev.room,
+      hospital: pendingScanData.hospital || prev.hospital,
+      chiefComplaint: pendingScanData.chiefComplaint || prev.chiefComplaint,
+    }));
+    
+    setShowScanConfirmModal(false);
+    setPendingScanData(null);
+    clearScan();
+  }, [pendingScanData, clearScan]);
+  
+  // Cancel scan confirmation
+  const handleCancelScan = useCallback(() => {
+    setShowScanConfirmModal(false);
+    setPendingScanData(null);
+    clearScan();
+  }, [clearScan]);
+  
   // Toggle search
   const toggleSearch = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -226,7 +293,12 @@ export default function PatientsScreen() {
       delayLongPress={500}
     >
       <View style={styles.patientInfo}>
-        <Text style={styles.patientName}>{patient.name}</Text>
+        <View style={styles.patientNameRow}>
+          <Text style={styles.patientName}>{patient.name}</Text>
+          {patient.room && (
+            <Text style={styles.patientRoom}>{patient.room}</Text>
+          )}
+        </View>
         <View style={styles.patientDetails}>
           <Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>
           {patient.dob && <Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}
@@ -299,29 +371,45 @@ export default function PatientsScreen() {
     );
   }, [callDays, expandedCallDays, toggleCallDay, renderHospitalSection]);
   
-  // Hospital selector
+  // Hospital selector with scan button
   const HospitalPicker = () => (
-    <View style={styles.hospitalPicker}>
-      {HOSPITAL_ORDER.filter(h => h !== 'OTHER').map(hospital => (
-        <TouchableOpacity
-          key={hospital}
-          style={[
-            styles.hospitalOption,
-            newPatient.hospital === hospital && styles.hospitalOptionSelected,
-          ]}
-          onPress={() => {
-            Haptics.selectionAsync();
-            setNewPatient(prev => ({ ...prev, hospital }));
-          }}
-        >
-          <Text style={[
-            styles.hospitalOptionText,
-            newPatient.hospital === hospital && styles.hospitalOptionTextSelected,
-          ]}>
-            {hospital}
-          </Text>
-        </TouchableOpacity>
-      ))}
+    <View style={styles.hospitalPickerRow}>
+      <View style={styles.hospitalPicker}>
+        {HOSPITAL_ORDER.filter(h => h !== 'OTHER').map(hospital => (
+          <TouchableOpacity
+            key={hospital}
+            style={[
+              styles.hospitalOption,
+              newPatient.hospital === hospital && styles.hospitalOptionSelected,
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setNewPatient(prev => ({ ...prev, hospital }));
+            }}
+          >
+            <Text style={[
+              styles.hospitalOptionText,
+              newPatient.hospital === hospital && styles.hospitalOptionTextSelected,
+            ]}>
+              {hospital}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+      <TouchableOpacity
+        style={styles.scanButton}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setShowScanModal(true);
+        }}
+        disabled={isScanning || isProcessing}
+      >
+        {isProcessing ? (
+          <ActivityIndicator size="small" color={colors.primary} />
+        ) : (
+          <Ionicons name="camera" size={22} color={colors.primary} />
+        )}
+      </TouchableOpacity>
     </View>
   );
   
@@ -480,6 +568,17 @@ export default function PatientsScreen() {
                 keyboardType="numbers-and-punctuation"
               />
               
+              {/* Room */}
+              <Text style={styles.formLabel}>Room</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="e.g., CSU 2516-1, Room 302"
+                placeholderTextColor={colors.textTertiary}
+                value={newPatient.room}
+                onChangeText={(text) => setNewPatient(prev => ({ ...prev, room: text }))}
+                autoCapitalize="characters"
+              />
+              
               {/* Chief Complaint */}
               <View style={styles.formLabelRow}>
                 <Text style={styles.formLabel}>Chief Complaint</Text>
@@ -575,6 +674,168 @@ export default function PatientsScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+      
+      {/* Scan Image Modal */}
+      <Modal
+        visible={showScanModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowScanModal(false)}
+      >
+        <TouchableOpacity 
+          style={styles.scanModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowScanModal(false)}
+        >
+          <View style={styles.scanModalContent}>
+            <Text style={styles.scanModalTitle}>Scan Image</Text>
+            <Text style={styles.scanModalSubtitle}>
+              Take a photo or select an image to extract patient details
+            </Text>
+            
+            <TouchableOpacity 
+              style={styles.scanModalOption}
+              onPress={handleScanCamera}
+            >
+              <Ionicons name="camera" size={24} color={colors.primary} />
+              <Text style={styles.scanModalOptionText}>Take Photo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.scanModalOption}
+              onPress={handleScanLibrary}
+            >
+              <Ionicons name="images" size={24} color={colors.primary} />
+              <Text style={styles.scanModalOptionText}>Photo Library</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={styles.scanModalCancel}
+              onPress={() => setShowScanModal(false)}
+            >
+              <Text style={styles.scanModalCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+      
+      {/* Scan Confirmation Modal */}
+      <Modal
+        visible={showScanConfirmModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCancelScan}
+      >
+        <View style={styles.confirmModalContainer}>
+          <View style={styles.confirmModalHeader}>
+            <TouchableOpacity onPress={handleCancelScan}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Confirm Details</Text>
+            <TouchableOpacity onPress={handleApplyScanData}>
+              <Text style={styles.modalSave}>Apply</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <ScrollView style={styles.confirmModalContent}>
+            {scannedImageUri && (
+              <Image 
+                source={{ uri: scannedImageUri }} 
+                style={styles.scannedImage}
+                resizeMode="contain"
+              />
+            )}
+            
+            <Text style={styles.confirmSectionTitle}>Extracted Data</Text>
+            <Text style={styles.confirmHint}>
+              Edit any incorrect values before applying
+            </Text>
+            
+            {pendingScanData && (
+              <View style={styles.confirmFields}>
+                <View style={styles.confirmField}>
+                  <Text style={styles.confirmFieldLabel}>Name</Text>
+                  <TextInput
+                    style={styles.confirmFieldInput}
+                    value={pendingScanData.name || ''}
+                    onChangeText={(text) => setPendingScanData(prev => prev ? {...prev, name: text} : null)}
+                    placeholder="Not detected"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                </View>
+                
+                <View style={styles.confirmField}>
+                  <Text style={styles.confirmFieldLabel}>MRN</Text>
+                  <TextInput
+                    style={styles.confirmFieldInput}
+                    value={pendingScanData.mrn || ''}
+                    onChangeText={(text) => setPendingScanData(prev => prev ? {...prev, mrn: text} : null)}
+                    placeholder="Not detected"
+                    placeholderTextColor={colors.textTertiary}
+                    keyboardType="number-pad"
+                  />
+                </View>
+                
+                <View style={styles.confirmField}>
+                  <Text style={styles.confirmFieldLabel}>Date of Birth</Text>
+                  <TextInput
+                    style={styles.confirmFieldInput}
+                    value={pendingScanData.dob || ''}
+                    onChangeText={(text) => setPendingScanData(prev => prev ? {...prev, dob: text} : null)}
+                    placeholder="Not detected"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                </View>
+                
+                <View style={styles.confirmField}>
+                  <Text style={styles.confirmFieldLabel}>Room</Text>
+                  <TextInput
+                    style={styles.confirmFieldInput}
+                    value={pendingScanData.room || ''}
+                    onChangeText={(text) => setPendingScanData(prev => prev ? {...prev, room: text} : null)}
+                    placeholder="Not detected"
+                    placeholderTextColor={colors.textTertiary}
+                  />
+                </View>
+                
+                <View style={styles.confirmField}>
+                  <Text style={styles.confirmFieldLabel}>Hospital</Text>
+                  <Text style={styles.confirmFieldValue}>
+                    {pendingScanData.hospital ? HOSPITAL_NAMES[pendingScanData.hospital] : 'Not detected'}
+                  </Text>
+                </View>
+                
+                <View style={styles.confirmField}>
+                  <Text style={styles.confirmFieldLabel}>Chief Complaint</Text>
+                  <TextInput
+                    style={[styles.confirmFieldInput, styles.confirmFieldInputMultiline]}
+                    value={pendingScanData.chiefComplaint || ''}
+                    onChangeText={(text) => setPendingScanData(prev => prev ? {...prev, chiefComplaint: text} : null)}
+                    placeholder="Not detected"
+                    placeholderTextColor={colors.textTertiary}
+                    multiline
+                    numberOfLines={2}
+                  />
+                </View>
+              </View>
+            )}
+            
+            {scanError && (
+              <Text style={styles.scanErrorText}>{scanError}</Text>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+      
+      {/* Processing Overlay */}
+      {isProcessing && (
+        <View style={styles.processingOverlay}>
+          <View style={styles.processingContent}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.processingText}>Analyzing image...</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -988,5 +1249,178 @@ const styles = StyleSheet.create({
     fontSize: typography.sm,
     color: colors.error,
     marginTop: spacing.xs,
+  },
+  // Patient row with room
+  patientNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  patientRoom: {
+    fontSize: typography.sm,
+    fontWeight: typography.medium,
+    color: colors.primary,
+    backgroundColor: colors.primarySubtle,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  // Hospital picker with scan button
+  hospitalPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  scanButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  // Scan Modal
+  scanModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scanModalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    width: '80%',
+    maxWidth: 320,
+  },
+  scanModalTitle: {
+    fontSize: typography.xl,
+    fontWeight: typography.bold,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  scanModalSubtitle: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  scanModalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.primarySubtle,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing.sm,
+  },
+  scanModalOptionText: {
+    fontSize: typography.base,
+    fontWeight: typography.medium,
+    color: colors.primary,
+  },
+  scanModalCancel: {
+    alignItems: 'center',
+    padding: spacing.md,
+    marginTop: spacing.sm,
+  },
+  scanModalCancelText: {
+    fontSize: typography.base,
+    color: colors.textSecondary,
+  },
+  // Scan Confirmation Modal
+  confirmModalContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  confirmModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  confirmModalContent: {
+    flex: 1,
+    padding: spacing.lg,
+  },
+  scannedImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.surface,
+    marginBottom: spacing.lg,
+  },
+  confirmSectionTitle: {
+    fontSize: typography.lg,
+    fontWeight: typography.semibold,
+    color: colors.textPrimary,
+    marginBottom: spacing.xs,
+  },
+  confirmHint: {
+    fontSize: typography.sm,
+    color: colors.textSecondary,
+    marginBottom: spacing.lg,
+  },
+  confirmFields: {
+    gap: spacing.md,
+  },
+  confirmField: {
+    marginBottom: spacing.sm,
+  },
+  confirmFieldLabel: {
+    fontSize: typography.sm,
+    fontWeight: typography.medium,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  confirmFieldInput: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    color: colors.textPrimary,
+    fontSize: typography.base,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  confirmFieldInputMultiline: {
+    height: 60,
+    textAlignVertical: 'top',
+  },
+  confirmFieldValue: {
+    fontSize: typography.base,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+    padding: spacing.md,
+  },
+  scanErrorText: {
+    fontSize: typography.sm,
+    color: colors.error,
+    textAlign: 'center',
+    marginTop: spacing.md,
+  },
+  // Processing Overlay
+  processingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  processingContent: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  processingText: {
+    fontSize: typography.base,
+    color: colors.textPrimary,
+    fontWeight: typography.medium,
   },
 });
