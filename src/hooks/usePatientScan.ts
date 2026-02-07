@@ -7,7 +7,7 @@
 
 import { useState, useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
-import { readAsStringAsync } from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 import { useSettingsStore } from '../stores/settingsStore';
 import { Hospital } from '../stores/patientsStore';
 
