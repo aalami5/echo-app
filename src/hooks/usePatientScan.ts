@@ -71,14 +71,22 @@ export function usePatientScan(): UsePatientScanResult {
     setError(null);
     
     try {
-      // Read image as base64
-      const base64 = await readAsStringAsync(uri, {
-        encoding: 'base64',
-      });
+      // Read image as base64 (use passed base64 if available, otherwise read from file)
+      let base64: string;
+      if ((uri as any)._base64) {
+        base64 = (uri as any)._base64;
+      } else {
+        base64 = await readAsStringAsync(uri, {
+          encoding: 'base64',
+        });
+      }
       
       // Determine MIME type from URI
       const extension = uri.split('.').pop()?.toLowerCase() || 'jpeg';
       const mimeType = extension === 'png' ? 'image/png' : 'image/jpeg';
+      
+      // Log image size for debugging
+      console.log('[PatientScan] Image base64 length:', base64.length, 'chars (~', Math.round(base64.length * 0.75 / 1024), 'KB)');
       
       // Create the vision API request
       const prompt = `Extract patient information from this image. Look for:
@@ -128,6 +136,9 @@ Return ONLY a JSON object with these fields (use null for any not found):
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[PatientScan] API error:', response.status, errorText);
+        if (response.status === 502 || response.status === 504) {
+          throw new Error('Vision processing not available. Please enter details manually.');
+        }
         throw new Error(`Failed to process image: ${response.status}`);
       }
       
@@ -198,11 +209,13 @@ Return ONLY a JSON object with these fields (use null for any not found):
         return null;
       }
       
-      // Launch camera
+      // Launch camera - use lower quality to reduce payload size
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ['images'],
-        quality: 0.8,
-        allowsEditing: false,
+        quality: 0.3,
+        allowsEditing: true,
+        aspect: [4, 3],
+        base64: true,
       });
       
       if (result.canceled || !result.assets?.[0]) {
@@ -237,11 +250,13 @@ Return ONLY a JSON object with these fields (use null for any not found):
         return null;
       }
       
-      // Launch image picker
+      // Launch image picker - use lower quality to reduce payload size
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
-        quality: 0.8,
-        allowsEditing: false,
+        quality: 0.3,
+        allowsEditing: true,
+        aspect: [4, 3],
+        base64: true,
       });
       
       if (result.canceled || !result.assets?.[0]) {
