@@ -37,6 +37,7 @@ export function Avatar({
   const layer3Anim = useRef(new Animated.Value(1)).current;
   const layer4Anim = useRef(new Animated.Value(1)).current;
   const accentRotate = useRef(new Animated.Value(0)).current;
+  const breatheAnim = useRef(new Animated.Value(1)).current;
 
   // Determine animation intensity based on state
   const getIntensity = () => {
@@ -124,7 +125,36 @@ export function Avatar({
     return () => rotate.stop();
   }, []);
 
-  // Core pulse for speaking
+  // Slow breathing for entire avatar when idle
+  useEffect(() => {
+    if (state === 'idle' && !isRecording) {
+      const breathe = Animated.loop(
+        Animated.sequence([
+          Animated.timing(breatheAnim, {
+            toValue: 1.04,
+            duration: 2500,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(breatheAnim, {
+            toValue: 0.97,
+            duration: 2500,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      breathe.start();
+      return () => {
+        breathe.stop();
+        breatheAnim.setValue(1);
+      };
+    } else {
+      breatheAnim.setValue(1);
+    }
+  }, [state, isRecording]);
+
+  // Core pulse for speaking, breathing for idle
   useEffect(() => {
     if (state === 'speaking') {
       const speak = Animated.loop(
@@ -143,10 +173,30 @@ export function Avatar({
       );
       speak.start();
       return () => speak.stop();
+    } else if (state === 'idle' && !isRecording) {
+      // Slow breathing animation for idle/standby
+      const breathe = Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.06,
+            duration: 3000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0.98,
+            duration: 3000,
+            easing: Easing.inOut(Easing.sin),
+            useNativeDriver: true,
+          }),
+        ])
+      );
+      breathe.start();
+      return () => breathe.stop();
     } else {
       pulseAnim.setValue(1);
     }
-  }, [state]);
+  }, [state, isRecording]);
 
   const handlePress = async () => {
     await Haptics.impactAsync(
@@ -193,7 +243,7 @@ export function Avatar({
       activeOpacity={0.9}
       disabled={!onPress}
     >
-      <View style={[styles.container, { width: size * 2, height: size * 2 }]}>
+      <Animated.View style={[styles.container, { width: size * 2, height: size * 2, transform: [{ scale: breatheAnim }] }]}>
         
         {/* Outer glow */}
         <Animated.View
@@ -343,7 +393,7 @@ export function Avatar({
             },
           ]}
         />
-      </View>
+      </Animated.View>
     </TouchableOpacity>
   );
 }
