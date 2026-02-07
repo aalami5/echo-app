@@ -551,24 +551,36 @@ export const usePatientsStore = create<PatientsState>()(
           let callDayId = dateToCallDayId.get(patientDate);
           
           if (!callDayId) {
+            // Create date object in local timezone for correct labels
+            const [year, month, day] = patientDate.split('-').map(Number);
+            const dateObj = new Date(year, month - 1, day);
+            const correctDisplayDate = formatDisplayDate(dateObj);
+            const correctDayOfWeek = getDayOfWeek(dateObj);
+            
             // Look for existing call day with this date
             const existingCallDay = Object.values(state.callDays).find(cd => cd.date === patientDate);
             
             if (existingCallDay) {
               callDayId = existingCallDay.id;
-              updatedCallDays[callDayId] = { ...existingCallDay, patientIds: [] };
+              // IMPORTANT: Always recalculate labels from the date, don't trust stored values
+              updatedCallDays[callDayId] = { 
+                ...existingCallDay, 
+                displayDate: correctDisplayDate,
+                dayOfWeek: correctDayOfWeek,
+                patientIds: [] 
+              };
+              console.log(`[Patients] Using existing call day for ${patientDate}, fixed labels: ${correctDisplayDate} ${correctDayOfWeek}`);
             } else {
               // Create new call day
               callDayId = generateUUID();
-              const dateObj = new Date(seenDate.getFullYear(), seenDate.getMonth(), seenDate.getDate());
               updatedCallDays[callDayId] = {
                 id: callDayId,
                 date: patientDate,
-                displayDate: formatDisplayDate(dateObj),
-                dayOfWeek: getDayOfWeek(dateObj),
+                displayDate: correctDisplayDate,
+                dayOfWeek: correctDayOfWeek,
                 patientIds: [],
               };
-              console.log(`[Patients] Created new call day for ${patientDate}`);
+              console.log(`[Patients] Created new call day for ${patientDate}: ${correctDisplayDate} ${correctDayOfWeek}`);
             }
             dateToCallDayId.set(patientDate, callDayId);
           }
