@@ -55,13 +55,11 @@ export default function ChatScreen() {
   const { voiceEnabled, autoPlayResponses } = useSettingsStore();
   const { 
     isRecording, 
-    recordingDuration: duration, 
     audioLevel,
     isTranscribing,
     isSpeaking,
     startRecording, 
     stopRecording, 
-    cancelRecording,
     speak,
     stopSpeaking,
     isConfigured: voiceConfigured,
@@ -153,11 +151,6 @@ export default function ChatScreen() {
     }
   };
 
-  const handleCancelRecording = async () => {
-    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    cancelRecording();
-  };
-
   const handleSendText = async () => {
     if (textMessage.trim()) {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -198,12 +191,6 @@ export default function ChatScreen() {
     }, 1500);
   };
 
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
   const renderMessage = ({ item }: { item: Message }) => (
     <ChatMessage message={item} />
   );
@@ -238,13 +225,11 @@ export default function ChatScreen() {
             audioLevel={audioLevel}
           />
           
-          {/* Status / Recording info */}
+          {/* Status info */}
           {isRecording ? (
-            <View style={styles.recordingStatus}>
-              <Text style={styles.recordingTime}>{formatDuration(duration)}</Text>
-              <TouchableOpacity onPress={handleCancelRecording} style={styles.cancelButton}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
+            <View style={styles.statusContainer}>
+              <View style={[styles.statusDot, { backgroundColor: colors.error }]} />
+              <Text style={styles.statusText}>Listening...</Text>
             </View>
           ) : isTranscribing ? (
             <View style={styles.statusContainer}>
@@ -390,28 +375,6 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: typography.sm,
     color: colors.primary,
-    fontWeight: '500',
-  },
-  recordingStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    marginTop: spacing.sm,
-  },
-  recordingTime: {
-    fontSize: typography.xl,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    fontVariant: ['tabular-nums'],
-  },
-  cancelButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    backgroundColor: colors.error + '20',
-    borderRadius: borderRadius.md,
-  },
-  cancelText: {
-    color: colors.error,
     fontWeight: '500',
   },
   messageList: {

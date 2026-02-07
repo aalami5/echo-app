@@ -19,11 +19,11 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
   
   // Ring animations - each ring pulses independently
   const ring1Scale = useRef(new Animated.Value(1)).current;
-  const ring1Opacity = useRef(new Animated.Value(0.6)).current;
+  const ring1Opacity = useRef(new Animated.Value(0.8)).current;
   const ring2Scale = useRef(new Animated.Value(1)).current;
-  const ring2Opacity = useRef(new Animated.Value(0.4)).current;
+  const ring2Opacity = useRef(new Animated.Value(0.5)).current;
   const ring3Scale = useRef(new Animated.Value(1)).current;
-  const ring3Opacity = useRef(new Animated.Value(0.2)).current;
+  const ring3Opacity = useRef(new Animated.Value(0.3)).current;
 
   // Audio-reactive scale for recording
   const audioScale = useRef(new Animated.Value(1)).current;
@@ -31,7 +31,7 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
   // React to audio level during recording
   useEffect(() => {
     if (isRecording && audioLevel > 0) {
-      const scale = 1 + (audioLevel * 0.3); // Scale up to 1.3 based on audio
+      const scale = 1 + (audioLevel * 0.3);
       Animated.spring(audioScale, {
         toValue: scale,
         friction: 5,
@@ -53,11 +53,11 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
     coreScale.setValue(1);
     coreOpacity.setValue(1);
     ring1Scale.setValue(1);
-    ring1Opacity.setValue(0.6);
+    ring1Opacity.setValue(0.8);
     ring2Scale.setValue(1);
-    ring2Opacity.setValue(0.4);
+    ring2Opacity.setValue(0.5);
     ring3Scale.setValue(1);
-    ring3Opacity.setValue(0.2);
+    ring3Opacity.setValue(0.3);
 
     let animations: Animated.CompositeAnimation[] = [];
 
@@ -97,9 +97,9 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
         // Active listening - rings expand and brighten
         animations.push(
           Animated.parallel([
-            Animated.timing(ring1Opacity, { toValue: 0.9, duration: 200, useNativeDriver: true }),
-            Animated.timing(ring2Opacity, { toValue: 0.7, duration: 200, useNativeDriver: true }),
-            Animated.timing(ring3Opacity, { toValue: 0.5, duration: 200, useNativeDriver: true }),
+            Animated.timing(ring1Opacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+            Animated.timing(ring2Opacity, { toValue: 0.8, duration: 200, useNativeDriver: true }),
+            Animated.timing(ring3Opacity, { toValue: 0.6, duration: 200, useNativeDriver: true }),
           ])
         );
         // Pulsing rings while listening
@@ -124,7 +124,7 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
         break;
 
       case 'thinking':
-        // Thinking - core pulses, rings contract slightly with yellow tint handled by stateColor
+        // Thinking - core pulses, rings contract slightly
         animations.push(
           Animated.loop(
             Animated.sequence([
@@ -175,9 +175,9 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
         // Bright rings while speaking
         animations.push(
           Animated.parallel([
-            Animated.timing(ring1Opacity, { toValue: 0.8, duration: 150, useNativeDriver: true }),
-            Animated.timing(ring2Opacity, { toValue: 0.6, duration: 150, useNativeDriver: true }),
-            Animated.timing(ring3Opacity, { toValue: 0.4, duration: 150, useNativeDriver: true }),
+            Animated.timing(ring1Opacity, { toValue: 1, duration: 150, useNativeDriver: true }),
+            Animated.timing(ring2Opacity, { toValue: 0.7, duration: 150, useNativeDriver: true }),
+            Animated.timing(ring3Opacity, { toValue: 0.5, duration: 150, useNativeDriver: true }),
           ])
         );
         break;
@@ -219,36 +219,27 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
 
   // State-based colors
   const stateColor = {
-    idle: colors.avatarIdle,        // Cyan/teal
-    listening: colors.avatarListening, // Bright cyan
-    thinking: colors.avatarThinking,   // Yellow
-    speaking: colors.avatarSpeaking,   // Teal/green
-    alert: colors.avatarAlert,         // Orange/red
+    idle: colors.avatarIdle,
+    listening: colors.avatarListening,
+    thinking: colors.avatarThinking,
+    speaking: colors.avatarSpeaking,
+    alert: colors.avatarAlert,
   }[state];
 
-  const coreSize = size * 0.35;
-  const ring1Size = size * 0.55;
-  const ring2Size = size * 0.75;
-  const ring3Size = size * 0.95;
+  // Sizes with clear spacing between rings
+  const coreSize = size * 0.30;
+  const ring1Size = size * 0.50;
+  const ring2Size = size * 0.72;
+  const ring3Size = size * 0.94;
+
+  // Graduated thickness: inner rings thicker, outer rings thinner
+  const ring1Width = 4;
+  const ring2Width = 2.5;
+  const ring3Width = 1.5;
 
   return (
-    <Pressable onPress={handlePress} style={[styles.container, { width: size * 1.3, height: size * 1.3 }]}>
-      {/* Outer glow */}
-      <Animated.View
-        style={[
-          styles.glow,
-          {
-            width: size * 1.2,
-            height: size * 1.2,
-            borderRadius: size * 0.6,
-            backgroundColor: stateColor,
-            opacity: 0.15,
-            transform: [{ scale: ring3Scale }],
-          },
-        ]}
-      />
-
-      {/* Ring 3 (outermost) */}
+    <Pressable onPress={handlePress} style={[styles.container, { width: size * 1.2, height: size * 1.2 }]}>
+      {/* Ring 3 (outermost) - thinnest */}
       <Animated.View
         style={[
           styles.ring,
@@ -256,6 +247,7 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
             width: ring3Size,
             height: ring3Size,
             borderRadius: ring3Size / 2,
+            borderWidth: ring3Width,
             borderColor: stateColor,
             opacity: ring3Opacity,
             transform: [{ scale: ring3Scale }, { scale: audioScale }],
@@ -263,7 +255,7 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
         ]}
       />
 
-      {/* Ring 2 */}
+      {/* Ring 2 - medium thickness */}
       <Animated.View
         style={[
           styles.ring,
@@ -271,6 +263,7 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
             width: ring2Size,
             height: ring2Size,
             borderRadius: ring2Size / 2,
+            borderWidth: ring2Width,
             borderColor: stateColor,
             opacity: ring2Opacity,
             transform: [{ scale: ring2Scale }, { scale: audioScale }],
@@ -278,7 +271,7 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
         ]}
       />
 
-      {/* Ring 1 (innermost ring) */}
+      {/* Ring 1 (innermost ring) - thickest */}
       <Animated.View
         style={[
           styles.ring,
@@ -286,6 +279,7 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
             width: ring1Size,
             height: ring1Size,
             borderRadius: ring1Size / 2,
+            borderWidth: ring1Width,
             borderColor: stateColor,
             opacity: ring1Opacity,
             transform: [{ scale: ring1Scale }, { scale: audioScale }],
@@ -306,8 +300,8 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
             transform: [{ scale: coreScale }, { scale: audioScale }],
             ...shadows.glow,
             shadowColor: stateColor,
-            shadowRadius: 20,
-            shadowOpacity: 0.8,
+            shadowRadius: 15,
+            shadowOpacity: 0.9,
           },
         ]}
       />
@@ -320,12 +314,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  glow: {
-    position: 'absolute',
-  },
   ring: {
     position: 'absolute',
-    borderWidth: 2,
+    backgroundColor: 'transparent',
   },
   core: {
     position: 'absolute',
