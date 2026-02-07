@@ -1,275 +1,268 @@
 import React, { useEffect, useRef } from 'react';
-import {
-  StyleSheet,
-  View,
-  Animated,
-  Easing,
-  TouchableOpacity,
-} from 'react-native';
+import { StyleSheet, View, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as Haptics from 'expo-haptics';
-import { colors } from '../constants/theme';
 import type { AvatarState } from '../types';
+import { colors, shadows } from '../constants/theme';
 
 interface AvatarProps {
   state: AvatarState;
   size?: number;
-  onPress?: () => void;
-  isRecording?: boolean;
-  audioLevel?: number;
 }
 
-export function Avatar({ 
-  state, 
-  size = 120, 
-  onPress, 
-  isRecording = false,
-  audioLevel = 0 
-}: AvatarProps) {
-  // Animation values
-  const breatheAnim = useRef(new Animated.Value(1)).current;
-  const coreGlow = useRef(new Animated.Value(0.6)).current;
-  const ring1 = useRef(new Animated.Value(1)).current;
-  const ring2 = useRef(new Animated.Value(1)).current;
-  const ring3 = useRef(new Animated.Value(1)).current;
-  const ring1Opacity = useRef(new Animated.Value(0.5)).current;
-  const ring2Opacity = useRef(new Animated.Value(0.4)).current;
-  const ring3Opacity = useRef(new Animated.Value(0.3)).current;
+export function Avatar({ state, size = 120 }: AvatarProps) {
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+  const glowAnim = useRef(new Animated.Value(0.3)).current;
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+  const coreAnim = useRef(new Animated.Value(1)).current;
 
-  // Idle breathing animation
   useEffect(() => {
-    if (state === 'idle' && !isRecording) {
-      const breathe = Animated.loop(
-        Animated.sequence([
-          Animated.timing(breatheAnim, {
-            toValue: 1.05,
-            duration: 2000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(breatheAnim, {
-            toValue: 1,
-            duration: 2000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      breathe.start();
-      return () => breathe.stop();
-    }
-  }, [state, isRecording]);
-
-  // Core glow pulse
-  useEffect(() => {
-    const glow = Animated.loop(
-      Animated.sequence([
-        Animated.timing(coreGlow, {
-          toValue: isRecording ? 1 : state === 'speaking' ? 0.9 : 0.8,
-          duration: isRecording ? 300 : 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(coreGlow, {
-          toValue: isRecording ? 0.6 : state === 'speaking' ? 0.5 : 0.5,
-          duration: isRecording ? 300 : 1500,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    glow.start();
-    return () => glow.stop();
-  }, [state, isRecording]);
-
-  // Pulsing rings animation - the "echo" effect
-  useEffect(() => {
-    const duration = isRecording ? 800 : state === 'speaking' ? 600 : state === 'thinking' ? 1200 : 2000;
+    // Reset animations
+    pulseAnim.setValue(1);
+    glowAnim.setValue(0.3);
     
-    const createRingPulse = (
-      scaleAnim: Animated.Value, 
-      opacityAnim: Animated.Value, 
-      maxScale: number, 
-      delay: number,
-      baseOpacity: number
-    ) => {
-      return Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.parallel([
-            Animated.timing(scaleAnim, {
-              toValue: maxScale,
-              duration: duration,
-              easing: Easing.out(Easing.ease),
-              useNativeDriver: true,
-            }),
-            Animated.timing(opacityAnim, {
-              toValue: 0,
-              duration: duration,
-              easing: Easing.out(Easing.ease),
-              useNativeDriver: true,
-            }),
-          ]),
-          Animated.parallel([
-            Animated.timing(scaleAnim, {
+    let animations: Animated.CompositeAnimation[] = [];
+
+    switch (state) {
+      case 'idle':
+        // Gentle breathing pulse
+        animations.push(
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(pulseAnim, {
+                toValue: 1.03,
+                duration: 3000,
+                easing: Easing.inOut(Easing.sin),
+                useNativeDriver: true,
+              }),
+              Animated.timing(pulseAnim, {
+                toValue: 1,
+                duration: 3000,
+                easing: Easing.inOut(Easing.sin),
+                useNativeDriver: true,
+              }),
+            ])
+          )
+        );
+        // Subtle glow pulse
+        animations.push(
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(glowAnim, {
+                toValue: 0.5,
+                duration: 3000,
+                easing: Easing.inOut(Easing.sin),
+                useNativeDriver: true,
+              }),
+              Animated.timing(glowAnim, {
+                toValue: 0.3,
+                duration: 3000,
+                easing: Easing.inOut(Easing.sin),
+                useNativeDriver: true,
+              }),
+            ])
+          )
+        );
+        break;
+
+      case 'listening':
+        // Expanded, ready state with brighter glow
+        animations.push(
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(pulseAnim, {
+                toValue: 1.08,
+                duration: 800,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+              Animated.timing(pulseAnim, {
+                toValue: 1.04,
+                duration: 800,
+                easing: Easing.inOut(Easing.ease),
+                useNativeDriver: true,
+              }),
+            ])
+          )
+        );
+        animations.push(
+          Animated.timing(glowAnim, {
+            toValue: 0.8,
+            duration: 300,
+            useNativeDriver: true,
+          })
+        );
+        break;
+
+      case 'thinking':
+        // Rotating, processing feel
+        animations.push(
+          Animated.loop(
+            Animated.timing(rotateAnim, {
               toValue: 1,
-              duration: 0,
+              duration: 4000,
+              easing: Easing.linear,
               useNativeDriver: true,
-            }),
-            Animated.timing(opacityAnim, {
-              toValue: baseOpacity,
-              duration: 0,
-              useNativeDriver: true,
-            }),
-          ]),
-        ])
-      );
-    };
+            })
+          )
+        );
+        animations.push(
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(coreAnim, {
+                toValue: 0.6,
+                duration: 600,
+                useNativeDriver: true,
+              }),
+              Animated.timing(coreAnim, {
+                toValue: 1,
+                duration: 600,
+                useNativeDriver: true,
+              }),
+            ])
+          )
+        );
+        break;
 
-    const maxScale = isRecording ? 1.8 : state === 'speaking' ? 2.0 : 1.5;
+      case 'speaking':
+        // Rhythmic pulse synced to speech
+        animations.push(
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(pulseAnim, {
+                toValue: 1.06,
+                duration: 150,
+                useNativeDriver: true,
+              }),
+              Animated.timing(pulseAnim, {
+                toValue: 1.02,
+                duration: 150,
+                useNativeDriver: true,
+              }),
+            ])
+          )
+        );
+        animations.push(
+          Animated.timing(glowAnim, {
+            toValue: 0.7,
+            duration: 200,
+            useNativeDriver: true,
+          })
+        );
+        break;
+
+      case 'alert':
+        // Attention pulse
+        animations.push(
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(pulseAnim, {
+                toValue: 1.1,
+                duration: 400,
+                useNativeDriver: true,
+              }),
+              Animated.timing(pulseAnim, {
+                toValue: 1,
+                duration: 400,
+                useNativeDriver: true,
+              }),
+            ])
+          )
+        );
+        animations.push(
+          Animated.loop(
+            Animated.sequence([
+              Animated.timing(glowAnim, {
+                toValue: 1,
+                duration: 400,
+                useNativeDriver: true,
+              }),
+              Animated.timing(glowAnim, {
+                toValue: 0.4,
+                duration: 400,
+                useNativeDriver: true,
+              }),
+            ])
+          )
+        );
+        break;
+    }
+
+    animations.forEach(a => a.start());
     
-    const pulse1 = createRingPulse(ring1, ring1Opacity, maxScale, 0, 0.5);
-    const pulse2 = createRingPulse(ring2, ring2Opacity, maxScale, duration / 3, 0.4);
-    const pulse3 = createRingPulse(ring3, ring3Opacity, maxScale, (duration / 3) * 2, 0.3);
-
-    pulse1.start();
-    pulse2.start();
-    pulse3.start();
-
     return () => {
-      pulse1.stop();
-      pulse2.stop();
-      pulse3.stop();
-      ring1.setValue(1);
-      ring2.setValue(1);
-      ring3.setValue(1);
-      ring1Opacity.setValue(0.5);
-      ring2Opacity.setValue(0.4);
-      ring3Opacity.setValue(0.3);
+      animations.forEach(a => a.stop());
+      rotateAnim.setValue(0);
     };
-  }, [state, isRecording]);
+  }, [state]);
 
-  const handlePress = async () => {
-    await Haptics.impactAsync(
-      isRecording 
-        ? Haptics.ImpactFeedbackStyle.Medium 
-        : Haptics.ImpactFeedbackStyle.Heavy
-    );
-    onPress?.();
-  };
+  const rotation = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', '360deg'],
+  });
 
-  // Colors based on state
-  const isThinking = state === 'thinking';
-  const coreColor = isThinking ? '#FACC15' : colors.primary;
-  const ringColor = isThinking ? '#FDE047' : colors.primary;
-  const glowColor = isThinking ? '#FEF08A' : colors.primaryGlow;
+  const stateColor = {
+    idle: colors.avatarIdle,
+    listening: colors.avatarListening,
+    thinking: colors.avatarThinking,
+    speaking: colors.avatarSpeaking,
+    alert: colors.avatarAlert,
+  }[state];
 
   return (
-    <TouchableOpacity
-      onPress={handlePress}
-      activeOpacity={0.9}
-      disabled={!onPress}
-    >
-      <Animated.View 
+    <View style={[styles.container, { width: size * 1.5, height: size * 1.5 }]}>
+      {/* Outer glow */}
+      <Animated.View
         style={[
-          styles.container, 
-          { 
-            width: size * 2.2, 
-            height: size * 2.2,
-            transform: [{ scale: breatheAnim }],
-          }
+          styles.glow,
+          {
+            width: size * 1.4,
+            height: size * 1.4,
+            borderRadius: size * 0.7,
+            backgroundColor: stateColor,
+            opacity: glowAnim,
+            transform: [{ scale: pulseAnim }],
+          },
+        ]}
+      />
+      
+      {/* Main avatar body */}
+      <Animated.View
+        style={[
+          styles.avatarOuter,
+          {
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+            transform: [
+              { scale: pulseAnim },
+              { rotate: rotation },
+            ],
+          },
         ]}
       >
-        {/* Pulsing ring 3 - outermost */}
-        <Animated.View
-          style={[
-            styles.ring,
-            {
-              width: size,
-              height: size,
-              borderRadius: size / 2,
-              borderColor: ringColor,
-              opacity: ring3Opacity,
-              transform: [{ scale: ring3 }],
-            },
-          ]}
-        />
-
-        {/* Pulsing ring 2 */}
-        <Animated.View
-          style={[
-            styles.ring,
-            {
-              width: size,
-              height: size,
-              borderRadius: size / 2,
-              borderColor: ringColor,
-              opacity: ring2Opacity,
-              transform: [{ scale: ring2 }],
-            },
-          ]}
-        />
-
-        {/* Pulsing ring 1 - innermost ring */}
-        <Animated.View
-          style={[
-            styles.ring,
-            {
-              width: size,
-              height: size,
-              borderRadius: size / 2,
-              borderColor: ringColor,
-              opacity: ring1Opacity,
-              transform: [{ scale: ring1 }],
-            },
-          ]}
-        />
-
-        {/* Outer glow */}
-        <Animated.View
-          style={[
-            styles.glow,
-            {
-              width: size * 0.9,
-              height: size * 0.9,
-              borderRadius: size * 0.45,
-              backgroundColor: glowColor,
-              opacity: coreGlow,
-            },
-          ]}
-        />
-
-        {/* Solid core */}
-        <View
-          style={[
-            styles.core,
-            {
-              width: size * 0.6,
-              height: size * 0.6,
-              borderRadius: size * 0.3,
-              backgroundColor: coreColor,
-              shadowColor: coreColor,
-            },
-          ]}
-        />
-
-        {/* Bright center */}
         <LinearGradient
-          colors={isThinking 
-            ? ['#FFFFFF', '#FEF9C3', '#FACC15']
-            : ['#FFFFFF', '#CFFAFE', colors.primary]
-          }
-          style={[
-            styles.center,
-            {
-              width: size * 0.35,
-              height: size * 0.35,
-              borderRadius: size * 0.175,
-            },
-          ]}
-        />
+          colors={['#1E2D45', '#162032', '#0B1120']}
+          style={[styles.gradient, { borderRadius: size / 2 }]}
+        >
+          {/* Inner rings */}
+          <View style={[styles.ring, styles.ring1, { borderColor: stateColor }]} />
+          <View style={[styles.ring, styles.ring2, { borderColor: stateColor }]} />
+          
+          {/* Core */}
+          <Animated.View
+            style={[
+              styles.core,
+              {
+                backgroundColor: stateColor,
+                opacity: coreAnim,
+                ...shadows.glow,
+                shadowColor: stateColor,
+              },
+            ]}
+          />
+        </LinearGradient>
       </Animated.View>
-    </TouchableOpacity>
+    </View>
   );
 }
 
@@ -278,20 +271,35 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ring: {
-    position: 'absolute',
-    borderWidth: 2,
-  },
   glow: {
     position: 'absolute',
   },
-  core: {
-    position: 'absolute',
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 20,
+  avatarOuter: {
+    overflow: 'hidden',
+    ...shadows.lg,
   },
-  center: {
+  gradient: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ring: {
     position: 'absolute',
+    borderWidth: 1.5,
+    borderRadius: 999,
+    opacity: 0.4,
+  },
+  ring1: {
+    width: '75%',
+    height: '75%',
+  },
+  ring2: {
+    width: '55%',
+    height: '55%',
+  },
+  core: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
   },
 });
