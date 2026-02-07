@@ -88,6 +88,9 @@ interface PatientsState {
   // Quick add helpers
   getRecentComplaints: (limit?: number) => string[];
   getCommonComplaints: () => string[];
+  
+  // Maintenance
+  mergeDuplicateDates: () => void;
 }
 
 // Helper to format date for display
@@ -252,16 +255,14 @@ export const usePatientsStore = create<PatientsState>()(
         const isoDate = getISODate(date);
         const state = get();
         
-        // Check if call day already exists for this date
+        // Check if call day already exists for this date - STRICT CHECK
         const existing = Object.values(state.callDays).find(cd => cd.date === isoDate);
         if (existing) {
-          // Make sure it's in the order array (and only once)
-          if (!state.callDayOrder.includes(existing.id)) {
-            set((s) => ({
-              callDayOrder: [existing.id, ...s.callDayOrder.filter(id => id !== existing.id)],
-              activeCallDayId: existing.id,
-            }));
-          }
+          // Ensure it's active and in order array (deduplicated)
+          set((s) => ({
+            callDayOrder: [existing.id, ...s.callDayOrder.filter(id => id !== existing.id)],
+            activeCallDayId: existing.id,
+          }));
           return existing.id;
         }
         
@@ -274,15 +275,28 @@ export const usePatientsStore = create<PatientsState>()(
           patientIds: [],
         };
         
-        set((state) => ({
-          callDays: {
-            ...state.callDays,
-            [callDayId]: newCallDay,
-          },
-          // Ensure no duplicates in order array
-          callDayOrder: [callDayId, ...state.callDayOrder.filter(id => id !== callDayId)],
-          activeCallDayId: callDayId,
-        }));
+        set((state) => {
+          // Double-check no duplicate was created in the meantime
+          const stillNoExisting = !Object.values(state.callDays).find(cd => cd.date === isoDate);
+          if (!stillNoExisting) {
+            // Another call day was created for this date, abort
+            const existingNow = Object.values(state.callDays).find(cd => cd.date === isoDate)!;
+            return {
+              activeCallDayId: existingNow.id,
+              callDayOrder: [existingNow.id, ...state.callDayOrder.filter(id => id !== existingNow.id)],
+            };
+          }
+          
+          return {
+            callDays: {
+              ...state.callDays,
+              [callDayId]: newCallDay,
+            },
+            // Ensure no duplicates in order array
+            callDayOrder: [callDayId, ...state.callDayOrder.filter(id => id !== callDayId)],
+            activeCallDayId: callDayId,
+          };
+        });
         
         return callDayId;
       },
@@ -395,6 +409,69 @@ export const usePatientsStore = create<PatientsState>()(
         ];
       },
       
+      // Maintenance: merge any duplicate date groups
+      mergeDuplicateDates: () => {
+        const state = get();
+        const dateToCallDay = new Map<string, string>();
+        const mergedCallDays: Record<string, CallDay> = {};
+        const mergedPatients = { ...state.patients };
+        const finalOrder: string[] = [];
+        let hadDuplicates = false;
+        
+        for (const id of state.callDayOrder) {
+          const callDay = state.callDays[id];
+          if (!callDay) continue;
+          
+          if (dateToCallDay.has(callDay.date)) {
+            // Duplicate date found - merge patients into existing call day
+            hadDuplicates = true;
+            const existingId = dateToCallDay.get(callDay.date)!;
+            const existingCallDay = mergedCallDays[existingId];
+            
+            // Move patients to existing call day
+            for (const patientId of callDay.patientIds) {
+              if (mergedPatients[patientId]) {
+                mergedPatients[patientId] = {
+                  ...mergedPatients[patientId],
+                  callDayId: existingId,
+                };
+                if (!existingCallDay.patientIds.includes(patientId)) {
+                  existingCallDay.patientIds.push(patientId);
+                }
+              }
+            }
+            console.log(`[Patients] Merged duplicate ${callDay.date} into ${existingId}`);
+          } else {
+            // First occurrence of this date
+            dateToCallDay.set(callDay.date, id);
+            mergedCallDays[id] = { ...callDay };
+            finalOrder.push(id);
+          }
+        }
+        
+        if (hadDuplicates) {
+          // Sort by date (newest first)
+          finalOrder.sort((a, b) => {
+            const dateA = mergedCallDays[a]?.date || '';
+            const dateB = mergedCallDays[b]?.date || '';
+            return dateB.localeCompare(dateA);
+          });
+          
+          set({
+            callDayOrder: finalOrder,
+            callDays: mergedCallDays,
+            patients: mergedPatients,
+          });
+          
+          // Sync cleaned data to server
+          syncPatients({
+            patients: mergedPatients,
+            callDays: mergedCallDays,
+            callDayOrder: finalOrder,
+          }).catch(e => console.log('[Patients] Sync error:', e));
+        }
+      },
+      
       // Export
       exportToCSV: () => {
         const state = get();
@@ -453,70 +530,11 @@ export const usePatientsStore = create<PatientsState>()(
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         
-        // Cleanup: deduplicate callDayOrder
-        const seenIds = new Set<string>();
-        const cleanOrder: string[] = [];
-        for (const id of state.callDayOrder) {
-          if (!seenIds.has(id) && state.callDays[id]) {
-            seenIds.add(id);
-            cleanOrder.push(id);
-          }
-        }
-        
-        // Cleanup: merge call days with same date
-        const dateToCallDay = new Map<string, string>(); // date -> callDayId
-        const mergedCallDays: Record<string, CallDay> = {};
-        const mergedPatients = { ...state.patients };
-        const finalOrder: string[] = [];
-        
-        for (const id of cleanOrder) {
-          const callDay = state.callDays[id];
-          if (!callDay) continue;
-          
-          if (dateToCallDay.has(callDay.date)) {
-            // Duplicate date - merge patients into existing call day
-            const existingId = dateToCallDay.get(callDay.date)!;
-            const existingCallDay = mergedCallDays[existingId];
-            
-            // Move patients to existing call day
-            for (const patientId of callDay.patientIds) {
-              if (mergedPatients[patientId]) {
-                mergedPatients[patientId] = {
-                  ...mergedPatients[patientId],
-                  callDayId: existingId,
-                };
-                if (!existingCallDay.patientIds.includes(patientId)) {
-                  existingCallDay.patientIds.push(patientId);
-                }
-              }
-            }
-          } else {
-            // First occurrence of this date
-            dateToCallDay.set(callDay.date, id);
-            mergedCallDays[id] = { ...callDay };
-            finalOrder.push(id);
-          }
-        }
-        
-        // Sort by date (newest first)
-        finalOrder.sort((a, b) => {
-          const dateA = mergedCallDays[a]?.date || '';
-          const dateB = mergedCallDays[b]?.date || '';
-          return dateB.localeCompare(dateA);
-        });
-        
-        // Apply cleanup if there were changes
-        if (
-          cleanOrder.length !== state.callDayOrder.length ||
-          Object.keys(mergedCallDays).length !== Object.keys(state.callDays).length
-        ) {
-          usePatientsStore.setState({
-            callDayOrder: finalOrder,
-            callDays: mergedCallDays,
-            patients: mergedPatients,
-          });
-          console.log('[Patients] Cleaned up duplicate call days');
-        }
+        // Run cleanup after a short delay to ensure store is ready
+        setTimeout(() => {
+          usePatientsStore.getState().mergeDuplicateDates();
+          console.log('[Patients] Rehydration cleanup complete');
+        }, 100);
       },
     }
   )
