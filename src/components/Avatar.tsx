@@ -124,29 +124,31 @@ export function Avatar({ state, size = 120, onPress, isRecording, audioLevel = 0
         break;
 
       case 'thinking':
-        // Thinking - core pulses, rings contract slightly
+        // Thinking - same gentle breathing as idle, just in yellow
         animations.push(
           Animated.loop(
-            Animated.sequence([
-              Animated.timing(coreOpacity, { toValue: 0.5, duration: 500, useNativeDriver: true }),
-              Animated.timing(coreOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+            Animated.stagger(400, [
+              Animated.sequence([
+                Animated.timing(ring1Scale, { toValue: 1.08, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+                Animated.timing(ring1Scale, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+              ]),
+              Animated.sequence([
+                Animated.timing(ring2Scale, { toValue: 1.12, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+                Animated.timing(ring2Scale, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+              ]),
+              Animated.sequence([
+                Animated.timing(ring3Scale, { toValue: 1.15, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+                Animated.timing(ring3Scale, { toValue: 1, duration: 2000, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+              ]),
             ])
           )
         );
-        // Rings pulse inward/outward rhythmically
+        // Subtle core pulse
         animations.push(
           Animated.loop(
             Animated.sequence([
-              Animated.parallel([
-                Animated.timing(ring1Scale, { toValue: 0.95, duration: 400, useNativeDriver: true }),
-                Animated.timing(ring2Scale, { toValue: 0.9, duration: 400, useNativeDriver: true }),
-                Animated.timing(ring3Scale, { toValue: 0.85, duration: 400, useNativeDriver: true }),
-              ]),
-              Animated.parallel([
-                Animated.timing(ring1Scale, { toValue: 1.1, duration: 400, useNativeDriver: true }),
-                Animated.timing(ring2Scale, { toValue: 1.15, duration: 400, useNativeDriver: true }),
-                Animated.timing(ring3Scale, { toValue: 1.2, duration: 400, useNativeDriver: true }),
-              ]),
+              Animated.timing(coreScale, { toValue: 1.05, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
+              Animated.timing(coreScale, { toValue: 1, duration: 2500, easing: Easing.inOut(Easing.sin), useNativeDriver: true }),
             ])
           )
         );

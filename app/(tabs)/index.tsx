@@ -225,6 +225,8 @@ export default function ChatScreen() {
             audioLevel={audioLevel}
           />
           
+          <View style={{ height: spacing.lg }} />
+          
           {/* Status info */}
           {isRecording ? (
             <View style={styles.statusContainer}>
