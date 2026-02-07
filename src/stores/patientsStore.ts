@@ -223,15 +223,23 @@ export const usePatientsStore = create<PatientsState>()(
       },
       
       createCallDay: (date = new Date()) => {
-        const callDayId = generateUUID();
         const isoDate = getISODate(date);
+        const state = get();
         
         // Check if call day already exists for this date
-        const existing = Object.values(get().callDays).find(cd => cd.date === isoDate);
+        const existing = Object.values(state.callDays).find(cd => cd.date === isoDate);
         if (existing) {
+          // Make sure it's in the order array (and only once)
+          if (!state.callDayOrder.includes(existing.id)) {
+            set((s) => ({
+              callDayOrder: [existing.id, ...s.callDayOrder.filter(id => id !== existing.id)],
+              activeCallDayId: existing.id,
+            }));
+          }
           return existing.id;
         }
         
+        const callDayId = generateUUID();
         const newCallDay: CallDay = {
           id: callDayId,
           date: isoDate,
@@ -245,7 +253,8 @@ export const usePatientsStore = create<PatientsState>()(
             ...state.callDays,
             [callDayId]: newCallDay,
           },
-          callDayOrder: [callDayId, ...state.callDayOrder],
+          // Ensure no duplicates in order array
+          callDayOrder: [callDayId, ...state.callDayOrder.filter(id => id !== callDayId)],
           activeCallDayId: callDayId,
         }));
         
@@ -407,6 +416,74 @@ export const usePatientsStore = create<PatientsState>()(
         callDays: state.callDays,
         callDayOrder: state.callDayOrder,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        
+        // Cleanup: deduplicate callDayOrder
+        const seenIds = new Set<string>();
+        const cleanOrder: string[] = [];
+        for (const id of state.callDayOrder) {
+          if (!seenIds.has(id) && state.callDays[id]) {
+            seenIds.add(id);
+            cleanOrder.push(id);
+          }
+        }
+        
+        // Cleanup: merge call days with same date
+        const dateToCallDay = new Map<string, string>(); // date -> callDayId
+        const mergedCallDays: Record<string, CallDay> = {};
+        const mergedPatients = { ...state.patients };
+        const finalOrder: string[] = [];
+        
+        for (const id of cleanOrder) {
+          const callDay = state.callDays[id];
+          if (!callDay) continue;
+          
+          if (dateToCallDay.has(callDay.date)) {
+            // Duplicate date - merge patients into existing call day
+            const existingId = dateToCallDay.get(callDay.date)!;
+            const existingCallDay = mergedCallDays[existingId];
+            
+            // Move patients to existing call day
+            for (const patientId of callDay.patientIds) {
+              if (mergedPatients[patientId]) {
+                mergedPatients[patientId] = {
+                  ...mergedPatients[patientId],
+                  callDayId: existingId,
+                };
+                if (!existingCallDay.patientIds.includes(patientId)) {
+                  existingCallDay.patientIds.push(patientId);
+                }
+              }
+            }
+          } else {
+            // First occurrence of this date
+            dateToCallDay.set(callDay.date, id);
+            mergedCallDays[id] = { ...callDay };
+            finalOrder.push(id);
+          }
+        }
+        
+        // Sort by date (newest first)
+        finalOrder.sort((a, b) => {
+          const dateA = mergedCallDays[a]?.date || '';
+          const dateB = mergedCallDays[b]?.date || '';
+          return dateB.localeCompare(dateA);
+        });
+        
+        // Apply cleanup if there were changes
+        if (
+          cleanOrder.length !== state.callDayOrder.length ||
+          Object.keys(mergedCallDays).length !== Object.keys(state.callDays).length
+        ) {
+          usePatientsStore.setState({
+            callDayOrder: finalOrder,
+            callDays: mergedCallDays,
+            patients: mergedPatients,
+          });
+          console.log('[Patients] Cleaned up duplicate call days');
+        }
+      },
     }
   )
 );

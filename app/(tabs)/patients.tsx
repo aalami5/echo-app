@@ -393,7 +393,7 @@ export default function PatientsScreen() {
     >
       <View style={styles.patientInfo}>
         <View style={styles.patientNameRow}>
-          <Text style={styles.patientName}>{patient.name}</Text>
+          <Text style={styles.patientName} numberOfLines={1}>{patient.name}</Text>
           {patient.room && (
             <Text style={styles.patientRoom}>{patient.room}</Text>
           )}
@@ -403,13 +403,15 @@ export default function PatientsScreen() {
           {patient.dob && <Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}
         </View>
         {patient.chiefComplaint && (
-          <Text style={styles.patientComplaint}>{patient.chiefComplaint}</Text>
+          <Text style={styles.patientComplaint} numberOfLines={2}>{patient.chiefComplaint}</Text>
         )}
         {showHospital && (
           <Text style={styles.patientHospital}>{HOSPITAL_NAMES[patient.hospital]}</Text>
         )}
       </View>
-      <Ionicons name="pencil" size={16} color={colors.textTertiary} />
+      <View style={styles.patientEditIcon}>
+        <Ionicons name="pencil" size={16} color={colors.textTertiary} />
+      </View>
     </TouchableOpacity>
   ), [handleEditPatient, handleDeletePatient]);
   
@@ -1447,7 +1449,7 @@ const styles = StyleSheet.create({
   },
   patientRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.md,
     padding: spacing.md,
@@ -1455,11 +1457,17 @@ const styles = StyleSheet.create({
   },
   patientInfo: {
     flex: 1,
+    marginRight: spacing.sm,
+  },
+  patientEditIcon: {
+    paddingTop: 2,
+    paddingLeft: spacing.xs,
   },
   patientName: {
     fontSize: typography.base,
     fontWeight: typography.semibold,
     color: colors.textPrimary,
+    flex: 1,
   },
   patientDetails: {
     flexDirection: 'row',
