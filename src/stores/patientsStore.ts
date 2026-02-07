@@ -2,13 +2,15 @@
  * Patients Store
  * 
  * Stores patient list data for on-call tracking.
- * Data is stored locally only (PHI security).
+ * Data is stored locally with secure storage (PHI security).
+ * Syncs to remote server for search/backup.
  * Organized by call day, grouped by hospital.
  */
 
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import * as SecureStore from 'expo-secure-store';
+import { syncPatients } from '../services/patientSync';
 
 // Simple UUID generator (no external dependency)
 const generateUUID = (): string => {
@@ -186,6 +188,14 @@ export const usePatientsStore = create<PatientsState>()(
           activeCallDayId: targetCallDayId,
         }));
         
+        // Sync to server (async, non-blocking)
+        const newState = get();
+        syncPatients({
+          patients: newState.patients,
+          callDays: newState.callDays,
+          callDayOrder: newState.callDayOrder,
+        }).catch(e => console.log('[Patients] Sync error:', e));
+        
         return patientId;
       },
       
@@ -199,6 +209,14 @@ export const usePatientsStore = create<PatientsState>()(
             },
           },
         }));
+        
+        // Sync to server (async, non-blocking)
+        const newState = get();
+        syncPatients({
+          patients: newState.patients,
+          callDays: newState.callDays,
+          callDayOrder: newState.callDayOrder,
+        }).catch(e => console.log('[Patients] Sync error:', e));
       },
       
       deletePatient: (id) => {
@@ -220,6 +238,14 @@ export const usePatientsStore = create<PatientsState>()(
             } : state.callDays,
           };
         });
+        
+        // Sync to server (async, non-blocking)
+        const newState = get();
+        syncPatients({
+          patients: newState.patients,
+          callDays: newState.callDays,
+          callDayOrder: newState.callDayOrder,
+        }).catch(e => console.log('[Patients] Sync error:', e));
       },
       
       createCallDay: (date = new Date()) => {
@@ -281,6 +307,14 @@ export const usePatientsStore = create<PatientsState>()(
             activeCallDayId: state.activeCallDayId === id ? null : state.activeCallDayId,
           };
         });
+        
+        // Sync to server (async, non-blocking)
+        const newState = get();
+        syncPatients({
+          patients: newState.patients,
+          callDays: newState.callDays,
+          callDayOrder: newState.callDayOrder,
+        }).catch(e => console.log('[Patients] Sync error:', e));
       },
       
       setSearchQuery: (query) => set({ searchQuery: query }),
