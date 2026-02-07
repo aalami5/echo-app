@@ -107,7 +107,11 @@ const getDayOfWeek = (date: Date): string => {
 };
 
 const getISODate = (date: Date): string => {
-  return date.toISOString().split('T')[0];
+  // Use local timezone, not UTC, to avoid date mismatches
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 };
 
 // Custom storage adapter using SecureStore for persistence (PHI security)
@@ -155,6 +159,10 @@ export const usePatientsStore = create<PatientsState>()(
         const state = get();
         const today = getISODate(new Date());
         
+        console.log('[Patients] Adding patient, today is:', today);
+        console.log('[Patients] Explicit callDayId:', callDayId);
+        console.log('[Patients] Existing call days:', Object.values(state.callDays).map(cd => cd.date));
+        
         // Determine target call day:
         // 1. If explicit callDayId provided, use it
         // 2. Otherwise, ALWAYS use today's date (create if needed)
@@ -163,13 +171,18 @@ export const usePatientsStore = create<PatientsState>()(
         if (!targetCallDayId) {
           // Find or create today's call day
           const existingToday = Object.values(state.callDays).find(cd => cd.date === today);
+          console.log('[Patients] Found existing today group:', existingToday?.id, existingToday?.date);
+          
           if (existingToday) {
             targetCallDayId = existingToday.id;
           } else {
             // Create new call day for today
+            console.log('[Patients] Creating new call day for:', today);
             targetCallDayId = get().createCallDay();
           }
         }
+        
+        console.log('[Patients] Final targetCallDayId:', targetCallDayId);
         
         const patientId = generateUUID();
         const newPatient: Patient = {
