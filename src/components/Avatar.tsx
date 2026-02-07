@@ -6,8 +6,9 @@ import {
   Easing,
   TouchableOpacity,
 } from 'react-native';
-import Svg, { Path, Defs, RadialGradient, Stop, Circle, G } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
+import { colors } from '../constants/theme';
 import type { AvatarState } from '../types';
 
 interface AvatarProps {
@@ -18,9 +19,6 @@ interface AvatarProps {
   audioLevel?: number;
 }
 
-// Attempt simpler approach with animated circular layers that have wavy borders
-const AnimatedView = Animated.View;
-
 export function Avatar({ 
   state, 
   size = 120, 
@@ -29,163 +27,29 @@ export function Avatar({
   audioLevel = 0 
 }: AvatarProps) {
   // Animation values
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const glowAnim = useRef(new Animated.Value(0.5)).current;
-  const layer1Anim = useRef(new Animated.Value(1)).current;
-  const layer2Anim = useRef(new Animated.Value(1)).current;
-  const layer3Anim = useRef(new Animated.Value(1)).current;
-  const layer4Anim = useRef(new Animated.Value(1)).current;
-  const accentRotate = useRef(new Animated.Value(0)).current;
   const breatheAnim = useRef(new Animated.Value(1)).current;
+  const coreGlow = useRef(new Animated.Value(0.6)).current;
+  const ring1 = useRef(new Animated.Value(1)).current;
+  const ring2 = useRef(new Animated.Value(1)).current;
+  const ring3 = useRef(new Animated.Value(1)).current;
+  const ring1Opacity = useRef(new Animated.Value(0.5)).current;
+  const ring2Opacity = useRef(new Animated.Value(0.4)).current;
+  const ring3Opacity = useRef(new Animated.Value(0.3)).current;
 
-  // Determine animation intensity based on state
-  const getIntensity = () => {
-    if (state === 'speaking') return { speed: 0.5, scale: 0.15 }; // Most dynamic
-    if (isRecording) return { speed: 0.7, scale: 0.1 }; // Moderate
-    if (state === 'thinking') return { speed: 1.2, scale: 0.03 }; // Subtle, dense
-    return { speed: 1, scale: 0.05 }; // Idle - gentle
-  };
-
-  const intensity = getIntensity();
-
-  // Main pulse animation
-  useEffect(() => {
-    const createLayerPulse = (anim: Animated.Value, duration: number, delay: number, scale: number) => {
-      return Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(anim, {
-            toValue: 1 + scale,
-            duration: duration * intensity.speed,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(anim, {
-            toValue: 1 - scale * 0.5,
-            duration: duration * intensity.speed,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-    };
-
-    const pulse1 = createLayerPulse(layer1Anim, 2000, 0, intensity.scale);
-    const pulse2 = createLayerPulse(layer2Anim, 2200, 150, intensity.scale * 0.8);
-    const pulse3 = createLayerPulse(layer3Anim, 2400, 300, intensity.scale * 0.6);
-    const pulse4 = createLayerPulse(layer4Anim, 2600, 450, intensity.scale * 0.4);
-
-    pulse1.start();
-    pulse2.start();
-    pulse3.start();
-    pulse4.start();
-
-    return () => {
-      pulse1.stop();
-      pulse2.stop();
-      pulse3.stop();
-      pulse4.stop();
-    };
-  }, [intensity.speed, intensity.scale]);
-
-  // Glow animation
-  useEffect(() => {
-    const glow = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim, {
-          toValue: state === 'speaking' ? 0.9 : isRecording ? 0.75 : 0.6,
-          duration: 1500 * intensity.speed,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim, {
-          toValue: state === 'speaking' ? 0.5 : isRecording ? 0.4 : 0.3,
-          duration: 1500 * intensity.speed,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    glow.start();
-    return () => glow.stop();
-  }, [state, isRecording, intensity.speed]);
-
-  // Rotation for accent elements
-  useEffect(() => {
-    const rotate = Animated.loop(
-      Animated.timing(accentRotate, {
-        toValue: 1,
-        duration: 20000,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      })
-    );
-    rotate.start();
-    return () => rotate.stop();
-  }, []);
-
-  // Slow breathing for entire avatar when idle
+  // Idle breathing animation
   useEffect(() => {
     if (state === 'idle' && !isRecording) {
       const breathe = Animated.loop(
         Animated.sequence([
           Animated.timing(breatheAnim, {
-            toValue: 1.04,
-            duration: 2500,
+            toValue: 1.05,
+            duration: 2000,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
           Animated.timing(breatheAnim, {
-            toValue: 0.97,
-            duration: 2500,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      breathe.start();
-      return () => {
-        breathe.stop();
-        breatheAnim.setValue(1);
-      };
-    } else {
-      breatheAnim.setValue(1);
-    }
-  }, [state, isRecording]);
-
-  // Core pulse for speaking, breathing for idle
-  useEffect(() => {
-    if (state === 'speaking') {
-      const speak = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.15,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
             toValue: 1,
-            duration: 150,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-      speak.start();
-      return () => speak.stop();
-    } else if (state === 'idle' && !isRecording) {
-      // Slow breathing animation for idle/standby
-      const breathe = Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, {
-            toValue: 1.06,
-            duration: 3000,
-            easing: Easing.inOut(Easing.sin),
-            useNativeDriver: true,
-          }),
-          Animated.timing(pulseAnim, {
-            toValue: 0.98,
-            duration: 3000,
+            duration: 2000,
             easing: Easing.inOut(Easing.sin),
             useNativeDriver: true,
           }),
@@ -193,9 +57,96 @@ export function Avatar({
       );
       breathe.start();
       return () => breathe.stop();
-    } else {
-      pulseAnim.setValue(1);
     }
+  }, [state, isRecording]);
+
+  // Core glow pulse
+  useEffect(() => {
+    const glow = Animated.loop(
+      Animated.sequence([
+        Animated.timing(coreGlow, {
+          toValue: isRecording ? 1 : state === 'speaking' ? 0.9 : 0.8,
+          duration: isRecording ? 300 : 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+        Animated.timing(coreGlow, {
+          toValue: isRecording ? 0.6 : state === 'speaking' ? 0.5 : 0.5,
+          duration: isRecording ? 300 : 1500,
+          easing: Easing.inOut(Easing.sin),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    glow.start();
+    return () => glow.stop();
+  }, [state, isRecording]);
+
+  // Pulsing rings animation - the "echo" effect
+  useEffect(() => {
+    const duration = isRecording ? 800 : state === 'speaking' ? 600 : state === 'thinking' ? 1200 : 2000;
+    
+    const createRingPulse = (
+      scaleAnim: Animated.Value, 
+      opacityAnim: Animated.Value, 
+      maxScale: number, 
+      delay: number,
+      baseOpacity: number
+    ) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.parallel([
+            Animated.timing(scaleAnim, {
+              toValue: maxScale,
+              duration: duration,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacityAnim, {
+              toValue: 0,
+              duration: duration,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            }),
+          ]),
+          Animated.parallel([
+            Animated.timing(scaleAnim, {
+              toValue: 1,
+              duration: 0,
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacityAnim, {
+              toValue: baseOpacity,
+              duration: 0,
+              useNativeDriver: true,
+            }),
+          ]),
+        ])
+      );
+    };
+
+    const maxScale = isRecording ? 1.8 : state === 'speaking' ? 2.0 : 1.5;
+    
+    const pulse1 = createRingPulse(ring1, ring1Opacity, maxScale, 0, 0.5);
+    const pulse2 = createRingPulse(ring2, ring2Opacity, maxScale, duration / 3, 0.4);
+    const pulse3 = createRingPulse(ring3, ring3Opacity, maxScale, (duration / 3) * 2, 0.3);
+
+    pulse1.start();
+    pulse2.start();
+    pulse3.start();
+
+    return () => {
+      pulse1.stop();
+      pulse2.stop();
+      pulse3.stop();
+      ring1.setValue(1);
+      ring2.setValue(1);
+      ring3.setValue(1);
+      ring1Opacity.setValue(0.5);
+      ring2Opacity.setValue(0.4);
+      ring3Opacity.setValue(0.3);
+    };
   }, [state, isRecording]);
 
   const handlePress = async () => {
@@ -207,35 +158,11 @@ export function Avatar({
     onPress?.();
   };
 
-  // Color schemes
+  // Colors based on state
   const isThinking = state === 'thinking';
-  const colors = isThinking ? {
-    outer: '#4A3F00',
-    mid1: '#6B5A00',
-    mid2: '#9A8200',
-    inner: '#CAAB00',
-    core: '#FFE066',
-    glow: '#FACC15',
-    accent: '#FDE047',
-  } : {
-    outer: '#0A2E3D',
-    mid1: '#0C4A5E',
-    mid2: '#0E6377',
-    inner: '#0EA5B5',
-    core: '#67E8F9',
-    glow: '#22D3EE',
-    accent: '#06B6D4',
-  };
-
-  const spin = accentRotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const reverseSpin = accentRotate.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['360deg', '0deg'],
-  });
+  const coreColor = isThinking ? '#FACC15' : colors.primary;
+  const ringColor = isThinking ? '#FDE047' : colors.primary;
+  const glowColor = isThinking ? '#FEF08A' : colors.primaryGlow;
 
   return (
     <TouchableOpacity
@@ -243,153 +170,101 @@ export function Avatar({
       activeOpacity={0.9}
       disabled={!onPress}
     >
-      <Animated.View style={[styles.container, { width: size * 2, height: size * 2, transform: [{ scale: breatheAnim }] }]}>
-        
+      <Animated.View 
+        style={[
+          styles.container, 
+          { 
+            width: size * 2.2, 
+            height: size * 2.2,
+            transform: [{ scale: breatheAnim }],
+          }
+        ]}
+      >
+        {/* Pulsing ring 3 - outermost */}
+        <Animated.View
+          style={[
+            styles.ring,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderColor: ringColor,
+              opacity: ring3Opacity,
+              transform: [{ scale: ring3 }],
+            },
+          ]}
+        />
+
+        {/* Pulsing ring 2 */}
+        <Animated.View
+          style={[
+            styles.ring,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderColor: ringColor,
+              opacity: ring2Opacity,
+              transform: [{ scale: ring2 }],
+            },
+          ]}
+        />
+
+        {/* Pulsing ring 1 - innermost ring */}
+        <Animated.View
+          style={[
+            styles.ring,
+            {
+              width: size,
+              height: size,
+              borderRadius: size / 2,
+              borderColor: ringColor,
+              opacity: ring1Opacity,
+              transform: [{ scale: ring1 }],
+            },
+          ]}
+        />
+
         {/* Outer glow */}
         <Animated.View
           style={[
             styles.glow,
             {
-              width: size * 1.6,
-              height: size * 1.6,
-              borderRadius: size * 0.8,
-              backgroundColor: colors.glow,
-              opacity: glowAnim,
+              width: size * 0.9,
+              height: size * 0.9,
+              borderRadius: size * 0.45,
+              backgroundColor: glowColor,
+              opacity: coreGlow,
             },
           ]}
         />
 
-        {/* Rotating accent elements */}
-        <Animated.View
-          style={[
-            styles.accentContainer,
-            {
-              width: size * 1.8,
-              height: size * 1.8,
-              transform: [{ rotate: spin }],
-            },
-          ]}
-        >
-          {/* Accent dots */}
-          <View style={[styles.accentDot, { backgroundColor: colors.accent, top: 0, left: '45%' }]} />
-          <View style={[styles.accentDot, { backgroundColor: colors.accent, bottom: 0, left: '45%' }]} />
-          <View style={[styles.accentDot, { backgroundColor: colors.accent, left: 0, top: '45%' }]} />
-          <View style={[styles.accentDot, { backgroundColor: colors.accent, right: 0, top: '45%' }]} />
-          
-          {/* Accent arcs */}
-          <View style={[styles.accentArc, { backgroundColor: colors.accent, top: '10%', left: '10%', transform: [{ rotate: '-45deg' }] }]} />
-          <View style={[styles.accentArc, { backgroundColor: colors.accent, top: '10%', right: '10%', transform: [{ rotate: '45deg' }] }]} />
-          <View style={[styles.accentArc, { backgroundColor: colors.accent, bottom: '10%', left: '10%', transform: [{ rotate: '45deg' }] }]} />
-          <View style={[styles.accentArc, { backgroundColor: colors.accent, bottom: '10%', right: '10%', transform: [{ rotate: '-45deg' }] }]} />
-        </Animated.View>
-
-        {/* Counter-rotating accents */}
-        <Animated.View
-          style={[
-            styles.accentContainer,
-            {
-              width: size * 1.5,
-              height: size * 1.5,
-              transform: [{ rotate: reverseSpin }],
-            },
-          ]}
-        >
-          <View style={[styles.accentDotSmall, { backgroundColor: colors.accent, top: '5%', left: '30%' }]} />
-          <View style={[styles.accentDotSmall, { backgroundColor: colors.accent, bottom: '5%', right: '30%' }]} />
-          <View style={[styles.accentDotSmall, { backgroundColor: colors.accent, top: '30%', right: '5%' }]} />
-          <View style={[styles.accentDotSmall, { backgroundColor: colors.accent, bottom: '30%', left: '5%' }]} />
-        </Animated.View>
-
-        {/* Layer 4 - Outermost */}
-        <Animated.View
-          style={[
-            styles.blobLayer,
-            {
-              width: size * 1.3,
-              height: size * 1.3,
-              borderRadius: size * 0.35,
-              backgroundColor: colors.outer,
-              transform: [{ scale: layer4Anim }, { rotate: '45deg' }],
-            },
-          ]}
-        />
-
-        {/* Layer 3 */}
-        <Animated.View
-          style={[
-            styles.blobLayer,
-            {
-              width: size * 1.1,
-              height: size * 1.1,
-              borderRadius: size * 0.3,
-              backgroundColor: colors.mid1,
-              transform: [{ scale: layer3Anim }, { rotate: '45deg' }],
-              borderWidth: 2,
-              borderColor: colors.accent + '40',
-            },
-          ]}
-        />
-
-        {/* Layer 2 */}
-        <Animated.View
-          style={[
-            styles.blobLayer,
-            {
-              width: size * 0.85,
-              height: size * 0.85,
-              borderRadius: size * 0.22,
-              backgroundColor: colors.mid2,
-              transform: [{ scale: layer2Anim }, { rotate: '45deg' }],
-              borderWidth: 1.5,
-              borderColor: colors.accent + '60',
-            },
-          ]}
-        />
-
-        {/* Layer 1 - Inner */}
-        <Animated.View
-          style={[
-            styles.blobLayer,
-            {
-              width: size * 0.6,
-              height: size * 0.6,
-              borderRadius: size * 0.15,
-              backgroundColor: colors.inner,
-              transform: [{ scale: layer1Anim }, { rotate: '45deg' }],
-            },
-          ]}
-        />
-
-        {/* Core - Brightest */}
-        <Animated.View
+        {/* Solid core */}
+        <View
           style={[
             styles.core,
             {
-              width: size * 0.35,
-              height: size * 0.35,
-              borderRadius: size * 0.08,
-              backgroundColor: colors.core,
-              transform: [{ scale: pulseAnim }, { rotate: '45deg' }],
-              shadowColor: colors.core,
-              shadowOpacity: 0.9,
-              shadowRadius: 20,
+              width: size * 0.6,
+              height: size * 0.6,
+              borderRadius: size * 0.3,
+              backgroundColor: coreColor,
+              shadowColor: coreColor,
             },
           ]}
         />
 
-        {/* Center glow point */}
-        <Animated.View
+        {/* Bright center */}
+        <LinearGradient
+          colors={isThinking 
+            ? ['#FFFFFF', '#FEF9C3', '#FACC15']
+            : ['#FFFFFF', '#CFFAFE', colors.primary]
+          }
           style={[
-            styles.centerGlow,
+            styles.center,
             {
-              width: size * 0.15,
-              height: size * 0.15,
-              borderRadius: size * 0.075,
-              backgroundColor: '#FFFFFF',
-              opacity: glowAnim,
-              shadowColor: '#FFFFFF',
-              shadowOpacity: 1,
-              shadowRadius: 15,
+              width: size * 0.35,
+              height: size * 0.35,
+              borderRadius: size * 0.175,
             },
           ]}
         />
@@ -403,41 +278,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  ring: {
+    position: 'absolute',
+    borderWidth: 2,
+  },
   glow: {
-    position: 'absolute',
-  },
-  accentContainer: {
-    position: 'absolute',
-  },
-  accentDot: {
-    position: 'absolute',
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  accentDotSmall: {
-    position: 'absolute',
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    opacity: 0.7,
-  },
-  accentArc: {
-    position: 'absolute',
-    width: 25,
-    height: 3,
-    borderRadius: 1.5,
-    opacity: 0.6,
-  },
-  blobLayer: {
     position: 'absolute',
   },
   core: {
     position: 'absolute',
     shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 20,
   },
-  centerGlow: {
+  center: {
     position: 'absolute',
-    shadowOffset: { width: 0, height: 0 },
   },
 });
