@@ -1,147 +1,181 @@
 # Echo App
 
-Oliver's personal AI assistant interface - a native iOS/macOS app to interact with Echo.
+Oliver's personal AI assistant interface — a native iOS app to interact with Echo.
+
+![Platform](https://img.shields.io/badge/platform-iOS-lightgrey)
+![React Native](https://img.shields.io/badge/React%20Native-Expo%20SDK%2052-blue)
+![License](https://img.shields.io/badge/license-Private-red)
+
+---
 
 ## Features
 
-- 🎨 Beautiful dark theme inspired by Echo's avatar
-- 🎤 Voice input (tap to record)
-- 🔊 Voice output (TTS)
-- 💬 Real-time chat with streaming responses
-- 🔮 Animated avatar with state indicators
-- 🔐 Secure authentication (2FA + biometrics)
-- 📱 Works on iPhone, iPad, and Mac
+- 🎤 **Voice-First** — Tap the avatar to talk, Echo responds with voice
+- 💬 **Text Chat** — Type when voice isn't convenient
+- 🏥 **Patient Tracking** — On-call patient list with voice input and image scanning
+- 🔐 **Secure Storage** — All data encrypted in iOS Keychain
+- 🔮 **Animated Avatar** — Visual feedback for listening, thinking, speaking states
+- 📱 **Native Feel** — Haptic feedback, smooth animations, dark theme
 
-## Getting Started
+---
+
+## Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- npm or yarn
-- Expo Go app on your iPhone (for testing)
-- Xcode (for iOS simulator)
+- Expo Go app on iPhone
 
-### Installation
+### Run
 
 ```bash
-# Clone the repo
+# Clone
 git clone https://github.com/aalami5/echo-app.git
 cd echo-app
 
-# Install dependencies
+# Install
 npm install
 
-# Start the development server
+# Start
 npx expo start
 ```
 
-### Running the App
+Scan the QR code with your iPhone camera to open in Expo Go.
 
-**On iPhone (Expo Go):**
-1. Install "Expo Go" from the App Store
-2. Run `npx expo start` on your computer
-3. Scan the QR code with your iPhone camera
+---
 
-**On iOS Simulator:**
-```bash
-npm run ios
-```
+## Configuration
 
-**On Web (limited features):**
-```bash
-npm run web
-```
+Open the app → Settings tab and configure:
+
+| Setting | Description |
+|---------|-------------|
+| **Gateway URL** | `https://echo.oppersmedical.com` |
+| **Gateway Token** | Your authentication token |
+| **OpenAI API Key** | For Whisper (voice transcription) |
+| **ElevenLabs Key** | For TTS (voice output) |
+
+---
 
 ## Architecture
 
 ```
-src/
-├── app/                 # Expo Router pages
-│   ├── (tabs)/         # Tab navigation
-│   │   ├── index.tsx   # Chat screen
-│   │   └── explore.tsx # Settings screen
-│   └── login.tsx       # Auth screen
-├── components/         # Reusable UI components
-│   ├── Avatar.tsx      # Animated Echo avatar
-│   ├── ChatInput.tsx   # Message input + voice
-│   └── ChatMessage.tsx # Chat bubbles
-├── constants/
-│   └── theme.ts        # Design system tokens
-├── hooks/
-│   └── useVoiceRecording.ts
-├── lib/
-│   ├── supabase.ts     # Auth client
-│   └── websocket.ts    # Gateway connection
-├── stores/
-│   ├── authStore.ts    # Auth state (Zustand)
-│   └── chatStore.ts    # Chat state (Zustand)
-└── types/
-    └── index.ts        # TypeScript types
+┌─────────────────────────────────────┐
+│            Echo App (iOS)           │
+│                                     │
+│  Chat │ Patients │ Calendar │ Settings
+│                                     │
+│        Zustand Stores (Persisted)   │
+│        ─────────────────────────    │
+│        expo-secure-store (Keychain) │
+└──────────────────┬──────────────────┘
+                   │ HTTPS
+                   ▼
+┌──────────────────────────────────────┐
+│   OpenClaw Gateway (Mac Mini)        │
+│   echo.oppersmedical.com             │
+└──────────────────────────────────────┘
 ```
 
-## Configuration
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for full system design.
 
-### Environment Variables
+---
 
-Create `.env` in the project root:
+## Documentation
 
-```env
-EXPO_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-EXPO_PUBLIC_WS_URL=ws://localhost:8765
+| Document | Description |
+|----------|-------------|
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design, data flow, security |
+| [API.md](docs/API.md) | Gateway protocol, external services |
+| [STORES.md](docs/STORES.md) | Zustand state management |
+| [COMPONENTS.md](docs/COMPONENTS.md) | UI component library |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Build, test, release guide |
+| [CHANGELOG.md](docs/CHANGELOG.md) | Version history |
+| [PRD.md](PRD.md) | Product requirements document |
+
+---
+
+## Project Structure
+
+```
+echo-app/
+├── app/                    # Expo Router pages
+│   └── (tabs)/            # Tab screens
+├── src/
+│   ├── components/        # UI components
+│   ├── hooks/             # Custom React hooks
+│   ├── services/          # API clients
+│   ├── stores/            # Zustand stores
+│   └── types/             # TypeScript types
+├── docs/                  # Documentation
+└── assets/                # Images, fonts
 ```
 
-### Supabase Setup
+---
 
-1. Create a project at [supabase.com](https://supabase.com)
-2. Enable Email auth in Authentication settings
-3. Enable MFA/2FA (optional but recommended)
-4. Copy URL and anon key to `.env`
+## Key Features
 
-### Gateway Connection
+### Chat with Persistence
 
-The app connects to the OpenClaw Gateway via WebSocket:
+Messages are stored in iOS Keychain and survive:
+- App crashes
+- Force quit
+- App updates
+- Device restarts (with Keychain backup)
 
-- **Development:** `ws://localhost:8765`
-- **Production:** Configure your server URL
+### Patient Tracking
 
-The Gateway needs the `echo-app` channel plugin enabled.
+- Organize patients by call day
+- Group by hospital (SEQ, ECH, SMCMC, Mills)
+- Voice input for chief complaint
+- Scan images to extract patient details
+- Export to CSV
 
-## Design System
+### Voice Interaction
 
-Based on Echo's avatar color palette:
+- **Input:** Tap avatar → record → Whisper transcription
+- **Output:** ElevenLabs TTS with "River" voice
 
-| Token | Color | Usage |
-|-------|-------|-------|
-| `background` | `#0B1120` | App background |
-| `surface` | `#162032` | Cards, inputs |
-| `primary` | `#5CFFFA` | Buttons, accents |
-| `textPrimary` | `#F8FAFC` | Main text |
-| `textSecondary` | `#94A3B8` | Muted text |
+---
 
-## Avatar States
+## Development
 
-The avatar animates based on Echo's state:
+```bash
+# Start dev server
+npx expo start
 
-- **Idle** — Gentle breathing pulse
-- **Listening** — Expanded, bright glow
-- **Thinking** — Slow rotation, pulsing core
-- **Speaking** — Rhythmic sync pulse
-- **Alert** — Attention-grabbing flash
+# Run on iOS Simulator
+npx expo run:ios
+
+# Clear caches
+npx expo start --clear
+```
+
+---
+
+## Security
+
+- All persistent data encrypted via expo-secure-store (iOS Keychain)
+- Patient data stored locally only (never sent to cloud)
+- HTTPS for all network traffic via Cloudflare Tunnel
+- API keys stored securely on device
+
+---
 
 ## Roadmap
 
-- [x] Phase 1: MVP scaffold
-- [x] Phase 1: Design system
-- [ ] Phase 1: Auth flow (Supabase)
-- [ ] Phase 1: WebSocket connection
-- [ ] Phase 1: Push notifications
-- [ ] Phase 2: Animated avatar (Lottie)
-- [ ] Phase 2: Rich cards
-- [ ] Phase 3: iOS widgets
-- [ ] Phase 3: Siri Shortcuts
-- [ ] Phase 4: Apple Watch app
+- [ ] Push notifications
+- [ ] Streaming responses
+- [ ] iOS widgets
+- [ ] Siri Shortcuts
+- [ ] Apple Watch app
+
+---
 
 ## License
 
-Private - Oliver Aalami
+Private — Oliver Aalami
+
+---
+
+*Built with ❤️ by Echo 🔮*

@@ -1,0 +1,124 @@
+# Changelog
+
+All notable changes to Echo App are documented here.
+
+Format based on [Keep a Changelog](https://keepachangelog.com/).
+
+---
+
+## [Unreleased]
+
+### Added
+- Chat message persistence via SecureStore
+  - Messages now survive app crashes and restarts
+  - Limited to last 100 messages to prevent storage bloat
+  - Uses encrypted iOS Keychain storage
+
+---
+
+## [0.2.0] - 2026-02-06
+
+### Added
+- **Patients Tab** — On-call patient tracking
+  - Call day organization with hospital grouping
+  - Quick add with voice input for chief complaint
+  - Image scanning to extract patient details
+  - Search across all patients
+  - CSV export for backup
+  - Persistent storage via SecureStore
+
+- **Voice Input** — Speech-to-text for patient forms
+  - Uses OpenAI Whisper API
+  - Audio level visualization
+  - Recording duration display
+
+- **Image Scanning** — Extract patient info from photos
+  - Camera and photo library support
+  - OCR via OpenAI Vision
+  - Editable results before adding
+
+- **Pending Patient Flow**
+  - Receive patient info from WhatsApp
+  - Review and edit before adding to list
+  - Haptic notification on arrival
+
+### Changed
+- Improved avatar state transitions
+- Better error handling for gateway connection
+
+### Fixed
+- Gateway URL whitespace handling
+- Connection status sync between hook and store
+
+---
+
+## [0.1.0] - 2026-02-02
+
+### Added
+- **Initial Release** — Core chat functionality
+  - Real-time conversation with Echo
+  - Voice input (tap avatar to record)
+  - Voice output (ElevenLabs TTS)
+  - Animated avatar with state indicators
+  - Dark theme based on Echo's color palette
+
+- **Gateway Integration**
+  - OpenAI-compatible HTTP API
+  - Bearer token authentication
+  - Health check with retry
+
+- **Settings Screen**
+  - Gateway URL and token configuration
+  - Voice on/off toggle
+  - API key management (OpenAI, ElevenLabs)
+  - Haptic feedback toggle
+
+- **Tab Navigation**
+  - Chat (main)
+  - Today (calendar placeholder)
+  - Patients (placeholder)
+  - Settings
+
+---
+
+## Development Milestones
+
+### Phase 1: MVP ✅
+- [x] Project setup (Expo, TypeScript, navigation)
+- [x] Basic chat UI (send/receive text)
+- [x] HTTP API connection to Gateway
+- [x] Voice input (record → Whisper → send)
+- [x] Voice output (TTS playback)
+- [x] Animated avatar (basic states)
+- [x] Settings screen
+- [ ] Push notifications (deferred)
+- [ ] Authentication (deferred)
+
+### Phase 2: Polish (In Progress)
+- [x] Patient tracking feature
+- [x] Chat message persistence
+- [ ] Streaming message display
+- [ ] Rich cards (calendar, email)
+- [ ] Image/file attachments
+- [ ] Memory transparency view
+
+### Phase 3: Platform Integration (Planned)
+- [ ] iOS home screen widget
+- [ ] Siri Shortcuts
+- [ ] macOS support
+
+---
+
+## Upgrade Notes
+
+### 0.1.0 → 0.2.0
+
+No migration needed. Patient data uses new SecureStore keys.
+
+### Pre-0.2.0 → 0.2.0+
+
+Chat history will start fresh (no prior persistence).
+
+---
+
+*Maintained by Echo 🔮*
