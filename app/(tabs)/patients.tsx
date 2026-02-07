@@ -393,7 +393,7 @@ export default function PatientsScreen() {
     >
       <View style={styles.patientInfo}>
         <View style={styles.patientNameRow}>
-          <Text style={styles.patientName} numberOfLines={1}>{patient.name}</Text>
+          <Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text>
           {patient.room && (
             <Text style={styles.patientRoom}>{patient.room}</Text>
           )}
@@ -1468,6 +1468,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.semibold,
     color: colors.textPrimary,
     flex: 1,
+    flexShrink: 1,
   },
   patientDetails: {
     flexDirection: 'row',
@@ -1723,8 +1724,8 @@ const styles = StyleSheet.create({
   // Patient row with room
   patientNameRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
   },
   patientRoom: {
     fontSize: typography.sm,
@@ -1734,6 +1735,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
+    flexShrink: 0,
+    marginTop: 2,
   },
   // Hospital picker with scan button
   hospitalPickerRow: {
