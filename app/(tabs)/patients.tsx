@@ -246,7 +246,6 @@ export default function PatientsScreen() {
         hospital: data.hospital || prev.hospital,
         chiefComplaint: data.chiefComplaint || prev.chiefComplaint,
       }));
-      Alert.alert('Scan Complete', 'Patient details extracted. Review and edit as needed.');
     }
   }, [scanFromCamera]);
   
@@ -265,7 +264,6 @@ export default function PatientsScreen() {
         hospital: data.hospital || prev.hospital,
         chiefComplaint: data.chiefComplaint || prev.chiefComplaint,
       }));
-      Alert.alert('Scan Complete', 'Patient details extracted. Review and edit as needed.');
     }
   }, [scanFromLibrary]);
   
@@ -592,19 +590,13 @@ export default function PatientsScreen() {
           </View>
         ) : (
           <>
-            {/* New Call Day Button */}
-            <TouchableOpacity style={styles.newCallDayButton} onPress={handleNewCallDay}>
-              <Ionicons name="add-circle" size={24} color={colors.primary} />
-              <Text style={styles.newCallDayText}>Start New Call Day</Text>
-            </TouchableOpacity>
-            
             {/* Call Days List */}
             {callDayOrder.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="people-outline" size={48} color={colors.textTertiary} />
-                <Text style={styles.emptyStateTitle}>No call days yet</Text>
+                <Text style={styles.emptyStateTitle}>No patients yet</Text>
                 <Text style={styles.emptyStateSubtitle}>
-                  Start a new call day to begin tracking patients
+                  Tap + to add your first patient
                 </Text>
               </View>
             ) : (
