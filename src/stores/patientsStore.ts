@@ -90,6 +90,7 @@ interface PatientsState {
   getCommonComplaints: () => string[];
   
   // Maintenance
+  fixCallDayLabels: () => void;
   mergeDuplicateDates: () => void;
 }
 
@@ -425,6 +426,45 @@ export const usePatientsStore = create<PatientsState>()(
         ];
       },
       
+      // Maintenance: fix any incorrect displayDate/dayOfWeek based on actual date
+      fixCallDayLabels: () => {
+        const state = get();
+        let hasChanges = false;
+        const fixedCallDays: Record<string, CallDay> = {};
+        
+        for (const [id, callDay] of Object.entries(state.callDays)) {
+          // Parse the date and regenerate displayDate/dayOfWeek
+          const [year, month, day] = callDay.date.split('-').map(Number);
+          const dateObj = new Date(year, month - 1, day); // Local timezone
+          const correctDisplayDate = formatDisplayDate(dateObj);
+          const correctDayOfWeek = getDayOfWeek(dateObj);
+          
+          if (callDay.displayDate !== correctDisplayDate || callDay.dayOfWeek !== correctDayOfWeek) {
+            console.log(`[Patients] Fixing labels for ${callDay.date}: "${callDay.displayDate}" → "${correctDisplayDate}"`);
+            fixedCallDays[id] = {
+              ...callDay,
+              displayDate: correctDisplayDate,
+              dayOfWeek: correctDayOfWeek,
+            };
+            hasChanges = true;
+          } else {
+            fixedCallDays[id] = callDay;
+          }
+        }
+        
+        if (hasChanges) {
+          set({ callDays: fixedCallDays });
+          
+          // Sync fixed data to server
+          const newState = get();
+          syncPatients({
+            patients: newState.patients,
+            callDays: newState.callDays,
+            callDayOrder: newState.callDayOrder,
+          }).catch(e => console.log('[Patients] Sync error:', e));
+        }
+      },
+      
       // Maintenance: merge any duplicate date groups
       mergeDuplicateDates: () => {
         const state = get();
@@ -548,6 +588,7 @@ export const usePatientsStore = create<PatientsState>()(
         
         // Run cleanup after a short delay to ensure store is ready
         setTimeout(() => {
+          usePatientsStore.getState().fixCallDayLabels();
           usePatientsStore.getState().mergeDuplicateDates();
           console.log('[Patients] Rehydration cleanup complete');
         }, 100);
