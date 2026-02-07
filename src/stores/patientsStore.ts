@@ -153,12 +153,15 @@ export const usePatientsStore = create<PatientsState>()(
       
       addPatient: (patientData, callDayId) => {
         const state = get();
+        const today = getISODate(new Date());
         
-        // Use provided call day or create today's call day
-        let targetCallDayId = callDayId || state.activeCallDayId;
+        // Determine target call day:
+        // 1. If explicit callDayId provided, use it
+        // 2. Otherwise, ALWAYS use today's date (create if needed)
+        let targetCallDayId = callDayId;
+        
         if (!targetCallDayId) {
-          // Check if today's call day exists
-          const today = getISODate(new Date());
+          // Find or create today's call day
           const existingToday = Object.values(state.callDays).find(cd => cd.date === today);
           if (existingToday) {
             targetCallDayId = existingToday.id;
