@@ -22,6 +22,7 @@ import {
   Keyboard,
   Image,
   ActivityIndicator,
+  ActionSheetIOS,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -400,7 +401,25 @@ export default function PatientsScreen() {
         style={styles.scanButton}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-          setShowScanModal(true);
+          if (Platform.OS === 'ios') {
+            ActionSheetIOS.showActionSheetWithOptions(
+              {
+                options: ['Cancel', 'Take Photo', 'Photo Library'],
+                cancelButtonIndex: 0,
+                title: 'Scan Image',
+                message: 'Take a photo or select an image to extract patient details',
+              },
+              (buttonIndex) => {
+                if (buttonIndex === 1) {
+                  handleScanCamera();
+                } else if (buttonIndex === 2) {
+                  handleScanLibrary();
+                }
+              }
+            );
+          } else {
+            setShowScanModal(true);
+          }
         }}
         disabled={isScanning || isProcessing}
       >
