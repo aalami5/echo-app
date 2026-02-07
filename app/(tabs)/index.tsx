@@ -81,6 +81,16 @@ export default function ChatScreen() {
     }
   }, [messages.length]);
 
+  // Scroll to bottom on initial load (after persisted messages are loaded)
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Longer delay for initial load to ensure content is rendered
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: false });
+      }, 300);
+    }
+  }, []); // Empty deps = only run on mount
+
   const sendMessageToGateway = async (content: string) => {
     console.log('[Chat] sendMessageToGateway called with:', content);
     
@@ -275,6 +285,17 @@ export default function ChatScreen() {
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmptyState}
+          onContentSizeChange={() => {
+            // Scroll to end when content size changes (initial load + new messages)
+            flatListRef.current?.scrollToEnd({ animated: false });
+          }}
+          onLayout={() => {
+            // Also scroll on layout to catch initial render
+            if (messages.length > 0) {
+              flatListRef.current?.scrollToEnd({ animated: false });
+            }
+          }}
+          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         />
 
         {/* Text input toggle / input area - above tab bar */}
