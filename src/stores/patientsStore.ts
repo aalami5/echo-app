@@ -92,6 +92,7 @@ interface PatientsState {
   // Maintenance
   fixCallDayLabels: () => void;
   mergeDuplicateDates: () => void;
+  reorganizePatientsByTimeSeen: () => void;
 }
 
 // Helper to format date for display
@@ -528,6 +529,106 @@ export const usePatientsStore = create<PatientsState>()(
         }
       },
       
+      // Maintenance: reorganize patients into correct date groups based on timeSeen
+      reorganizePatientsByTimeSeen: () => {
+        const state = get();
+        const updatedPatients: Record<string, Patient> = {};
+        const updatedCallDays: Record<string, CallDay> = {};
+        const dateToCallDayId: Map<string, string> = new Map();
+        let hasChanges = false;
+        
+        console.log('[Patients] Reorganizing patients by timeSeen...');
+        
+        // First, create/find call days for each patient based on their timeSeen
+        for (const patient of Object.values(state.patients)) {
+          // Parse timeSeen to get local date
+          const seenDate = new Date(patient.timeSeen);
+          const patientDate = getISODate(seenDate);
+          
+          console.log(`[Patients] Patient ${patient.name}: timeSeen=${patient.timeSeen} → date=${patientDate}`);
+          
+          // Find or create call day for this date
+          let callDayId = dateToCallDayId.get(patientDate);
+          
+          if (!callDayId) {
+            // Look for existing call day with this date
+            const existingCallDay = Object.values(state.callDays).find(cd => cd.date === patientDate);
+            
+            if (existingCallDay) {
+              callDayId = existingCallDay.id;
+              updatedCallDays[callDayId] = { ...existingCallDay, patientIds: [] };
+            } else {
+              // Create new call day
+              callDayId = generateUUID();
+              const dateObj = new Date(seenDate.getFullYear(), seenDate.getMonth(), seenDate.getDate());
+              updatedCallDays[callDayId] = {
+                id: callDayId,
+                date: patientDate,
+                displayDate: formatDisplayDate(dateObj),
+                dayOfWeek: getDayOfWeek(dateObj),
+                patientIds: [],
+              };
+              console.log(`[Patients] Created new call day for ${patientDate}`);
+            }
+            dateToCallDayId.set(patientDate, callDayId);
+          }
+          
+          // Check if patient needs to move
+          if (patient.callDayId !== callDayId) {
+            console.log(`[Patients] Moving ${patient.name} from ${patient.callDayId} to ${callDayId}`);
+            hasChanges = true;
+          }
+          
+          // Update patient with correct callDayId
+          updatedPatients[patient.id] = {
+            ...patient,
+            callDayId: callDayId,
+          };
+          
+          // Add patient to call day
+          if (!updatedCallDays[callDayId]) {
+            const existingCallDay = state.callDays[callDayId];
+            if (existingCallDay) {
+              updatedCallDays[callDayId] = { ...existingCallDay, patientIds: [] };
+            }
+          }
+          if (updatedCallDays[callDayId]) {
+            updatedCallDays[callDayId].patientIds.push(patient.id);
+          }
+        }
+        
+        // Include any call days that have no patients (keep them)
+        for (const [id, callDay] of Object.entries(state.callDays)) {
+          if (!updatedCallDays[id]) {
+            updatedCallDays[id] = { ...callDay, patientIds: [] };
+          }
+        }
+        
+        // Sort call day order by date (newest first)
+        const newOrder = Object.keys(updatedCallDays).sort((a, b) => {
+          const dateA = updatedCallDays[a]?.date || '';
+          const dateB = updatedCallDays[b]?.date || '';
+          return dateB.localeCompare(dateA);
+        });
+        
+        console.log(`[Patients] Reorganization complete. Changes: ${hasChanges}`);
+        console.log(`[Patients] Call days:`, Object.values(updatedCallDays).map(cd => `${cd.date}: ${cd.patientIds.length} patients`));
+        
+        // Always apply (to fix patientIds arrays even if callDayId didn't change)
+        set({
+          patients: updatedPatients,
+          callDays: updatedCallDays,
+          callDayOrder: newOrder,
+        });
+        
+        // Sync to server
+        syncPatients({
+          patients: updatedPatients,
+          callDays: updatedCallDays,
+          callDayOrder: newOrder,
+        }).catch(e => console.log('[Patients] Sync error:', e));
+      },
+      
       // Export
       exportToCSV: () => {
         const state = get();
@@ -588,8 +689,8 @@ export const usePatientsStore = create<PatientsState>()(
         
         // Run cleanup after a short delay to ensure store is ready
         setTimeout(() => {
-          usePatientsStore.getState().fixCallDayLabels();
-          usePatientsStore.getState().mergeDuplicateDates();
+          // This is the master fix - reorganize all patients by their timeSeen
+          usePatientsStore.getState().reorganizePatientsByTimeSeen();
           console.log('[Patients] Rehydration cleanup complete');
         }, 100);
       },

@@ -62,7 +62,7 @@ export default function PatientsScreen() {
     exportToCSV,
     getRecentComplaints,
     getCommonComplaints,
-    mergeDuplicateDates,
+    reorganizePatientsByTimeSeen,
   } = usePatientsStore();
   
   // Voice input for chief complaint
@@ -120,9 +120,9 @@ export default function PatientsScreen() {
   // Animation refs
   const searchBarHeight = useRef(new Animated.Value(0)).current;
   
-  // Clean up any duplicate date groups on mount
+  // Reorganize patients by their timeSeen on mount
   useEffect(() => {
-    mergeDuplicateDates();
+    reorganizePatientsByTimeSeen();
   }, []);
   
   // Show pending patient modal when new patient arrives from WhatsApp
