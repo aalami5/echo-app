@@ -49,6 +49,7 @@ export default function PatientsScreen() {
     callDayOrder,
     searchQuery,
     addPatient,
+    updatePatient,
     deletePatient,
     createCallDay,
     deleteCallDay,
@@ -86,12 +87,15 @@ export default function PatientsScreen() {
   } = usePatientScan();
   
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
   const [showScanConfirmModal, setShowScanConfirmModal] = useState(false);
   const [pendingScanData, setPendingScanData] = useState<ScannedPatientData | null>(null);
   const [expandedCallDays, setExpandedCallDays] = useState<Set<string>>(new Set());
   const [isSearching, setIsSearching] = useState(false);
   const [showQuickComplaints, setShowQuickComplaints] = useState(false);
+  const [showEditQuickComplaints, setShowEditQuickComplaints] = useState(false);
   
   // Get quick complaints data
   const recentComplaints = useMemo(() => getRecentComplaints(5), [patients]);
@@ -260,6 +264,43 @@ export default function PatientsScreen() {
     clearScan();
   }, [clearScan]);
   
+  // Handle edit patient - open edit modal
+  const handleEditPatient = useCallback((patient: Patient) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setEditingPatient({ ...patient });
+    setShowEditModal(true);
+  }, []);
+  
+  // Save edited patient
+  const handleSaveEdit = useCallback(() => {
+    if (!editingPatient) return;
+    
+    if (!editingPatient.name.trim() || !editingPatient.mrn.trim()) {
+      Alert.alert('Required Fields', 'Please enter at least the patient name and MRN.');
+      return;
+    }
+    
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    updatePatient(editingPatient.id, {
+      name: editingPatient.name,
+      mrn: editingPatient.mrn,
+      dob: editingPatient.dob,
+      room: editingPatient.room,
+      hospital: editingPatient.hospital,
+      chiefComplaint: editingPatient.chiefComplaint,
+    });
+    
+    setShowEditModal(false);
+    setEditingPatient(null);
+  }, [editingPatient, updatePatient]);
+  
+  // Cancel edit
+  const handleCancelEdit = useCallback(() => {
+    setShowEditModal(false);
+    setEditingPatient(null);
+    setShowEditQuickComplaints(false);
+  }, []);
+  
   // Toggle search
   const toggleSearch = useCallback(() => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -285,11 +326,12 @@ export default function PatientsScreen() {
     setExpandedCallDays(prev => new Set([...prev, newId]));
   }, [createCallDay]);
   
-  // Render patient row
+  // Render patient row - tap to edit, long press to delete
   const renderPatient = useCallback((patient: Patient, showHospital = false) => (
     <TouchableOpacity
       key={patient.id}
       style={styles.patientRow}
+      onPress={() => handleEditPatient(patient)}
       onLongPress={() => handleDeletePatient(patient)}
       delayLongPress={500}
     >
@@ -311,9 +353,9 @@ export default function PatientsScreen() {
           <Text style={styles.patientHospital}>{HOSPITAL_NAMES[patient.hospital]}</Text>
         )}
       </View>
-      <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+      <Ionicons name="pencil" size={16} color={colors.textTertiary} />
     </TouchableOpacity>
-  ), [handleDeletePatient]);
+  ), [handleEditPatient, handleDeletePatient]);
   
   // Render hospital section
   const renderHospitalSection = useCallback((callDayId: string, hospital: Hospital) => {
@@ -690,6 +732,200 @@ export default function PatientsScreen() {
                 <Text style={styles.voiceError}>{voiceError}</Text>
               )}
             </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      
+      {/* Edit Patient Modal */}
+      <Modal
+        visible={showEditModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCancelEdit}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={handleCancelEdit}>
+                <Text style={styles.modalCancel}>Cancel</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Edit Patient</Text>
+              <TouchableOpacity onPress={handleSaveEdit}>
+                <Text style={styles.modalSave}>Save</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Form */}
+            {editingPatient && (
+              <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
+                {/* Hospital Selector */}
+                <Text style={styles.formLabel}>Hospital *</Text>
+                <View style={styles.hospitalPicker}>
+                  {HOSPITAL_ORDER.filter(h => h !== 'OTHER').map(hospital => (
+                    <TouchableOpacity
+                      key={hospital}
+                      style={[
+                        styles.hospitalOption,
+                        editingPatient.hospital === hospital && styles.hospitalOptionSelected,
+                      ]}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setEditingPatient(prev => prev ? { ...prev, hospital } : null);
+                      }}
+                    >
+                      <Text style={[
+                        styles.hospitalOptionText,
+                        editingPatient.hospital === hospital && styles.hospitalOptionTextSelected,
+                      ]}>
+                        {hospital}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                
+                {/* Name */}
+                <Text style={styles.formLabel}>Patient Name *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Last, First"
+                  placeholderTextColor={colors.textTertiary}
+                  value={editingPatient.name}
+                  onChangeText={(text) => setEditingPatient(prev => prev ? { ...prev, name: text } : null)}
+                  autoCapitalize="words"
+                />
+                
+                {/* MRN */}
+                <Text style={styles.formLabel}>MRN *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Medical Record Number"
+                  placeholderTextColor={colors.textTertiary}
+                  value={editingPatient.mrn}
+                  onChangeText={(text) => setEditingPatient(prev => prev ? { ...prev, mrn: text } : null)}
+                  keyboardType="number-pad"
+                />
+                
+                {/* DOB */}
+                <Text style={styles.formLabel}>Date of Birth</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="MM/DD/YYYY"
+                  placeholderTextColor={colors.textTertiary}
+                  value={editingPatient.dob}
+                  onChangeText={(text) => setEditingPatient(prev => prev ? { ...prev, dob: text } : null)}
+                  keyboardType="numbers-and-punctuation"
+                />
+                
+                {/* Room */}
+                <Text style={styles.formLabel}>Room</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g., CSU 2516-1, Room 302"
+                  placeholderTextColor={colors.textTertiary}
+                  value={editingPatient.room}
+                  onChangeText={(text) => setEditingPatient(prev => prev ? { ...prev, room: text } : null)}
+                  autoCapitalize="characters"
+                />
+                
+                {/* Chief Complaint */}
+                <View style={styles.formLabelRow}>
+                  <Text style={styles.formLabel}>Chief Complaint</Text>
+                  <TouchableOpacity 
+                    style={styles.quickComplaintsToggle}
+                    onPress={() => setShowEditQuickComplaints(!showEditQuickComplaints)}
+                  >
+                    <Ionicons 
+                      name={showEditQuickComplaints ? 'chevron-up' : 'flash'} 
+                      size={16} 
+                      color={colors.primary} 
+                    />
+                    <Text style={styles.quickComplaintsToggleText}>Quick</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Quick Complaints Picker */}
+                {showEditQuickComplaints && (
+                  <View style={styles.quickComplaintsContainer}>
+                    {recentComplaints.length > 0 && (
+                      <>
+                        <Text style={styles.quickComplaintsSection}>Recent</Text>
+                        <View style={styles.quickComplaintsList}>
+                          {recentComplaints.map((complaint, idx) => (
+                            <TouchableOpacity
+                              key={`edit-recent-${idx}`}
+                              style={styles.quickComplaintChip}
+                              onPress={() => {
+                                Haptics.selectionAsync();
+                                setEditingPatient(prev => prev ? { ...prev, chiefComplaint: complaint } : null);
+                                setShowEditQuickComplaints(false);
+                              }}
+                            >
+                              <Text style={styles.quickComplaintText}>{complaint}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      </>
+                    )}
+                    <Text style={styles.quickComplaintsSection}>Common</Text>
+                    <View style={styles.quickComplaintsList}>
+                      {commonComplaints.slice(0, 10).map((complaint, idx) => (
+                        <TouchableOpacity
+                          key={`edit-common-${idx}`}
+                          style={styles.quickComplaintChip}
+                          onPress={() => {
+                            Haptics.selectionAsync();
+                            setEditingPatient(prev => prev ? { ...prev, chiefComplaint: complaint } : null);
+                            setShowEditQuickComplaints(false);
+                          }}
+                        >
+                          <Text style={styles.quickComplaintText}>{complaint}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                
+                <TextInput
+                  style={[styles.formInput, styles.formInputMultiline]}
+                  placeholder="e.g., DVT consult, LE bypass evaluation"
+                  placeholderTextColor={colors.textTertiary}
+                  value={editingPatient.chiefComplaint}
+                  onChangeText={(text) => setEditingPatient(prev => prev ? { ...prev, chiefComplaint: text } : null)}
+                  multiline
+                  numberOfLines={2}
+                />
+                
+                {/* Delete Button */}
+                <TouchableOpacity 
+                  style={styles.deleteButton}
+                  onPress={() => {
+                    Alert.alert(
+                      'Delete Patient',
+                      `Remove ${editingPatient.name} from the list?`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                          text: 'Delete',
+                          style: 'destructive',
+                          onPress: () => {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                            deletePatient(editingPatient.id);
+                            handleCancelEdit();
+                          },
+                        },
+                      ]
+                    );
+                  }}
+                >
+                  <Ionicons name="trash-outline" size={20} color={colors.error} />
+                  <Text style={styles.deleteButtonText}>Delete Patient</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            )}
           </View>
         </KeyboardAvoidingView>
       </Modal>
@@ -1442,5 +1678,24 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     color: colors.textPrimary,
     fontWeight: typography.medium,
+  },
+  // Delete button in edit modal
+  deleteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginTop: spacing.xl,
+    marginBottom: spacing.xxl,
+    padding: spacing.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.error,
+    backgroundColor: colors.errorSubtle,
+  },
+  deleteButtonText: {
+    fontSize: typography.base,
+    fontWeight: typography.medium,
+    color: colors.error,
   },
 });
