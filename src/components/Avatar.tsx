@@ -375,11 +375,6 @@ export function Avatar({
             <Text style={styles.recordingText}>Listening...</Text>
           </View>
         )}
-
-        {/* Tap hint */}
-        {!isRecording && onPress && state === 'idle' && (
-          <Text style={styles.tapHint}>Tap to talk</Text>
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -435,11 +430,5 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 14,
     fontWeight: '500',
-  },
-  tapHint: {
-    position: 'absolute',
-    bottom: 10,
-    color: colors.textTertiary,
-    fontSize: 12,
   },
 });
