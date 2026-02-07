@@ -9,9 +9,6 @@ import { useState, useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import { useSettingsStore } from '../stores/settingsStore';
-
-// OpenAI API key for vision (from Gateway config)
-const OPENAI_API_KEY = 'REMOVED_FOR_SECURITY';
 import { Hospital } from '../stores/patientsStore';
 
 export interface ScannedPatientData {
@@ -66,7 +63,7 @@ export function usePatientScan(): UsePatientScanResult {
   const [scannedData, setScannedData] = useState<ScannedPatientData | null>(null);
   const [imageUri, setImageUri] = useState<string | null>(null);
   
-  const { gatewayUrl, gatewayToken } = useSettingsStore();
+  const { gatewayUrl, gatewayToken, openaiApiKey } = useSettingsStore();
   
   // Process image with vision API
   const processImage = useCallback(async (uri: string): Promise<ScannedPatientData | null> => {
@@ -103,11 +100,16 @@ export function usePatientScan(): UsePatientScanResult {
 Return ONLY valid JSON with these exact fields (use null if not found):
 {"name":"LAST, FIRST","mrn":"1234567","dob":"MM/DD/YYYY","room":"Room/Bed","hospital":"Hospital name","chiefComplaint":"Diagnosis"}`;
 
+      // Check for API key
+      if (!openaiApiKey) {
+        throw new Error('OpenAI API key not configured. Please set it in Settings.');
+      }
+      
       const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${OPENAI_API_KEY}`,
+          'Authorization': `Bearer ${openaiApiKey}`,
         },
         body: JSON.stringify({
           model: 'gpt-4o',
@@ -194,7 +196,7 @@ Return ONLY valid JSON with these exact fields (use null if not found):
     } finally {
       setIsProcessing(false);
     }
-  }, [gatewayUrl, gatewayToken]);
+  }, [gatewayUrl, gatewayToken, openaiApiKey]);
   
   // Scan from camera
   const scanFromCamera = useCallback(async (): Promise<ScannedPatientData | null> => {
