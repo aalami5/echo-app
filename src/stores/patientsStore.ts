@@ -59,9 +59,12 @@ interface PatientsState {
   // UI State
   searchQuery: string;
   activeCallDayId: string | null;         // Currently selected call day for adding
+  pendingPatient: Omit<Patient, 'id' | 'timeSeen' | 'callDayId'> | null;  // Patient from WhatsApp pending add
   
   // Actions
   addPatient: (patient: Omit<Patient, 'id' | 'timeSeen' | 'callDayId'>, callDayId?: string) => string;
+  setPendingPatient: (patient: Omit<Patient, 'id' | 'timeSeen' | 'callDayId'> | null) => void;
+  clearPendingPatient: () => void;
   updatePatient: (id: string, updates: Partial<Patient>) => void;
   deletePatient: (id: string) => void;
   
@@ -137,8 +140,12 @@ export const usePatientsStore = create<PatientsState>()(
       callDayOrder: [],
       searchQuery: '',
       activeCallDayId: null,
+      pendingPatient: null,
       
       // Actions
+      setPendingPatient: (patient) => set({ pendingPatient: patient }),
+      clearPendingPatient: () => set({ pendingPatient: null }),
+      
       addPatient: (patientData, callDayId) => {
         const state = get();
         

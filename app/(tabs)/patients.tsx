@@ -5,7 +5,7 @@
  * Features: Quick add, search, voice input, export.
  */
 
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -48,12 +48,14 @@ export default function PatientsScreen() {
     callDays,
     callDayOrder,
     searchQuery,
+    pendingPatient,
     addPatient,
     updatePatient,
     deletePatient,
     createCallDay,
     deleteCallDay,
     setSearchQuery,
+    clearPendingPatient,
     getPatientsByCallDay,
     getPatientsByHospital,
     searchPatients,
@@ -91,11 +93,14 @@ export default function PatientsScreen() {
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
   const [showScanModal, setShowScanModal] = useState(false);
   const [showScanConfirmModal, setShowScanConfirmModal] = useState(false);
+  const [showPendingPatientModal, setShowPendingPatientModal] = useState(false);
   const [pendingScanData, setPendingScanData] = useState<ScannedPatientData | null>(null);
   const [expandedCallDays, setExpandedCallDays] = useState<Set<string>>(new Set());
   const [isSearching, setIsSearching] = useState(false);
   const [showQuickComplaints, setShowQuickComplaints] = useState(false);
   const [showEditQuickComplaints, setShowEditQuickComplaints] = useState(false);
+  const [showPendingQuickComplaints, setShowPendingQuickComplaints] = useState(false);
+  const [pendingPatientEdits, setPendingPatientEdits] = useState<Omit<Patient, 'id' | 'timeSeen' | 'callDayId'> | null>(null);
   
   // Get quick complaints data
   const recentComplaints = useMemo(() => getRecentComplaints(5), [patients]);
@@ -113,6 +118,15 @@ export default function PatientsScreen() {
   
   // Animation refs
   const searchBarHeight = useRef(new Animated.Value(0)).current;
+  
+  // Show pending patient modal when new patient arrives from WhatsApp
+  useEffect(() => {
+    if (pendingPatient && !showPendingPatientModal) {
+      setPendingPatientEdits({ ...pendingPatient });
+      setShowPendingPatientModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    }
+  }, [pendingPatient, showPendingPatientModal]);
   
   // Search results
   const searchResults = useMemo(() => {
@@ -300,6 +314,32 @@ export default function PatientsScreen() {
     setEditingPatient(null);
     setShowEditQuickComplaints(false);
   }, []);
+  
+  // Accept pending patient from WhatsApp
+  const handleAcceptPendingPatient = useCallback(() => {
+    if (!pendingPatientEdits) return;
+    
+    if (!pendingPatientEdits.name.trim() || !pendingPatientEdits.mrn.trim()) {
+      Alert.alert('Required Fields', 'Please enter at least the patient name and MRN.');
+      return;
+    }
+    
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    addPatient(pendingPatientEdits);
+    
+    setShowPendingPatientModal(false);
+    setPendingPatientEdits(null);
+    clearPendingPatient();
+    setShowPendingQuickComplaints(false);
+  }, [pendingPatientEdits, addPatient, clearPendingPatient]);
+  
+  // Dismiss pending patient from WhatsApp
+  const handleDismissPendingPatient = useCallback(() => {
+    setShowPendingPatientModal(false);
+    setPendingPatientEdits(null);
+    clearPendingPatient();
+    setShowPendingQuickComplaints(false);
+  }, [clearPendingPatient]);
   
   // Toggle search
   const toggleSearch = useCallback(() => {
@@ -924,6 +964,162 @@ export default function PatientsScreen() {
                   <Ionicons name="trash-outline" size={20} color={colors.error} />
                   <Text style={styles.deleteButtonText}>Delete Patient</Text>
                 </TouchableOpacity>
+              </ScrollView>
+            )}
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+      
+      {/* Pending Patient Modal - from WhatsApp */}
+      <Modal
+        visible={showPendingPatientModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleDismissPendingPatient}
+      >
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalContent}>
+            {/* Modal Header */}
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={handleDismissPendingPatient}>
+                <Text style={styles.modalCancel}>Dismiss</Text>
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>📷 New Patient</Text>
+              <TouchableOpacity onPress={handleAcceptPendingPatient}>
+                <Text style={styles.modalSave}>Add</Text>
+              </TouchableOpacity>
+            </View>
+            
+            {/* Info Banner */}
+            <View style={styles.pendingBanner}>
+              <Ionicons name="chatbubble-ellipses" size={20} color={colors.primary} />
+              <Text style={styles.pendingBannerText}>
+                Patient info received from WhatsApp. Review and add to your list.
+              </Text>
+            </View>
+            
+            {/* Form */}
+            {pendingPatientEdits && (
+              <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
+                {/* Hospital Selector */}
+                <Text style={styles.formLabel}>Hospital *</Text>
+                <View style={styles.hospitalPicker}>
+                  {HOSPITAL_ORDER.filter(h => h !== 'OTHER').map(hospital => (
+                    <TouchableOpacity
+                      key={hospital}
+                      style={[
+                        styles.hospitalOption,
+                        pendingPatientEdits.hospital === hospital && styles.hospitalOptionSelected,
+                      ]}
+                      onPress={() => {
+                        Haptics.selectionAsync();
+                        setPendingPatientEdits(prev => prev ? { ...prev, hospital } : null);
+                      }}
+                    >
+                      <Text style={[
+                        styles.hospitalOptionText,
+                        pendingPatientEdits.hospital === hospital && styles.hospitalOptionTextSelected,
+                      ]}>
+                        {hospital}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                
+                {/* Name */}
+                <Text style={styles.formLabel}>Patient Name *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Last, First"
+                  placeholderTextColor={colors.textTertiary}
+                  value={pendingPatientEdits.name}
+                  onChangeText={(text) => setPendingPatientEdits(prev => prev ? { ...prev, name: text } : null)}
+                  autoCapitalize="words"
+                />
+                
+                {/* MRN */}
+                <Text style={styles.formLabel}>MRN *</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="Medical Record Number"
+                  placeholderTextColor={colors.textTertiary}
+                  value={pendingPatientEdits.mrn}
+                  onChangeText={(text) => setPendingPatientEdits(prev => prev ? { ...prev, mrn: text } : null)}
+                  keyboardType="number-pad"
+                />
+                
+                {/* DOB */}
+                <Text style={styles.formLabel}>Date of Birth</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="MM/DD/YYYY"
+                  placeholderTextColor={colors.textTertiary}
+                  value={pendingPatientEdits.dob}
+                  onChangeText={(text) => setPendingPatientEdits(prev => prev ? { ...prev, dob: text } : null)}
+                  keyboardType="numbers-and-punctuation"
+                />
+                
+                {/* Room */}
+                <Text style={styles.formLabel}>Room</Text>
+                <TextInput
+                  style={styles.formInput}
+                  placeholder="e.g., CSU 2516-1, Room 302"
+                  placeholderTextColor={colors.textTertiary}
+                  value={pendingPatientEdits.room}
+                  onChangeText={(text) => setPendingPatientEdits(prev => prev ? { ...prev, room: text } : null)}
+                  autoCapitalize="characters"
+                />
+                
+                {/* Chief Complaint */}
+                <View style={styles.formLabelRow}>
+                  <Text style={styles.formLabel}>Chief Complaint</Text>
+                  <TouchableOpacity 
+                    style={styles.quickComplaintsToggle}
+                    onPress={() => setShowPendingQuickComplaints(!showPendingQuickComplaints)}
+                  >
+                    <Ionicons 
+                      name={showPendingQuickComplaints ? 'chevron-up' : 'flash'} 
+                      size={16} 
+                      color={colors.primary} 
+                    />
+                    <Text style={styles.quickComplaintsToggleText}>Quick</Text>
+                  </TouchableOpacity>
+                </View>
+                
+                {/* Quick Complaints Picker */}
+                {showPendingQuickComplaints && (
+                  <View style={styles.quickComplaintsContainer}>
+                    <Text style={styles.quickComplaintsSection}>Common</Text>
+                    <View style={styles.quickComplaintsList}>
+                      {commonComplaints.slice(0, 10).map((complaint, idx) => (
+                        <TouchableOpacity
+                          key={`pending-common-${idx}`}
+                          style={styles.quickComplaintChip}
+                          onPress={() => {
+                            Haptics.selectionAsync();
+                            setPendingPatientEdits(prev => prev ? { ...prev, chiefComplaint: complaint } : null);
+                            setShowPendingQuickComplaints(false);
+                          }}
+                        >
+                          <Text style={styles.quickComplaintText}>{complaint}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+                
+                <TextInput
+                  style={[styles.formInput, styles.formInputMultiline]}
+                  placeholder="e.g., DVT consult, LE bypass evaluation"
+                  placeholderTextColor={colors.textTertiary}
+                  value={pendingPatientEdits.chiefComplaint}
+                  onChangeText={(text) => setPendingPatientEdits(prev => prev ? { ...prev, chiefComplaint: text } : null)}
+                  multiline
+                  numberOfLines={2}
+                />
               </ScrollView>
             )}
           </View>
@@ -1678,6 +1874,22 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     color: colors.textPrimary,
     fontWeight: typography.medium,
+  },
+  // Pending patient banner
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primarySubtle,
+    padding: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.sm,
+    borderRadius: borderRadius.lg,
+  },
+  pendingBannerText: {
+    flex: 1,
+    fontSize: typography.sm,
+    color: colors.primary,
   },
   // Delete button in edit modal
   deleteButton: {

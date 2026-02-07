@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { useChatStore } from '../stores/chatStore';
 import { useCalendarStore } from '../stores/calendarStore';
 import { useWebSocketStore } from '../stores/websocketStore';
+import { usePatientsStore } from '../stores/patientsStore';
 import type { Message, AvatarState } from '../types';
 
 // Gateway WebSocket URL - will be configurable later
@@ -18,6 +19,7 @@ export function useWebSocket(token: string | null) {
   const { addMessage, setAvatarState, setConnected } = useChatStore();
   const { setEvents } = useCalendarStore();
   const { setConnected: setWsConnected, setConnecting, setLastMessageTime, setError } = useWebSocketStore();
+  const { addPatient, setPendingPatient } = usePatientsStore();
 
   const connect = useCallback(() => {
     if (!token) {
@@ -117,6 +119,21 @@ export function useWebSocket(token: string | null) {
             case 'calendar.sync':
               // Gateway is requesting calendar sync
               console.log('[WS] Calendar sync requested');
+              break;
+
+            case 'patient.add':
+              // Gateway is sending patient data to add
+              console.log('[WS] Patient data received:', data.patient);
+              if (data.patient) {
+                setPendingPatient({
+                  name: data.patient.name || '',
+                  mrn: data.patient.mrn || '',
+                  dob: data.patient.dob || '',
+                  room: data.patient.room || '',
+                  hospital: data.patient.hospital || 'SEQ',
+                  chiefComplaint: data.patient.chiefComplaint || '',
+                });
+              }
               break;
           }
         } catch (e) {
