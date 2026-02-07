@@ -9,6 +9,9 @@ import { useState, useCallback } from 'react';
 import * as ImagePicker from 'expo-image-picker';
 import { readAsStringAsync } from 'expo-file-system/legacy';
 import { useSettingsStore } from '../stores/settingsStore';
+
+// OpenAI API key for vision (from Gateway config)
+const OPENAI_API_KEY = 'REMOVED_FOR_SECURITY';
 import { Hospital } from '../stores/patientsStore';
 
 export interface ScannedPatientData {
@@ -88,44 +91,38 @@ export function usePatientScan(): UsePatientScanResult {
       // Log image size for debugging
       console.log('[PatientScan] Image base64 length:', base64.length, 'chars (~', Math.round(base64.length * 0.75 / 1024), 'KB)');
       
-      // Create the vision API request
-      const prompt = `Extract patient information from this image. Look for:
-- Patient name (usually in format "LAST, FIRST" or "First Last")
-- MRN (Medical Record Number - usually a 6-7 digit number)
-- DOB or Date of Birth (in MM/DD/YYYY or similar format)
-- Room number or bed location (e.g., "CSU 2516-1", "Room 302", "4B")
+      // Create the vision API request - use OpenAI GPT-4 Vision directly
+      const prompt = `Extract patient information from this medical image (wristband, face sheet, or sticker). Look for:
+- Patient name (usually "LAST, FIRST" format)
+- MRN (Medical Record Number - typically 6-7 digits)
+- DOB/Date of Birth (MM/DD/YYYY format)
+- Room/bed location (e.g., "CSU 2516-1", "Room 302")
 - Hospital name if visible
-- Chief complaint or reason for admission if visible
+- Chief complaint/diagnosis if visible
 
-Return ONLY a JSON object with these fields (use null for any not found):
-{
-  "name": "LAST, FIRST",
-  "mrn": "1234567",
-  "dob": "MM/DD/YYYY",
-  "room": "Room/Bed",
-  "hospital": "Hospital name",
-  "chiefComplaint": "Reason if visible"
-}`;
+Return ONLY valid JSON with these exact fields (use null if not found):
+{"name":"LAST, FIRST","mrn":"1234567","dob":"MM/DD/YYYY","room":"Room/Bed","hospital":"Hospital name","chiefComplaint":"Diagnosis"}`;
 
-      const response = await fetch(`${gatewayUrl.trim()}/v1/chat/completions`, {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${gatewayToken}`,
+          'Authorization': `Bearer ${OPENAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'openclaw:main',
+          model: 'gpt-4o',
           messages: [
             {
               role: 'user',
               content: [
-                { type: 'text', text: prompt },
-                {
-                  type: 'image_url',
-                  image_url: {
+                { 
+                  type: 'image_url', 
+                  image_url: { 
                     url: `data:${mimeType};base64,${base64}`,
-                  },
+                    detail: 'high'
+                  } 
                 },
+                { type: 'text', text: prompt },
               ],
             },
           ],
@@ -136,10 +133,13 @@ Return ONLY a JSON object with these fields (use null for any not found):
       if (!response.ok) {
         const errorText = await response.text();
         console.error('[PatientScan] API error:', response.status, errorText);
-        if (response.status === 502 || response.status === 504) {
-          throw new Error('Vision processing not available. Please enter details manually.');
+        if (response.status === 401) {
+          throw new Error('API key invalid. Please check configuration.');
         }
-        throw new Error(`Failed to process image: ${response.status}`);
+        if (response.status === 429) {
+          throw new Error('Rate limited. Please wait and try again.');
+        }
+        throw new Error(`Vision processing failed: ${response.status}`);
       }
       
       const result = await response.json();
