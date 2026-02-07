@@ -55,6 +55,7 @@ export function useVoiceChat(): UseVoiceChatResult {
   const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const meteringInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const ttsService = useRef<ElevenLabsService | null>(null);
+  const durationRef = useRef<number>(0);
 
   // Get API keys from settings
   const { openaiApiKey, elevenlabsApiKey, voiceName } = useSettingsStore();
@@ -127,7 +128,9 @@ export function useVoiceChat(): UseVoiceChatResult {
       }));
 
       // Track duration
+      durationRef.current = 0;
       durationInterval.current = setInterval(() => {
+        durationRef.current += 1;
         setState(s => ({ ...s, recordingDuration: s.recordingDuration + 1 }));
       }, 1000);
 
@@ -157,6 +160,9 @@ export function useVoiceChat(): UseVoiceChatResult {
    * Stop recording and transcribe with Whisper
    */
   const stopRecording = useCallback(async (): Promise<string | null> => {
+    // Capture duration before clearing
+    const finalDuration = durationRef.current;
+    
     // Stop intervals
     if (durationInterval.current) {
       clearInterval(durationInterval.current);
@@ -175,6 +181,19 @@ export function useVoiceChat(): UseVoiceChatResult {
     }));
 
     if (!recording.current) {
+      return null;
+    }
+    
+    // Skip if recording was too short (likely accidental tap)
+    if (finalDuration < 1) {
+      console.log('[VoiceChat] Recording too short, discarding');
+      try {
+        await recording.current.stopAndUnloadAsync();
+      } catch (e) {
+        // Ignore
+      }
+      recording.current = null;
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       return null;
     }
 
@@ -210,6 +229,35 @@ export function useVoiceChat(): UseVoiceChatResult {
       setState(s => ({ ...s, isTranscribing: false }));
 
       console.log('[VoiceChat] Transcribed:', result.text);
+      
+      // Filter out Whisper hallucinations (common outputs when no real audio)
+      const hallucinations = [
+        'thank you',
+        'thanks for watching',
+        'subscribe',
+        'like and subscribe',
+        'see you next time',
+        'bye',
+        'goodbye',
+        'you',
+        'the end',
+        'music',
+        'applause',
+        'silence',
+        '...',
+        '',
+      ];
+      
+      const cleanedText = result.text?.trim().toLowerCase() || '';
+      
+      // Check if it's a hallucination or too short to be meaningful
+      if (!cleanedText || 
+          cleanedText.length < 2 ||
+          hallucinations.some(h => cleanedText === h || cleanedText === h + '.')) {
+        console.log('[VoiceChat] Filtered out hallucination/empty:', result.text);
+        return null;
+      }
+      
       return result.text;
 
     } catch (error) {
