@@ -19,6 +19,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { useChatStore } from '../../src/stores/chatStore';
 import { useSettingsStore } from '../../src/stores/settingsStore';
 import { useCalendar } from '../../src/hooks/useCalendar';
+import { usePatientSync } from '../../src/hooks/usePatientSync';
 import { VOICES, VoiceName } from '../../src/services/elevenlabs';
 import { colors, spacing, borderRadius, typography } from '../../src/constants/theme';
 
@@ -46,6 +47,7 @@ export default function SettingsScreen() {
     setAutoPlayResponses,
   } = useSettingsStore();
   const { isLoading: calendarSyncing, lastFetched: lastCalendarSync, refresh: refreshCalendar, error: calendarError } = useCalendar();
+  const { isSyncing: patientSyncing, lastSynced: lastPatientSync, syncNow: syncPatients, error: patientSyncError, patientCount } = usePatientSync();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showOpenAIKey, setShowOpenAIKey] = useState(false);
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
@@ -68,6 +70,14 @@ export default function SettingsScreen() {
     await refreshCalendar();
     if (calendarError) {
       Alert.alert('Sync Error', calendarError);
+    }
+  };
+
+  const handleSyncPatients = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    await syncPatients();
+    if (patientSyncError) {
+      Alert.alert('Sync Error', patientSyncError);
     }
   };
 
@@ -156,7 +166,45 @@ export default function SettingsScreen() {
               label="Last Synced" 
               value={formatLastSync(lastCalendarSync)} 
             />
+            <Divider full />
+            <SettingsRow 
+              icon="people-outline"
+              label="Patient Sync"
+              trailing={
+                <TouchableOpacity 
+                  style={styles.syncButton}
+                  onPress={handleSyncPatients}
+                  disabled={patientSyncing}
+                  activeOpacity={0.7}
+                >
+                  {patientSyncing ? (
+                    <ActivityIndicator size="small" color={colors.primary} />
+                  ) : (
+                    <>
+                      <Ionicons name="refresh" size={16} color={colors.primary} />
+                      <Text style={styles.syncButtonText}>Sync</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+              }
+            />
+            <Divider />
+            <SettingsRow 
+              icon="time-outline"
+              label="Last Synced" 
+              value={formatLastSync(lastPatientSync)} 
+            />
+            <Divider />
+            <SettingsRow 
+              icon="document-text-outline"
+              label="Patients" 
+              value={`${patientCount} stored`}
+              valueColor={patientCount > 0 ? colors.success : colors.textTertiary}
+            />
           </View>
+          <Text style={styles.sectionHint}>
+            Patient data syncs automatically every 5 minutes
+          </Text>
         </View>
 
         {/* Account Section */}
