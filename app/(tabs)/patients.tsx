@@ -231,23 +231,41 @@ export default function PatientsScreen() {
     setShowQuickComplaints(false);
   }, []);
   
-  // Handle scan from camera
+  // Handle scan from camera - apply directly to form
   const handleScanCamera = useCallback(async () => {
     setShowScanModal(false);
     const data = await scanFromCamera();
     if (data) {
-      setPendingScanData(data);
-      setShowScanConfirmModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setNewPatient(prev => ({
+        ...prev,
+        name: data.name || prev.name,
+        mrn: data.mrn || prev.mrn,
+        dob: data.dob || prev.dob,
+        room: data.room || prev.room,
+        hospital: data.hospital || prev.hospital,
+        chiefComplaint: data.chiefComplaint || prev.chiefComplaint,
+      }));
+      Alert.alert('Scan Complete', 'Patient details extracted. Review and edit as needed.');
     }
   }, [scanFromCamera]);
   
-  // Handle scan from library
+  // Handle scan from library - apply directly to form
   const handleScanLibrary = useCallback(async () => {
     setShowScanModal(false);
     const data = await scanFromLibrary();
     if (data) {
-      setPendingScanData(data);
-      setShowScanConfirmModal(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setNewPatient(prev => ({
+        ...prev,
+        name: data.name || prev.name,
+        mrn: data.mrn || prev.mrn,
+        dob: data.dob || prev.dob,
+        room: data.room || prev.room,
+        hospital: data.hospital || prev.hospital,
+        chiefComplaint: data.chiefComplaint || prev.chiefComplaint,
+      }));
+      Alert.alert('Scan Complete', 'Patient details extracted. Review and edit as needed.');
     }
   }, [scanFromLibrary]);
   
