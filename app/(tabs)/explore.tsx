@@ -17,9 +17,10 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useChatStore } from '../../src/stores/chatStore';
-import { useSettingsStore } from '../../src/stores/settingsStore';
+import { useSettingsStore, TextScale } from '../../src/stores/settingsStore';
 import { useCalendar } from '../../src/hooks/useCalendar';
 import { usePatientSync } from '../../src/hooks/usePatientSync';
+import { useScaledTypography, TEXT_SCALE_LABELS } from '../../src/hooks/useScaledTypography';
 import { VOICES, VoiceName } from '../../src/services/elevenlabs';
 import { colors, spacing, borderRadius, typography } from '../../src/constants/theme';
 
@@ -38,6 +39,7 @@ export default function SettingsScreen() {
     voiceName,
     voiceEnabled,
     autoPlayResponses,
+    textScale,
     setOpenAIKey, 
     setElevenLabsKey,
     setGatewayUrl,
@@ -45,7 +47,9 @@ export default function SettingsScreen() {
     setVoiceName,
     setVoiceEnabled,
     setAutoPlayResponses,
+    setTextScale,
   } = useSettingsStore();
+  const scaledTypography = useScaledTypography();
   const { isLoading: calendarSyncing, lastFetched: lastCalendarSync, refresh: refreshCalendar, error: calendarError } = useCalendar();
   const { isSyncing: patientSyncing, lastSynced: lastPatientSync, syncNow: syncPatients, error: patientSyncError, patientCount } = usePatientSync();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -361,6 +365,55 @@ export default function SettingsScreen() {
               showChevron 
             />
           </View>
+        </View>
+
+        {/* Accessibility Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>ACCESSIBILITY</Text>
+          <View style={styles.card}>
+            <View style={styles.textSizeRow}>
+              <View style={styles.textSizeHeader}>
+                <Ionicons name="text-outline" size={20} color={colors.textSecondary} />
+                <Text style={styles.label}>Text Size</Text>
+              </View>
+              <View style={styles.textSizeButtons}>
+                {(['normal', 'large', 'xlarge'] as TextScale[]).map((scale) => (
+                  <TouchableOpacity
+                    key={scale}
+                    style={[
+                      styles.textSizeButton,
+                      textScale === scale && styles.textSizeButtonActive,
+                    ]}
+                    onPress={async () => {
+                      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      setTextScale(scale);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text
+                      style={[
+                        styles.textSizeButtonText,
+                        textScale === scale && styles.textSizeButtonTextActive,
+                        { fontSize: scale === 'normal' ? 14 : scale === 'large' ? 16 : 18 },
+                      ]}
+                    >
+                      {scale === 'normal' ? 'A' : scale === 'large' ? 'A' : 'A'}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+            <Divider full />
+            <SettingsRow 
+              icon="information-circle-outline"
+              label="Current Size"
+              value={TEXT_SCALE_LABELS[textScale]}
+              valueColor={colors.primary}
+            />
+          </View>
+          <Text style={styles.sectionHint}>
+            Adjusts text size throughout the app for better readability
+          </Text>
         </View>
 
         {/* Notifications Section */}
@@ -684,5 +737,39 @@ const styles = StyleSheet.create({
     fontSize: typography.xs,
     marginTop: spacing.xs,
     opacity: 0.7,
+  },
+  textSizeRow: {
+    padding: spacing.md,
+  },
+  textSizeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  textSizeButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  textSizeButton: {
+    flex: 1,
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  textSizeButtonActive: {
+    backgroundColor: colors.primarySubtle,
+    borderColor: colors.primary,
+  },
+  textSizeButtonText: {
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  textSizeButtonTextActive: {
+    color: colors.primary,
   },
 });

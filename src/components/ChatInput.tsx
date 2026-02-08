@@ -12,6 +12,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { Ionicons } from '@expo/vector-icons';
 import { useVoiceRecording } from '../hooks/useVoiceRecording';
+import { useScaledTypography } from '../hooks/useScaledTypography';
 import { colors, spacing, borderRadius, typography, shadows } from '../constants/theme';
 
 interface ChatInputProps {
@@ -23,6 +24,7 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
   const [text, setText] = useState('');
   const [isFocused, setIsFocused] = useState(false);
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecording();
+  const scaledTypography = useScaledTypography();
   
   const recordingPulse = useRef(new Animated.Value(1)).current;
   const micScale = useRef(new Animated.Value(1)).current;
@@ -90,6 +92,28 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Dynamic text styles based on user's text scale preference
+  const inputStyle = {
+    flex: 1,
+    fontSize: scaledTypography.base,
+    color: colors.textPrimary,
+    maxHeight: 100,
+    paddingVertical: spacing.sm,
+  };
+
+  const cancelTextStyle = {
+    color: colors.error,
+    fontSize: scaledTypography.base,
+    fontWeight: typography.medium as '500',
+  };
+
+  const recordingTimeStyle = {
+    color: colors.textPrimary,
+    fontSize: scaledTypography.lg,
+    fontWeight: typography.medium as '500',
+    fontVariant: ['tabular-nums'] as ('tabular-nums')[],
+  };
+
   if (isRecording) {
     return (
       <View style={styles.container}>
@@ -100,7 +124,7 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
             style={styles.cancelButton}
             activeOpacity={0.7}
           >
-            <Text style={styles.cancelText}>Cancel</Text>
+            <Text style={cancelTextStyle}>Cancel</Text>
           </TouchableOpacity>
 
           {/* Recording indicator */}
@@ -111,7 +135,7 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
                 { transform: [{ scale: recordingPulse }] }
               ]} 
             />
-            <Text style={styles.recordingTime}>{formatDuration(duration)}</Text>
+            <Text style={recordingTimeStyle}>{formatDuration(duration)}</Text>
           </View>
 
           {/* Stop button */}
@@ -139,7 +163,7 @@ export function ChatInput({ onSendText, onSendAudio }: ChatInputProps) {
         isFocused && styles.inputContainerFocused
       ]}>
         <TextInput
-          style={styles.input}
+          style={inputStyle}
           placeholder="Message Echo..."
           placeholderTextColor={colors.textTertiary}
           value={text}
@@ -203,13 +227,7 @@ const styles = StyleSheet.create({
   inputContainerFocused: {
     borderColor: colors.borderFocused,
   },
-  input: {
-    flex: 1,
-    fontSize: typography.base,
-    color: colors.textPrimary,
-    maxHeight: 100,
-    paddingVertical: spacing.sm,
-  },
+  // input styles now dynamic via inputStyle
   sendButton: {
     borderRadius: borderRadius.full,
     overflow: 'hidden',
@@ -243,11 +261,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     padding: spacing.sm,
   },
-  cancelText: {
-    color: colors.error,
-    fontSize: typography.base,
-    fontWeight: typography.medium,
-  },
+  // cancelText styles now dynamic via cancelTextStyle
   recordingIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -259,12 +273,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: colors.error,
   },
-  recordingTime: {
-    color: colors.textPrimary,
-    fontSize: typography.lg,
-    fontWeight: typography.medium,
-    fontVariant: ['tabular-nums'],
-  },
+  // recordingTime styles now dynamic via recordingTimeStyle
   stopButton: {
     borderRadius: borderRadius.md,
     overflow: 'hidden',

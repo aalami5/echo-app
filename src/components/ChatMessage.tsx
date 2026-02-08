@@ -2,7 +2,8 @@ import React from 'react';
 import { StyleSheet, View, Text, Image } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import type { Message } from '../types';
-import { colors, spacing, borderRadius, typography } from '../constants/theme';
+import { colors, spacing, borderRadius } from '../constants/theme';
+import { useScaledTypography } from '../hooks/useScaledTypography';
 
 interface ChatMessageProps {
   message: Message;
@@ -10,6 +11,21 @@ interface ChatMessageProps {
 
 export function ChatMessage({ message }: ChatMessageProps) {
   const isFromUser = message.role === 'user';
+  const typography = useScaledTypography();
+
+  // Dynamic text styles based on user's text scale preference
+  const textStyle = {
+    fontSize: typography.base,
+    lineHeight: typography.lineHeight.base,
+    color: colors.textPrimary,
+  };
+
+  const timestampStyle = {
+    fontSize: typography.xs,
+    color: colors.textTertiary,
+    marginTop: spacing.xs,
+    marginHorizontal: spacing.xs,
+  };
 
   return (
     <View style={[styles.container, isFromUser ? styles.fromUser : styles.fromEcho]}>
@@ -27,7 +43,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {message.imageUrl && (
               <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
             )}
-            <Text style={styles.text}>{message.content}</Text>
+            <Text style={textStyle}>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </LinearGradient>
         ) : (
@@ -35,12 +51,12 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {message.imageUrl && (
               <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
             )}
-            <Text style={styles.text}>{message.content}</Text>
+            <Text style={textStyle}>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </View>
         )}
       </View>
-      <Text style={[styles.timestamp, isFromUser && styles.timestampRight]}>
+      <Text style={[timestampStyle, isFromUser && styles.timestampRight]}>
         {new Date(message.timestamp).toLocaleTimeString([], { 
           hour: '2-digit', 
           minute: '2-digit' 
@@ -96,25 +112,14 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     borderBottomLeftRadius: borderRadius.sm,
   },
-  text: {
-    fontSize: typography.base,
-    lineHeight: 22,
-    color: colors.textPrimary,
-  },
   messageImage: {
     width: 200,
     height: 200,
     borderRadius: borderRadius.md,
     marginBottom: spacing.sm,
   },
-  timestamp: {
-    fontSize: typography.xs,
-    color: colors.textTertiary,
-    marginTop: spacing.xs,
-    marginHorizontal: spacing.xs,
-  },
   timestampRight: {
-    textAlign: 'right',
+    textAlign: 'right' as const,
   },
   streamingContainer: {
     flexDirection: 'row',

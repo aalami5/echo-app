@@ -10,6 +10,9 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import * as SecureStore from 'expo-secure-store';
 import type { VoiceName } from '../services/elevenlabs';
 
+// Text scale options
+export type TextScale = 'normal' | 'large' | 'xlarge';
+
 interface SettingsState {
   // API Keys (stored securely)
   openaiApiKey: string | null;
@@ -22,6 +25,7 @@ interface SettingsState {
   
   // Display settings
   hapticFeedback: boolean;
+  textScale: TextScale;
   
   // Gateway settings
   gatewayUrl: string;
@@ -34,6 +38,7 @@ interface SettingsState {
   setVoiceEnabled: (enabled: boolean) => void;
   setAutoPlayResponses: (enabled: boolean) => void;
   setHapticFeedback: (enabled: boolean) => void;
+  setTextScale: (scale: TextScale) => void;
   setGatewayUrl: (url: string) => void;
   setGatewayToken: (token: string | null) => void;
   clearAllKeys: () => void;
@@ -75,6 +80,7 @@ export const useSettingsStore = create<SettingsState>()(
       voiceEnabled: true,
       autoPlayResponses: true,
       hapticFeedback: true,
+      textScale: 'normal',
       gatewayUrl: process.env.EXPO_PUBLIC_GATEWAY_URL || 'https://echo.oppersmedical.com',
       gatewayToken: null,
       
@@ -85,6 +91,7 @@ export const useSettingsStore = create<SettingsState>()(
       setVoiceEnabled: (enabled) => set({ voiceEnabled: enabled }),
       setAutoPlayResponses: (enabled) => set({ autoPlayResponses: enabled }),
       setHapticFeedback: (enabled) => set({ hapticFeedback: enabled }),
+      setTextScale: (scale) => set({ textScale: scale }),
       setGatewayUrl: (url) => set({ gatewayUrl: url.trim() }),
       setGatewayToken: (token) => set({ gatewayToken: token }),
       
@@ -104,6 +111,7 @@ export const useSettingsStore = create<SettingsState>()(
         voiceEnabled: state.voiceEnabled,
         autoPlayResponses: state.autoPlayResponses,
         hapticFeedback: state.hapticFeedback,
+        textScale: state.textScale,
         gatewayUrl: state.gatewayUrl,
         gatewayToken: state.gatewayToken,
       }),
