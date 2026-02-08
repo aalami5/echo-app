@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** February 7, 2026
+**Last Updated:** February 7, 2026 (evening)
 
 ---
 
@@ -75,6 +75,48 @@ export const typography = {
   bold: '700',
 };
 ```
+
+---
+
+## Hooks
+
+### useScaledTypography
+
+Returns scaled typography values based on user's text size preference.
+
+**File:** `src/hooks/useScaledTypography.ts`
+
+**Returns:**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `messageText` | `number` | Scaled font size for chat messages |
+| `inputText` | `number` | Scaled font size for text input |
+| `lineHeight` | `number` | Scaled line height for messages |
+
+**Usage:**
+
+```tsx
+import { useScaledTypography } from '../hooks/useScaledTypography';
+
+function ChatMessage({ message }) {
+  const { messageText, lineHeight } = useScaledTypography();
+  
+  return (
+    <Text style={{ fontSize: messageText, lineHeight }}>
+      {message.content}
+    </Text>
+  );
+}
+```
+
+**Scale Values:**
+
+| Setting | messageText | inputText | lineHeight |
+|---------|-------------|-----------|------------|
+| `normal` | 16 | 16 | 24 |
+| `large` | 18 | 18 | 27 |
+| `xlarge` | 20 | 20 | 30 |
 
 ---
 

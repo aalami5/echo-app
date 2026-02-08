@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** February 7, 2026
+**Last Updated:** February 7, 2026 (evening)
 
 ---
 
@@ -162,8 +162,15 @@ Manages app configuration and API keys.
 | `voiceEnabled` | `boolean` | ✅ | `true` |
 | `autoPlayResponses` | `boolean` | ✅ | `true` |
 | `hapticFeedback` | `boolean` | ✅ | `true` |
+| `textScale` | `TextScale` | ✅ | `'normal'` |
 | `gatewayUrl` | `string` | ✅ | env default |
 | `gatewayToken` | `string \| null` | ✅ | `null` |
+
+**Types:**
+
+```typescript
+type TextScale = 'normal' | 'large' | 'xlarge';
+```
 
 **Actions:**
 
@@ -174,6 +181,7 @@ setVoiceName(voice: VoiceName): void
 setVoiceEnabled(enabled: boolean): void
 setAutoPlayResponses(enabled: boolean): void
 setHapticFeedback(enabled: boolean): void
+setTextScale(scale: TextScale): void
 setGatewayUrl(url: string): void
 setGatewayToken(token: string | null): void
 clearAllKeys(): void

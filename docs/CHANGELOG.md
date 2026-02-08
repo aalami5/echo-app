@@ -13,6 +13,28 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   - Messages now survive app crashes and restarts
   - Limited to last 100 messages to prevent storage bloat
   - Uses encrypted iOS Keychain storage
+- **Text Size Accessibility** — Adjustable text size in Settings
+  - Three options: Normal, Large, Extra Large
+  - Affects chat messages and input field
+  - New `useScaledTypography` hook for consistent scaling
+- **Automated Patient Sync** — Background sync from WhatsApp/Gateway
+  - New sync server (`server/`) with Cloudflare Tunnel support
+  - Settings UI toggle for enabling/disabling sync
+  - Uses `usePatientSync` hook for client-side integration
+
+### Changed
+- Avatar idle/thinking animations refined for consistency
+  - Slower, calmer breathing animation in idle state
+  - Thinking animation now matches idle pacing
+
+### Fixed
+- Chat screen now scrolls to latest message on load
+- Patient list timezone handling for date grouping
+  - Uses local timezone consistently
+  - Auto-repairs displayDate/dayOfWeek from date field
+- Patient list duplicate date groups prevented
+- Patient card layout allows name wrapping while keeping room badge visible
+- Empty/hallucinated voice transcriptions filtered out
 
 ---
 
