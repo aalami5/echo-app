@@ -131,22 +131,33 @@ export class ElevenLabsService {
         shouldDuckAndroid: true,
       });
 
+      // Track if we've already fired onStart (to avoid duplicates)
+      let hasStarted = false;
+
       // Create and play sound
       const { sound } = await Audio.Sound.createAsync(
         { uri: fileUri },
         { shouldPlay: true },
         (status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            console.log('[ElevenLabs] Playback finished');
-            onEnd?.();
-            this.cleanup(fileUri);
+          if (status.isLoaded) {
+            // Fire onStart when audio actually starts playing
+            if (status.isPlaying && !hasStarted) {
+              hasStarted = true;
+              console.log('[ElevenLabs] Audio playback started');
+              onStart?.();
+            }
+            // Fire onEnd when playback finishes
+            if (status.didJustFinish) {
+              console.log('[ElevenLabs] Playback finished');
+              onEnd?.();
+              this.cleanup(fileUri);
+            }
           }
         }
       );
 
       this.currentSound = sound;
-      console.log('[ElevenLabs] Playing audio...');
-      onStart?.();
+      console.log('[ElevenLabs] Audio loaded, waiting for playback...');
 
     } catch (error) {
       console.error('[ElevenLabs] Error:', error);

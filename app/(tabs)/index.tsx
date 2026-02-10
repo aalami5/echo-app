@@ -57,6 +57,7 @@ export default function ChatScreen() {
     isRecording, 
     audioLevel,
     isTranscribing,
+    isLoadingAudio,
     isSpeaking,
     startRecording, 
     stopRecording, 
@@ -65,12 +66,20 @@ export default function ChatScreen() {
     isConfigured: voiceConfigured,
   } = useVoiceChat();
 
-  // Update avatar state when speaking ends
+  // Sync avatar state with voice chat state
+  // - isLoadingAudio: show 'thinking' (fetching audio from ElevenLabs)
+  // - isSpeaking: show 'speaking' (audio is actually playing)
+  // - neither: idle (unless something else set it)
   useEffect(() => {
-    if (!isSpeaking && avatarState === 'speaking') {
+    if (isSpeaking) {
+      setAvatarState('speaking');
+    } else if (isLoadingAudio) {
+      setAvatarState('thinking');
+    } else if (avatarState === 'speaking') {
+      // Audio just finished
       setAvatarState('idle');
     }
-  }, [isSpeaking, avatarState, setAvatarState]);
+  }, [isSpeaking, isLoadingAudio, avatarState, setAvatarState]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -122,8 +131,8 @@ export default function ChatScreen() {
       console.log('[Chat] Added assistant message to chat');
       
       // Speak the response if voice is enabled
+      // Avatar state will be managed by useEffect based on isLoadingAudio/isSpeaking
       if (voiceEnabled && autoPlayResponses) {
-        setAvatarState('speaking');
         try {
           await speak(response);
           // Don't set idle here - useEffect handles it when speaking ends
@@ -250,6 +259,15 @@ export default function ChatScreen() {
           ) : gatewayLoading ? (
             <View style={styles.statusContainer}>
               <Text style={styles.statusText}>Thinking...</Text>
+            </View>
+          ) : isLoadingAudio ? (
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusText}>Preparing voice...</Text>
+            </View>
+          ) : isSpeaking ? (
+            <View style={styles.statusContainer}>
+              <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
+              <Text style={styles.statusText}>Speaking...</Text>
             </View>
           ) : (
             <View style={styles.statusContainer}>

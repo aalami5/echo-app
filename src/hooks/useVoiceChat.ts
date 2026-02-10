@@ -20,7 +20,8 @@ interface VoiceChatState {
   
   // Processing state
   isTranscribing: boolean;
-  isSpeaking: boolean;
+  isLoadingAudio: boolean;  // True while fetching TTS audio
+  isSpeaking: boolean;      // True only when audio is actually playing
   
   // Error state
   error: string | null;
@@ -46,6 +47,7 @@ export function useVoiceChat(): UseVoiceChatResult {
     recordingDuration: 0,
     audioLevel: 0,
     isTranscribing: false,
+    isLoadingAudio: false,
     isSpeaking: false,
     error: null,
   });
@@ -312,24 +314,29 @@ export function useVoiceChat(): UseVoiceChatResult {
       return;
     }
 
-    setState(s => ({ ...s, isSpeaking: true, error: null }));
+    // Set loading state while we fetch audio from ElevenLabs
+    setState(s => ({ ...s, isLoadingAudio: true, error: null }));
 
     try {
       await ttsService.current.speak({
         text,
-        onStart: () => console.log('[VoiceChat] Speaking...'),
+        onStart: () => {
+          // Audio is now actually playing - switch from loading to speaking
+          console.log('[VoiceChat] Audio started, now speaking...');
+          setState(s => ({ ...s, isLoadingAudio: false, isSpeaking: true }));
+        },
         onEnd: () => {
           console.log('[VoiceChat] Done speaking');
           setState(s => ({ ...s, isSpeaking: false }));
         },
         onError: (error) => {
           console.error('[VoiceChat] TTS error:', error);
-          setState(s => ({ ...s, isSpeaking: false, error: 'TTS failed' }));
+          setState(s => ({ ...s, isLoadingAudio: false, isSpeaking: false, error: 'TTS failed' }));
         },
       });
     } catch (error) {
       console.error('[VoiceChat] Speak error:', error);
-      setState(s => ({ ...s, isSpeaking: false, error: 'Failed to speak' }));
+      setState(s => ({ ...s, isLoadingAudio: false, isSpeaking: false, error: 'Failed to speak' }));
     }
   }, []);
 
