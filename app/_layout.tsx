@@ -6,6 +6,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { useAuthStore } from '../src/stores/authStore';
+import { useNotifications } from '../src/hooks/useNotifications';
 import { colors } from '../src/constants/theme';
 
 export { ErrorBoundary } from 'expo-router';
@@ -56,11 +57,21 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const { isAuthenticated, isLoading, loadStoredAuth } = useAuthStore();
+  
+  // Register for push notifications
+  const { pushToken, isRegistered } = useNotifications();
 
   // Load stored auth on app start
   useEffect(() => {
     loadStoredAuth();
   }, []);
+  
+  // Log push notification registration status
+  useEffect(() => {
+    if (isRegistered) {
+      console.log('Push notifications registered, token:', pushToken?.substring(0, 20) + '...');
+    }
+  }, [isRegistered, pushToken]);
 
   // Handle auth state changes
   useEffect(() => {
