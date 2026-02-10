@@ -15,7 +15,6 @@ import {
   TextInput,
   Modal,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   Share,
   Animated,
@@ -24,6 +23,7 @@ import {
   ActivityIndicator,
   ActionSheetIOS,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
@@ -632,10 +632,7 @@ export default function PatientsScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowAddModal(false)}
       >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
-        >
+        <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
@@ -649,7 +646,13 @@ export default function PatientsScreen() {
             </View>
             
             {/* Form */}
-            <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
+            <KeyboardAwareScrollView 
+              style={styles.form} 
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              extraScrollHeight={120}
+              enableOnAndroid={true}
+            >
               {/* Hospital Selector */}
               <Text style={styles.formLabel}>Hospital *</Text>
               <HospitalPicker />
@@ -789,9 +792,9 @@ export default function PatientsScreen() {
               {voiceError && (
                 <Text style={styles.voiceError}>{voiceError}</Text>
               )}
-            </ScrollView>
+            </KeyboardAwareScrollView>
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
       
       {/* Edit Patient Modal */}
@@ -801,10 +804,7 @@ export default function PatientsScreen() {
         presentationStyle="pageSheet"
         onRequestClose={handleCancelEdit}
       >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
-        >
+        <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
@@ -819,7 +819,13 @@ export default function PatientsScreen() {
             
             {/* Form */}
             {editingPatient && (
-              <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
+              <KeyboardAwareScrollView 
+                style={styles.form} 
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                extraScrollHeight={120}
+                enableOnAndroid={true}
+              >
                 {/* Hospital Selector */}
                 <Text style={styles.formLabel}>Hospital *</Text>
                 <View style={styles.hospitalPicker}>
@@ -982,10 +988,10 @@ export default function PatientsScreen() {
                   <Ionicons name="trash-outline" size={20} color={colors.error} />
                   <Text style={styles.deleteButtonText}>Delete Patient</Text>
                 </TouchableOpacity>
-              </ScrollView>
+              </KeyboardAwareScrollView>
             )}
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
       
       {/* Pending Patient Modal - from WhatsApp */}
@@ -995,10 +1001,7 @@ export default function PatientsScreen() {
         presentationStyle="pageSheet"
         onRequestClose={handleDismissPendingPatient}
       >
-        <KeyboardAvoidingView 
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.modalContainer}
-        >
+        <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
             {/* Modal Header */}
             <View style={styles.modalHeader}>
@@ -1021,7 +1024,13 @@ export default function PatientsScreen() {
             
             {/* Form */}
             {pendingPatientEdits && (
-              <ScrollView style={styles.form} showsVerticalScrollIndicator={false}>
+              <KeyboardAwareScrollView 
+                style={styles.form} 
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                extraScrollHeight={120}
+                enableOnAndroid={true}
+              >
                 {/* Hospital Selector */}
                 <Text style={styles.formLabel}>Hospital *</Text>
                 <View style={styles.hospitalPicker}>
@@ -1138,10 +1147,10 @@ export default function PatientsScreen() {
                   multiline
                   numberOfLines={2}
                 />
-              </ScrollView>
+              </KeyboardAwareScrollView>
             )}
           </View>
-        </KeyboardAvoidingView>
+        </View>
       </Modal>
       
       {/* Scan Image Modal */}
@@ -1206,7 +1215,12 @@ export default function PatientsScreen() {
             </TouchableOpacity>
           </View>
           
-          <ScrollView style={styles.confirmModalContent}>
+          <KeyboardAwareScrollView 
+            style={styles.confirmModalContent}
+            keyboardShouldPersistTaps="handled"
+            extraScrollHeight={120}
+            enableOnAndroid={true}
+          >
             {scannedImageUri && (
               <Image 
                 source={{ uri: scannedImageUri }} 
@@ -1292,7 +1306,7 @@ export default function PatientsScreen() {
             {scanError && (
               <Text style={styles.scanErrorText}>{scanError}</Text>
             )}
-          </ScrollView>
+          </KeyboardAwareScrollView>
         </View>
       </Modal>
       

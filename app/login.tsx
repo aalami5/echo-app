@@ -5,13 +5,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
   Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { useAuthStore } from '../src/stores/authStore';
 import { Avatar } from '../src/components/Avatar';
 import { colors, spacing, borderRadius, typography } from '../src/constants/theme';
@@ -61,11 +61,13 @@ export default function LoginScreen() {
       colors={[colors.background, '#0D1526', colors.background]}
       style={styles.container}
     >
-      <KeyboardAvoidingView
+      <KeyboardAwareScrollView
         style={styles.keyboardView}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.xl }]}
+        keyboardShouldPersistTaps="handled"
+        extraScrollHeight={100}
+        enableOnAndroid={true}
       >
-        <View style={[styles.content, { paddingTop: insets.top + spacing.xl }]}>
           {/* Logo / Avatar */}
           <View style={styles.logoContainer}>
             <Avatar state="idle" size={100} />
@@ -138,8 +140,7 @@ export default function LoginScreen() {
           <Text style={[styles.version, { paddingBottom: insets.bottom + spacing.md }]}>
             v0.1.0
           </Text>
-        </View>
-      </KeyboardAvoidingView>
+      </KeyboardAwareScrollView>
     </LinearGradient>
   );
 }
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    flex: 1,
+    flexGrow: 1,
     padding: spacing.lg,
     justifyContent: 'space-between',
   },
