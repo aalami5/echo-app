@@ -21,7 +21,8 @@
     "production": {
       "ios": {
         "appleId": "aalami@mac.com",
-        "appleTeamId": "Q922968VSH"
+        "appleTeamId": "Q922968VSH",
+        "ascAppId": "6758975065"
       }
     }
   }
