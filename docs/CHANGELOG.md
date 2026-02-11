@@ -9,6 +9,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Push Notifications** (Build #4) — Native push notification infrastructure
+  - Meeting reminders (15/10/5 min with acknowledgment)
+  - Message preview notifications
+  - Daily brief notifications (6:30 AM)
+  - Expo push token registration
+  - Supabase integration for device tokens and notification acks
+  - Server-side push sending via expo-server-sdk
+  - New `useNotifications` hook for app integration
+- **Network Status UI Spec** — Build #5 roadmap document
+  - Connection quality indicator (3-tier signal strength)
+  - Message status indicators (sending/sent/failed)
+  - Toast notification system
+  - Network diagnostics screen
 - Chat message persistence via SecureStore
   - Messages now survive app crashes and restarts
   - Limited to last 100 messages to prevent storage bloat
@@ -28,6 +41,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   - Thinking animation now matches idle pacing
 
 ### Fixed
+- **Voice animation timing** — Animation now syncs with actual audio playback
+  - Added `isLoadingAudio` state for TTS fetch tracking
+  - Shows "Preparing voice..." while fetching audio
+  - Avatar only enters speaking state when audio actually plays
+- **Keyboard input fields** — Keyboard no longer covers input fields
+  - Replaced KeyboardAvoidingView with KeyboardAwareScrollView
+  - Applied to all modals: Login, Add/Edit/Pending Patient, Scan Confirm
+  - Added react-native-keyboard-aware-scroll-view package
 - Chat screen now scrolls to latest message on load
 - Patient list timezone handling for date grouping
   - Uses local timezone consistently

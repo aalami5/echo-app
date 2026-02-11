@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** February 7, 2026
+**Last Updated:** February 10, 2026
 
 ---
 
@@ -71,6 +71,8 @@ Echo App is a React Native (Expo) application that provides Oliver with a privat
 | **Audio** | expo-av | Recording & playback |
 | **Haptics** | expo-haptics | Tactile feedback |
 | **HTTP** | fetch (native) | Gateway API calls |
+| **Push** | expo-notifications | Remote push notifications |
+| **Database** | Supabase (Postgres) | Device tokens, notification acks |
 
 ---
 
@@ -104,13 +106,17 @@ echo-app/
 │   │   ├── useVoiceChat.ts       # Voice recording + TTS
 │   │   ├── useCalendar.ts        # Calendar integration
 │   │   ├── usePatientVoiceInput.ts  # Voice for patient forms
-│   │   └── usePatientScan.ts     # Image scanning for patients
+│   │   ├── usePatientScan.ts     # Image scanning for patients
+│   │   └── useNotifications.ts   # Push notification setup
 │   │
 │   ├── services/                 # External service clients
 │   │   ├── gateway.ts            # OpenClaw Gateway API
 │   │   ├── elevenlabs.ts         # Text-to-speech
 │   │   ├── whisper.ts            # Speech-to-text
-│   │   └── calendar.ts           # Google Calendar
+│   │   ├── calendar.ts           # Google Calendar
+│   │   ├── notifications/        # Push notification service
+│   │   │   └── index.ts          # Expo push registration & handling
+│   │   └── supabase.ts           # Supabase client for push tokens
 │   │
 │   ├── stores/                   # Zustand state stores
 │   │   ├── authStore.ts          # Authentication state
@@ -332,14 +338,66 @@ Chat store limits to **100 persisted messages** to prevent:
 
 ---
 
+## Push Notification Architecture
+
+### Overview
+
+```
+┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
+│   Echo App       │      │   Sync Server    │      │   Supabase       │
+│   (iOS device)   │      │   (Mac Mini)     │      │   (Cloud DB)     │
+└────────┬─────────┘      └────────┬─────────┘      └────────┬─────────┘
+         │                         │                         │
+         │ Register push token     │                         │
+         │ ─────────────────────────────────────────────────>│
+         │                         │                         │
+         │                         │  Query device tokens    │
+         │                         │ ─────────────────────────>
+         │                         │                         │
+         │                         │  Send push via Expo     │
+         │   <───────────────────────────────────────────────│
+         │                         │                         │
+         │ Store notification ack  │                         │
+         │ ─────────────────────────────────────────────────>│
+         │                         │                         │
+```
+
+### Notification Types
+
+| Type | Trigger | Timing | Ack Required |
+|------|---------|--------|--------------|
+| Meeting Reminder | Upcoming calendar event | 15/10/5 min before | Yes (snooze/dismiss) |
+| Message Preview | New message from Echo | Immediate | No |
+| Daily Brief | Scheduled | 6:30 AM | No |
+
+### Supabase Tables
+
+- `device_tokens` — Expo push tokens per user
+- `notification_acks` — Tracks which notifications were acknowledged
+
+### Server Integration
+
+The sync server (`server/index.js`) includes endpoints:
+- `POST /notify/meeting` — Send meeting reminder
+- `POST /notify/message` — Send message preview
+- `POST /notify/brief` — Send daily brief
+
+Uses `expo-server-sdk` for push delivery.
+
+---
+
 ## Future Architecture
+
+### Completed
+
+1. **Push Notifications** ✅ — Expo push via APNs for meeting reminders, messages, daily briefs
 
 ### Planned Additions
 
-1. **Push Notifications** — APNs integration for real-time alerts
-2. **Streaming Responses** — SSE for real-time message display
-3. **iCloud Sync** — Optional encrypted backup for settings
-4. **Widget Extension** — Quick voice input from home screen
+1. **Streaming Responses** — SSE for real-time message display
+2. **iCloud Sync** — Optional encrypted backup for settings
+3. **Widget Extension** — Quick voice input from home screen
+4. **Network Status UI** — Connection quality, message status indicators (Build #5)
 
 ### Not Planned
 
