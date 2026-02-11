@@ -1,10 +1,14 @@
 /**
- * Echo Patient Sync Server
+ * Echo Patient Sync Server + Push Notification Service
  * 
- * Simple Express server for patient data sync and search.
+ * Simple Express server for patient data sync, search, and push notifications.
  * - POST /sync - receives full patient list, saves to JSON
  * - GET /search?q=<query> - searches patients by name, MRN, room, complaint
  * - GET /patients - returns all patients
+ * - POST /notify - send push notification to all registered devices
+ * - POST /notify/meeting - send meeting reminder
+ * - POST /notify/message - send new message notification
+ * - POST /notify/brief - send daily brief notification
  * 
  * Uses same auth token as OpenClaw gateway for security.
  */
@@ -13,6 +17,16 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { Expo } = require('expo-server-sdk');
+const { createClient } = require('@supabase/supabase-js');
+
+// Initialize Expo SDK
+const expo = new Expo();
+
+// Initialize Supabase client
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://mshgthoogedzdoqgcgcj.supabase.co';
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1zaGd0aG9vZ2VkemRvcWdjZ2NqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAwODA5MTUsImV4cCI6MjA4NTY1NjkxNX0.BWkcIYjX4KsUDzUDbhrO2ieH-2bTXvMa7MOgc47-f6Y';
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
 
 const app = express();
 const PORT = process.env.PORT || 18790;
@@ -315,9 +329,234 @@ app.get('/patients/:id', (req, res) => {
   }
 });
 
+// ===============================================
+// Push Notification Routes
+// ===============================================
+
+/**
+ * Get all device tokens from Supabase
+ */
+async function getDeviceTokens() {
+  const { data, error } = await supabase
+    .from('device_tokens')
+    .select('token');
+  
+  if (error) {
+    console.error('[Notify] Error fetching tokens:', error);
+    return [];
+  }
+  
+  return data.map(row => row.token);
+}
+
+/**
+ * Check if a notification has been acknowledged
+ */
+async function isNotificationAcked(eventId) {
+  const { data, error } = await supabase
+    .from('notification_acks')
+    .select('id')
+    .eq('event_id', eventId)
+    .single();
+  
+  return !!data;
+}
+
+/**
+ * Send push notifications to all registered devices
+ */
+async function sendPushNotifications(title, body, data = {}) {
+  const tokens = await getDeviceTokens();
+  
+  if (tokens.length === 0) {
+    console.log('[Notify] No device tokens registered');
+    return { sent: 0, errors: [] };
+  }
+  
+  // Filter valid Expo push tokens
+  const validTokens = tokens.filter(token => Expo.isExpoPushToken(token));
+  
+  if (validTokens.length === 0) {
+    console.log('[Notify] No valid Expo push tokens');
+    return { sent: 0, errors: ['No valid Expo push tokens'] };
+  }
+  
+  // Build messages
+  const messages = validTokens.map(token => ({
+    to: token,
+    sound: 'default',
+    title,
+    body,
+    data,
+    priority: 'high',
+  }));
+  
+  // Send in chunks
+  const chunks = expo.chunkPushNotifications(messages);
+  const results = [];
+  const errors = [];
+  
+  for (const chunk of chunks) {
+    try {
+      const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
+      results.push(...ticketChunk);
+      
+      // Check for errors in tickets
+      ticketChunk.forEach((ticket, index) => {
+        if (ticket.status === 'error') {
+          errors.push({
+            token: chunk[index].to,
+            error: ticket.message,
+            details: ticket.details,
+          });
+        }
+      });
+    } catch (error) {
+      console.error('[Notify] Error sending chunk:', error);
+      errors.push({ error: error.message });
+    }
+  }
+  
+  console.log(`[Notify] Sent ${results.length} notifications, ${errors.length} errors`);
+  return { sent: results.length, errors };
+}
+
+/**
+ * POST /notify
+ * Send a generic push notification
+ */
+app.post('/notify', async (req, res) => {
+  try {
+    const { title, body, data } = req.body;
+    
+    if (!title || !body) {
+      return res.status(400).json({ error: 'Missing required fields: title, body' });
+    }
+    
+    const result = await sendPushNotifications(title, body, data || {});
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('[Notify] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /notify/meeting
+ * Send a meeting reminder notification
+ * Body: { eventId, title, startTime, location?, minutesBefore? }
+ */
+app.post('/notify/meeting', async (req, res) => {
+  try {
+    const { eventId, title, startTime, location, minutesBefore = 15 } = req.body;
+    
+    if (!eventId || !title) {
+      return res.status(400).json({ error: 'Missing required fields: eventId, title' });
+    }
+    
+    // Check if already acknowledged
+    const acked = await isNotificationAcked(eventId);
+    if (acked) {
+      return res.json({ success: true, sent: 0, skipped: 'already_acknowledged' });
+    }
+    
+    const notificationTitle = `📅 ${title}`;
+    let notificationBody = `Starting in ${minutesBefore} minutes`;
+    if (location) {
+      notificationBody += ` • ${location}`;
+    }
+    
+    const data = {
+      type: 'meeting',
+      eventId,
+      title,
+      startTime,
+      location,
+    };
+    
+    const result = await sendPushNotifications(notificationTitle, notificationBody, data);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('[Notify/Meeting] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /notify/message
+ * Send a new message notification
+ * Body: { preview?, sender? }
+ */
+app.post('/notify/message', async (req, res) => {
+  try {
+    const { preview, sender } = req.body;
+    
+    const notificationTitle = sender ? `💬 ${sender}` : '💬 New Message';
+    const notificationBody = preview || 'You have a new message from Echo';
+    
+    const data = {
+      type: 'message',
+      preview,
+      sender,
+    };
+    
+    const result = await sendPushNotifications(notificationTitle, notificationBody, data);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('[Notify/Message] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /notify/brief
+ * Send daily brief notification
+ * Body: { summary?, meetingCount?, firstMeeting? }
+ */
+app.post('/notify/brief', async (req, res) => {
+  try {
+    const { summary, meetingCount, firstMeeting } = req.body;
+    
+    const notificationTitle = '🌅 Good Morning';
+    let notificationBody = summary || 'Your daily brief is ready';
+    
+    if (meetingCount && firstMeeting) {
+      notificationBody = `${meetingCount} meeting${meetingCount > 1 ? 's' : ''} today. First: ${firstMeeting}`;
+    }
+    
+    const data = {
+      type: 'brief',
+      summary,
+      meetingCount,
+      firstMeeting,
+    };
+    
+    const result = await sendPushNotifications(notificationTitle, notificationBody, data);
+    res.json({ success: true, ...result });
+  } catch (e) {
+    console.error('[Notify/Brief] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * GET /notify/tokens
+ * Get count of registered device tokens (for debugging)
+ */
+app.get('/notify/tokens', async (req, res) => {
+  try {
+    const tokens = await getDeviceTokens();
+    res.json({ count: tokens.length });
+  } catch (e) {
+    console.error('[Notify/Tokens] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
-  console.log(`[Echo Patient Sync] Server running on port ${PORT}`);
-  console.log(`[Echo Patient Sync] Data file: ${DATA_FILE}`);
-  console.log(`[Echo Patient Sync] Auth: ${AUTH_TOKEN ? 'enabled' : 'disabled (no token set)'}`);
+  console.log(`[Echo Server] Running on port ${PORT}`);
+  console.log(`[Echo Server] Data file: ${DATA_FILE}`);
+  console.log(`[Echo Server] Auth: ${AUTH_TOKEN ? 'enabled' : 'disabled (no token set)'}`);
+  console.log(`[Echo Server] Supabase: ${SUPABASE_URL}`);
 });
