@@ -340,16 +340,6 @@ export default function ChatScreen() {
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmptyState}
-          onContentSizeChange={() => {
-            // Scroll to end when content size changes (initial load + new messages)
-            flatListRef.current?.scrollToEnd({ animated: false });
-          }}
-          onLayout={() => {
-            // Also scroll on layout to catch initial render
-            if (messages.length > 0) {
-              flatListRef.current?.scrollToEnd({ animated: false });
-            }
-          }}
           maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         />
 
