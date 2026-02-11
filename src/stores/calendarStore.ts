@@ -1,4 +1,14 @@
+/**
+ * Calendar Store with Persistence
+ * 
+ * Uses AsyncStorage for persistence with stale-while-revalidate pattern:
+ * - Shows cached data immediately on launch
+ * - Refreshes in background without blocking UI
+ */
+
 import { create } from 'zustand';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface CalendarEvent {
   id: string;
@@ -23,34 +33,112 @@ export interface CalendarEvent {
 interface CalendarStore {
   events: CalendarEvent[];
   isLoading: boolean;
-  lastFetched: Date | null;
+  isBackgroundRefreshing: boolean;
+  lastFetched: number | null;  // Store as timestamp for persistence
   setEvents: (events: CalendarEvent[]) => void;
   addEvent: (event: CalendarEvent) => void;
   removeEvent: (id: string) => void;
   setLoading: (loading: boolean) => void;
+  setBackgroundRefreshing: (refreshing: boolean) => void;
+  isStale: () => boolean;
+  _hasHydrated: boolean;
+  setHasHydrated: (hydrated: boolean) => void;
 }
 
-export const useCalendarStore = create<CalendarStore>((set) => ({
-  events: [],
-  isLoading: false,
-  lastFetched: null,
+// Stale threshold: 5 minutes
+const STALE_THRESHOLD_MS = 5 * 60 * 1000;
 
-  setEvents: (events) => set({ 
-    events, 
-    lastFetched: new Date(),
-    isLoading: false 
-  }),
+// Custom storage with date serialization
+const calendarStorage = {
+  getItem: async (name: string): Promise<string | null> => {
+    try {
+      const value = await AsyncStorage.getItem(name);
+      if (!value) return null;
+      
+      // Parse and convert date strings back to Date objects
+      const parsed = JSON.parse(value);
+      if (parsed.state?.events) {
+        parsed.state.events = parsed.state.events.map((event: any) => ({
+          ...event,
+          startTime: new Date(event.startTime),
+          endTime: event.endTime ? new Date(event.endTime) : undefined,
+        }));
+      }
+      return JSON.stringify(parsed);
+    } catch (e) {
+      console.log('[Calendar] Storage get error:', e);
+      return null;
+    }
+  },
+  setItem: async (name: string, value: string): Promise<void> => {
+    try {
+      // Dates are automatically serialized to ISO strings by JSON.stringify
+      await AsyncStorage.setItem(name, value);
+    } catch (e) {
+      console.log('[Calendar] Storage set error:', e);
+    }
+  },
+  removeItem: async (name: string): Promise<void> => {
+    try {
+      await AsyncStorage.removeItem(name);
+    } catch (e) {
+      console.log('[Calendar] Storage remove error:', e);
+    }
+  },
+};
 
-  addEvent: (event) => set((state) => ({
-    events: [...state.events, event],
-  })),
+export const useCalendarStore = create<CalendarStore>()(
+  persist(
+    (set, get) => ({
+      events: [],
+      isLoading: false,
+      isBackgroundRefreshing: false,
+      lastFetched: null,
+      _hasHydrated: false,
 
-  removeEvent: (id) => set((state) => ({
-    events: state.events.filter((e) => e.id !== id),
-  })),
+      setEvents: (events) => set({ 
+        events, 
+        lastFetched: Date.now(),
+        isLoading: false,
+        isBackgroundRefreshing: false,
+      }),
 
-  setLoading: (isLoading) => set({ isLoading }),
-}));
+      addEvent: (event) => set((state) => ({
+        events: [...state.events, event],
+      })),
+
+      removeEvent: (id) => set((state) => ({
+        events: state.events.filter((e) => e.id !== id),
+      })),
+
+      setLoading: (isLoading) => set({ isLoading }),
+      
+      setBackgroundRefreshing: (isBackgroundRefreshing) => set({ isBackgroundRefreshing }),
+
+      isStale: () => {
+        const { lastFetched } = get();
+        if (!lastFetched) return true;
+        return Date.now() - lastFetched > STALE_THRESHOLD_MS;
+      },
+
+      setHasHydrated: (hydrated) => set({ _hasHydrated: hydrated }),
+    }),
+    {
+      name: 'echo-calendar',
+      storage: createJSONStorage(() => calendarStorage),
+      // Only persist events and lastFetched timestamp
+      partialize: (state) => ({
+        events: state.events,
+        lastFetched: state.lastFetched,
+      }),
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.setHasHydrated(true);
+        }
+      },
+    }
+  )
+);
 
 // Helper to get today's events
 export function getTodayEvents(events: CalendarEvent[]): CalendarEvent[] {

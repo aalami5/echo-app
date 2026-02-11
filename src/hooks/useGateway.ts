@@ -7,6 +7,7 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
+import { useNetworkStore } from '../stores/networkStore';
 import { GatewayService } from '../services/gateway';
 
 // Wait for Zustand store to hydrate from SecureStore
@@ -77,24 +78,37 @@ export function useGateway(): UseGatewayReturn {
     };
   }, [gatewayUrl, gatewayToken]);
 
+  const { setLatency, setConnected: setNetworkConnected } = useNetworkStore();
+
   const checkConnection = useCallback(async (): Promise<boolean> => {
     if (!serviceRef.current) {
       setIsConnected(false);
+      setNetworkConnected(false);
       setError('Gateway not configured');
       return false;
     }
 
     try {
+      const startTime = Date.now();
       const healthy = await serviceRef.current.healthCheck();
+      const latencyMs = Date.now() - startTime;
+      
       setIsConnected(healthy);
+      setNetworkConnected(healthy);
       setError(healthy ? null : 'Gateway unreachable');
+      
+      if (healthy) {
+        setLatency(latencyMs);
+      }
+      
       return healthy;
     } catch (err) {
       setIsConnected(false);
+      setNetworkConnected(false);
       setError('Connection failed');
       return false;
     }
-  }, []);
+  }, [setLatency, setNetworkConnected]);
 
   const sendMessage = useCallback(async (content: string): Promise<string | null> => {
     if (!serviceRef.current) {

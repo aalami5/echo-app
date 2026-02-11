@@ -1,15 +1,55 @@
 import React from 'react';
-import { StyleSheet, View, Text, Image } from 'react-native';
+import { StyleSheet, View, Text, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import type { Message } from '../types';
+import { Ionicons } from '@expo/vector-icons';
+import type { Message, MessageStatus } from '../types';
 import { colors, spacing, borderRadius } from '../constants/theme';
 import { useScaledTypography } from '../hooks/useScaledTypography';
 
 interface ChatMessageProps {
   message: Message;
+  onRetry?: (messageId: string) => void;
 }
 
-export function ChatMessage({ message }: ChatMessageProps) {
+function MessageStatusIndicator({ 
+  status, 
+  onRetry 
+}: { 
+  status?: MessageStatus; 
+  onRetry?: () => void;
+}) {
+  if (!status) return null;
+  
+  switch (status) {
+    case 'sending':
+      return (
+        <View style={styles.statusIndicator}>
+          <ActivityIndicator size={10} color={colors.textTertiary} />
+        </View>
+      );
+    case 'sent':
+      return (
+        <View style={styles.statusIndicator}>
+          <Ionicons name="checkmark" size={12} color={colors.textTertiary} />
+        </View>
+      );
+    case 'failed':
+      return (
+        <TouchableOpacity 
+          onPress={onRetry} 
+          style={styles.statusIndicator}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="alert-circle" size={14} color={colors.error} />
+          <Text style={styles.retryText}>Tap to retry</Text>
+        </TouchableOpacity>
+      );
+    default:
+      return null;
+  }
+}
+
+export function ChatMessage({ message, onRetry }: ChatMessageProps) {
   const isFromUser = message.role === 'user';
   const typography = useScaledTypography();
 
@@ -27,15 +67,20 @@ export function ChatMessage({ message }: ChatMessageProps) {
     marginHorizontal: spacing.xs,
   };
 
+  const handleRetry = () => {
+    onRetry?.(message.id);
+  };
+
   return (
     <View style={[styles.container, isFromUser ? styles.fromUser : styles.fromEcho]}>
       <View style={[
         styles.bubble,
-        isFromUser ? styles.bubbleFromUser : styles.bubbleFromEcho
+        isFromUser ? styles.bubbleFromUser : styles.bubbleFromEcho,
+        message.status === 'failed' && styles.bubbleFailed,
       ]}>
         {isFromUser ? (
           <LinearGradient
-            colors={['#1E3A5F', '#162D4D']}
+            colors={message.status === 'failed' ? ['#3D1A1A', '#2D1515'] : ['#1E3A5F', '#162D4D']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.gradientBubble}
@@ -43,7 +88,7 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {message.imageUrl && (
               <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
             )}
-            <Text style={textStyle}>{message.content}</Text>
+            <Text style={textStyle} selectable>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </LinearGradient>
         ) : (
@@ -51,17 +96,25 @@ export function ChatMessage({ message }: ChatMessageProps) {
             {message.imageUrl && (
               <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
             )}
-            <Text style={textStyle}>{message.content}</Text>
+            <Text style={textStyle} selectable>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </View>
         )}
       </View>
-      <Text style={[timestampStyle, isFromUser && styles.timestampRight]}>
-        {new Date(message.timestamp).toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        })}
-      </Text>
+      <View style={[styles.metaRow, isFromUser && styles.metaRowRight]}>
+        <Text style={timestampStyle}>
+          {new Date(message.timestamp).toLocaleTimeString([], { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+          })}
+        </Text>
+        {isFromUser && (
+          <MessageStatusIndicator 
+            status={message.status} 
+            onRetry={handleRetry}
+          />
+        )}
+      </View>
     </View>
   );
 }
@@ -99,6 +152,9 @@ const styles = StyleSheet.create({
   bubbleFromEcho: {
     borderBottomLeftRadius: borderRadius.sm,
   },
+  bubbleFailed: {
+    opacity: 0.8,
+  },
   gradientBubble: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm + 2,
@@ -118,8 +174,22 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     marginBottom: spacing.sm,
   },
-  timestampRight: {
-    textAlign: 'right' as const,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  metaRowRight: {
+    justifyContent: 'flex-end',
+  },
+  statusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: spacing.xs,
+    gap: 4,
+  },
+  retryText: {
+    fontSize: 10,
+    color: colors.error,
   },
   streamingContainer: {
     flexDirection: 'row',

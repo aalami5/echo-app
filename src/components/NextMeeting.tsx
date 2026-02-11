@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Animated,
   Easing,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
@@ -20,7 +21,7 @@ interface NextMeetingProps {
 type MeetingStatus = 'now' | 'imminent' | 'upcoming' | 'later' | 'tomorrow' | 'free';
 
 export function NextMeeting({ onExpand }: NextMeetingProps) {
-  const { events } = useCalendarStore();
+  const { events, isBackgroundRefreshing } = useCalendarStore();
   const [expanded, setExpanded] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -235,6 +236,13 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
         
         {/* Main single line */}
         <View style={styles.mainLine}>
+          {isBackgroundRefreshing && (
+            <ActivityIndicator 
+              size="small" 
+              color={colors.primary} 
+              style={styles.refreshIndicator}
+            />
+          )}
           <Text style={[styles.timeText, { color: getStatusColor() }]}>
             {formatTimeDisplay()}
           </Text>
@@ -317,6 +325,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
+  },
+  refreshIndicator: {
+    marginRight: spacing.xs,
+    transform: [{ scale: 0.7 }],
   },
   timeText: {
     fontSize: typography.sm,

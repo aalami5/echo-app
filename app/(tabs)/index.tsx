@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -18,11 +18,14 @@ import * as Haptics from 'expo-haptics';
 import { useChatStore } from '../../src/stores/chatStore';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useSettingsStore } from '../../src/stores/settingsStore';
+import { useNetworkStore } from '../../src/stores/networkStore';
 import { useCalendar } from '../../src/hooks/useCalendar';
 import { Avatar } from '../../src/components/Avatar';
 import { ChatMessage } from '../../src/components/ChatMessage';
 import { ImagePickerModal } from '../../src/components/ImagePicker';
 import { NextMeeting } from '../../src/components/NextMeeting';
+import { NetworkIndicator } from '../../src/components/NetworkIndicator';
+import { ToastContainer } from '../../src/components/ToastContainer';
 import { useGateway } from '../../src/hooks/useGateway';
 import { useVoiceChat } from '../../src/hooks/useVoiceChat';
 import { colors, spacing, typography, borderRadius } from '../../src/constants/theme';
@@ -35,15 +38,17 @@ export default function ChatScreen() {
   const [textMessage, setTextMessage] = useState('');
   const [showImagePicker, setShowImagePicker] = useState(false);
   
-  const { messages, avatarState, isConnected: storeConnected, setAvatarState, addMessage, setConnected } = useChatStore();
+  const { messages, avatarState, isConnected: storeConnected, setAvatarState, addMessage, updateMessage, setConnected } = useChatStore();
   const { accessToken } = useAuthStore();
   const { refresh: refreshCalendar } = useCalendar();
   const { isConnected, isLoading: gatewayLoading, sendMessage: gatewaySend, checkConnection } = useGateway();
+  const { setConnected: setNetworkConnected, addToast } = useNetworkStore();
   
-  // Sync connection status to store
+  // Sync connection status to stores
   useEffect(() => {
     setConnected(isConnected);
-  }, [isConnected, setConnected]);
+    setNetworkConnected(isConnected);
+  }, [isConnected, setConnected, setNetworkConnected]);
 
   // Fetch real calendar data when connected
   useEffect(() => {
@@ -100,17 +105,27 @@ export default function ChatScreen() {
     }
   }, []); // Empty deps = only run on mount
 
-  const sendMessageToGateway = async (content: string) => {
+  const sendMessageToGateway = async (content: string, retryMessageId?: string) => {
     console.log('[Chat] sendMessageToGateway called with:', content);
     
-    // Add user message to chat
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      role: 'user',
-      content,
-      timestamp: new Date().toISOString(),
-    };
-    addMessage(userMessage);
+    let messageId: string;
+    
+    if (retryMessageId) {
+      // Retry existing message
+      messageId = retryMessageId;
+      updateMessage(messageId, { status: 'sending' });
+    } else {
+      // Add new user message to chat
+      messageId = Date.now().toString();
+      const userMessage: Message = {
+        id: messageId,
+        role: 'user',
+        content,
+        timestamp: new Date().toISOString(),
+        status: 'sending',
+      };
+      addMessage(userMessage);
+    }
     
     setAvatarState('thinking');
     
@@ -120,6 +135,9 @@ export default function ChatScreen() {
     console.log('[Chat] Gateway response:', response);
     
     if (response) {
+      // Mark user message as sent
+      updateMessage(messageId, { status: 'sent' });
+      
       // Add assistant response to chat
       const assistantMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -143,10 +161,25 @@ export default function ChatScreen() {
       }
     } else {
       console.log('[Chat] No response received from Gateway');
+      // Mark message as failed
+      updateMessage(messageId, { status: 'failed' });
+      addToast({
+        message: 'Failed to send message. Tap to retry.',
+        type: 'error',
+        duration: 5000,
+      });
     }
     
     setAvatarState('idle');
   };
+
+  // Handle message retry
+  const handleRetryMessage = useCallback((messageId: string) => {
+    const message = messages.find(m => m.id === messageId);
+    if (message && message.status === 'failed') {
+      sendMessageToGateway(message.content, messageId);
+    }
+  }, [messages]);
 
   const handleAvatarPress = async () => {
     if (isRecording) {
@@ -211,7 +244,7 @@ export default function ChatScreen() {
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
-    <ChatMessage message={item} />
+    <ChatMessage message={item} onRetry={handleRetryMessage} />
   );
 
   const renderEmptyState = () => (
@@ -228,6 +261,9 @@ export default function ChatScreen() {
         colors={[colors.background, '#0D1526', colors.background]}
         style={StyleSheet.absoluteFill}
       />
+      
+      {/* Toast notifications */}
+      <ToastContainer />
       
       <KeyboardAvoidingView
         style={styles.keyboardView}
@@ -271,6 +307,7 @@ export default function ChatScreen() {
             </View>
           ) : (
             <View style={styles.statusContainer}>
+              <NetworkIndicator compact />
               <View style={[
                 styles.statusDot,
                 { backgroundColor: isConnected ? colors.success : colors.textTertiary }

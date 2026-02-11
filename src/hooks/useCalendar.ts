@@ -1,10 +1,14 @@
 /**
  * useCalendar Hook
  * 
- * Manages calendar state and syncing with the Gateway.
+ * Implements stale-while-revalidate pattern:
+ * - Shows cached data immediately (persisted in calendarStore)
+ * - Refreshes in background without blocking UI
+ * - Visual indicator shows when background refresh is happening
  */
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { useCalendarStore, CalendarEvent } from '../stores/calendarStore';
 import { useSettingsStore } from '../stores/settingsStore';
 import { fetchCalendarEvents } from '../services/calendar';
@@ -12,7 +16,8 @@ import { fetchCalendarEvents } from '../services/calendar';
 interface UseCalendarReturn {
   events: CalendarEvent[];
   isLoading: boolean;
-  lastFetched: Date | null;
+  isBackgroundRefreshing: boolean;
+  lastFetched: number | null;
   error: string | null;
   refresh: () => Promise<void>;
   getNextEvent: () => CalendarEvent | null;
@@ -21,15 +26,54 @@ interface UseCalendarReturn {
 
 export function useCalendar(): UseCalendarReturn {
   const { gatewayUrl, gatewayToken } = useSettingsStore();
-  const { events, isLoading, lastFetched, setEvents, setLoading } = useCalendarStore();
+  const { 
+    events, 
+    isLoading, 
+    isBackgroundRefreshing,
+    lastFetched, 
+    setEvents, 
+    setLoading,
+    setBackgroundRefreshing,
+    isStale,
+    _hasHydrated,
+  } = useCalendarStore();
   const [error, setError] = useState<string | null>(null);
+  const refreshInProgressRef = useRef(false);
 
+  // Background refresh - doesn't block UI
+  const backgroundRefresh = useCallback(async () => {
+    if (!gatewayUrl || !gatewayToken) return;
+    if (refreshInProgressRef.current) return;
+    
+    refreshInProgressRef.current = true;
+    setBackgroundRefreshing(true);
+    setError(null);
+
+    try {
+      console.log('[useCalendar] Starting background refresh...');
+      const fetchedEvents = await fetchCalendarEvents(gatewayUrl, gatewayToken, { today: true });
+      setEvents(fetchedEvents);
+      console.log('[useCalendar] Background refresh complete, got', fetchedEvents.length, 'events');
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to fetch calendar';
+      setError(message);
+      console.error('[useCalendar] Background refresh error:', message);
+    } finally {
+      setBackgroundRefreshing(false);
+      refreshInProgressRef.current = false;
+    }
+  }, [gatewayUrl, gatewayToken, setEvents, setBackgroundRefreshing]);
+
+  // Manual refresh - shows full loading state (for pull-to-refresh)
   const refresh = useCallback(async () => {
     if (!gatewayUrl || !gatewayToken) {
       setError('Gateway not configured');
       return;
     }
 
+    if (refreshInProgressRef.current) return;
+
+    refreshInProgressRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -42,20 +86,39 @@ export function useCalendar(): UseCalendarReturn {
       console.error('[useCalendar] Error:', message);
     } finally {
       setLoading(false);
+      refreshInProgressRef.current = false;
     }
   }, [gatewayUrl, gatewayToken, setEvents, setLoading]);
 
-  // Auto-refresh on mount if we have credentials and no recent data
+  // Stale-while-revalidate: show cached data immediately, refresh in background if stale
   useEffect(() => {
-    if (gatewayUrl && gatewayToken) {
-      const shouldRefresh = !lastFetched || 
-        (new Date().getTime() - lastFetched.getTime() > 5 * 60 * 1000); // 5 min stale
-      
-      if (shouldRefresh && events.length === 0) {
-        refresh();
-      }
+    if (!_hasHydrated) return; // Wait for store hydration
+    if (!gatewayUrl || !gatewayToken) return;
+
+    // If data is stale, refresh in background (non-blocking!)
+    if (isStale()) {
+      console.log('[useCalendar] Data is stale, starting background refresh');
+      // Use setTimeout to ensure this doesn't block initial render
+      setTimeout(() => {
+        backgroundRefresh();
+      }, 100);
     }
-  }, [gatewayUrl, gatewayToken]); // Only on credential changes
+  }, [_hasHydrated, gatewayUrl, gatewayToken, isStale, backgroundRefresh]);
+
+  // Refresh when app comes to foreground (if stale)
+  useEffect(() => {
+    const handleAppStateChange = (nextState: AppStateStatus) => {
+      if (nextState === 'active' && gatewayUrl && gatewayToken) {
+        if (isStale()) {
+          console.log('[useCalendar] App foregrounded, data is stale, refreshing...');
+          backgroundRefresh();
+        }
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription.remove();
+  }, [gatewayUrl, gatewayToken, isStale, backgroundRefresh]);
 
   const getNextEvent = useCallback((): CalendarEvent | null => {
     const now = new Date();
@@ -84,6 +147,7 @@ export function useCalendar(): UseCalendarReturn {
   return {
     events,
     isLoading,
+    isBackgroundRefreshing,
     lastFetched,
     error,
     refresh,

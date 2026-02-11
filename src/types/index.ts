@@ -2,6 +2,10 @@
 
 export type AvatarState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'alert';
 
+export type MessageStatus = 'sending' | 'sent' | 'failed';
+
+export type ConnectionQuality = 'excellent' | 'good' | 'poor' | 'offline';
+
 export interface User {
   id: string;
   email: string;
@@ -18,6 +22,7 @@ export interface Message {
   imageUrl?: string;
   card?: RichCard;
   streaming?: boolean;
+  status?: MessageStatus;
 }
 
 export interface RichCard {

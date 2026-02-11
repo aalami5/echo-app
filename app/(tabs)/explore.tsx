@@ -85,14 +85,15 @@ export default function SettingsScreen() {
     }
   };
 
-  const formatLastSync = (date: Date | null) => {
+  const formatLastSync = (date: Date | number | null) => {
     if (!date) return 'Never';
-    const now = new Date();
-    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    const timestamp = typeof date === 'number' ? date : date.getTime();
+    const now = Date.now();
+    const diff = Math.floor((now - timestamp) / 1000);
     if (diff < 60) return 'Just now';
     if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
     if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-    return date.toLocaleDateString();
+    return new Date(timestamp).toLocaleDateString();
   };
 
   const getStatusColor = (status: ConnectionStatus) => {
