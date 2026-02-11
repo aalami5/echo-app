@@ -340,7 +340,6 @@ export default function ChatScreen() {
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmptyState}
-          maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
         />
 
         {/* Text input toggle / input area - above tab bar */}
