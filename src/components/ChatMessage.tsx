@@ -88,7 +88,7 @@ export function ChatMessage({ message, onRetry }: ChatMessageProps) {
             {message.imageUrl && (
               <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
             )}
-            <Text style={textStyle} selectable>{message.content}</Text>
+            <Text style={textStyle}>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </LinearGradient>
         ) : (
@@ -96,7 +96,7 @@ export function ChatMessage({ message, onRetry }: ChatMessageProps) {
             {message.imageUrl && (
               <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
             )}
-            <Text style={textStyle} selectable>{message.content}</Text>
+            <Text style={textStyle}>{message.content}</Text>
             {message.streaming && <StreamingIndicator />}
           </View>
         )}
