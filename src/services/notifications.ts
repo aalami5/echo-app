@@ -309,3 +309,22 @@ export async function scheduleMessageNotification(message: string): Promise<stri
     trigger: null,
   });
 }
+
+/**
+ * Schedule a simple "response ready" notification when app is backgrounded
+ * Used by Build 16+ immediate ack flow
+ */
+export async function scheduleResponseReadyNotification(): Promise<string> {
+  return await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Echo',
+      body: 'Echo has a response ready',
+      data: {
+        type: 'message',
+        timestamp: new Date().toISOString(),
+      } as unknown as Record<string, unknown>,
+      sound: true,
+    },
+    trigger: null, // Immediate
+  });
+}

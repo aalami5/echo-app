@@ -48,7 +48,7 @@ export default function ChatScreen() {
   const { messages, avatarState, isConnected: storeConnected, setAvatarState, addMessage, updateMessage, setConnected } = useChatStore();
   const { accessToken } = useAuthStore();
   const { refresh: refreshCalendar } = useCalendar();
-  const { isConnected, isLoading: gatewayLoading, sendMessageStream: gatewaySendStream, checkConnection } = useGateway();
+  const { isConnected, isLoading: gatewayLoading, sendMessage: gatewaySend, checkConnection } = useGateway();
   const { setConnected: setNetworkConnected, addToast } = useNetworkStore();
   
   // Sync connection status to stores
@@ -225,48 +225,33 @@ export default function ChatScreen() {
     
     setAvatarState('thinking');
     
-    // Create assistant message placeholder immediately (for instant acknowledgment)
+    // Create assistant placeholder immediately with acknowledgment message
     const assistantMessageId = (Date.now() + 1).toString();
     const assistantPlaceholder: Message = {
       id: assistantMessageId,
       role: 'assistant',
-      content: '',  // Start empty, will be filled by streaming
+      content: 'Got it, working on this...',
       timestamp: new Date().toISOString(),
-      streaming: true,  // Mark as streaming for UI indicator
+      status: 'thinking',  // Mark as thinking for UI indicator
     };
     addMessage(assistantPlaceholder);
-    console.log('[Chat] Added streaming placeholder message');
+    console.log('[Chat] Added thinking placeholder message');
     
-    // Track accumulated content for the callback
-    let accumulatedContent = '';
-    
-    // Stream callback - updates message content incrementally
-    const onChunk = (chunk: string, done: boolean) => {
-      if (chunk) {
-        accumulatedContent += chunk;
-        updateMessage(assistantMessageId, { content: accumulatedContent });
-      }
-      if (done) {
-        // Remove streaming flag when complete
-        updateMessage(assistantMessageId, { streaming: false });
-      }
-    };
-    
-    // Send to Gateway with streaming
-    console.log('[Chat] Calling gatewaySendStream...');
-    const response = await gatewaySendStream(content, onChunk, userMessageId);
-    console.log('[Chat] Streaming complete, final length:', response?.length || 0);
+    // Send to Gateway (non-streaming, waits for complete response)
+    console.log('[Chat] Calling gatewaySend...');
+    const response = await gatewaySend(content, userMessageId);
+    console.log('[Chat] Response received, length:', response?.length || 0);
     
     if (response) {
       // Mark user message as sent
       updateMessage(userMessageId, { status: 'sent' });
       
-      // Ensure final content is set and streaming flag is removed
+      // Replace placeholder with actual response
       updateMessage(assistantMessageId, { 
         content: response, 
-        streaming: false 
+        status: undefined,  // Remove thinking status
       });
-      console.log('[Chat] Finalized assistant message');
+      console.log('[Chat] Updated assistant message with response');
       
       // Speak the response if voice is enabled
       if (voiceEnabled && autoPlayResponses) {
@@ -281,10 +266,10 @@ export default function ChatScreen() {
       console.log('[Chat] No response received from Gateway');
       // Mark user message as failed
       updateMessage(userMessageId, { status: 'failed' });
-      // Remove the empty assistant placeholder
+      // Update placeholder with failure message
       updateMessage(assistantMessageId, { 
         content: 'Failed to get response. Please try again.',
-        streaming: false 
+        status: undefined,
       });
       addToast({
         message: 'Failed to send message. Tap to retry.',

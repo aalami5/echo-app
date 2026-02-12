@@ -2,7 +2,7 @@
 
 export type AvatarState = 'idle' | 'listening' | 'thinking' | 'speaking' | 'alert';
 
-export type MessageStatus = 'sending' | 'sent' | 'failed';
+export type MessageStatus = 'sending' | 'sent' | 'failed' | 'thinking';
 
 export type ConnectionQuality = 'excellent' | 'good' | 'poor' | 'offline';
 
