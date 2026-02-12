@@ -89,26 +89,57 @@ export default function ChatScreen() {
   // For inverted FlatList, we reverse the messages so newest appears at top of reversed list (bottom of screen)
   const reversedMessages = [...messages].reverse();
 
-  // Track if user has scrolled away from bottom
-  const [isAtBottom, setIsAtBottom] = useState(true);
-  const lastMessageCount = useRef(messages.length);
+  // Track last message to detect new ones
+  const lastMessageId = useRef<string | null>(null);
+  const userScrolledUp = useRef(false);
+  const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-scroll to bottom (index 0 in inverted list) when new messages arrive
+  // Scroll to bottom helper
+  const scrollToBottom = useCallback((animated = true) => {
+    flatListRef.current?.scrollToOffset({ offset: 0, animated });
+  }, []);
+
+  // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
-    if (messages.length > lastMessageCount.current && isAtBottom) {
-      // New message arrived and user was at bottom - scroll to show it
+    if (messages.length === 0) return;
+    
+    const latestMessage = messages[messages.length - 1];
+    const isNewMessage = latestMessage.id !== lastMessageId.current;
+    
+    if (isNewMessage) {
+      lastMessageId.current = latestMessage.id;
+      
+      // Always scroll to bottom for new messages
+      // Small delay to ensure content is rendered
       setTimeout(() => {
-        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-      }, 50);
+        scrollToBottom(true);
+      }, 100);
+      
+      // Reset user scroll flag when they send a message
+      if (latestMessage.role === 'user') {
+        userScrolledUp.current = false;
+      }
     }
-    lastMessageCount.current = messages.length;
-  }, [messages.length, isAtBottom]);
+  }, [messages, scrollToBottom]);
 
-  // Handle scroll to detect if user is at bottom
+  // Scroll to bottom on initial mount
+  useEffect(() => {
+    if (messages.length > 0) {
+      setTimeout(() => {
+        scrollToBottom(false);
+      }, 300);
+    }
+  }, []);
+
+  // Handle scroll to detect if user scrolled up manually
   const handleScroll = useCallback((event: any) => {
     const offsetY = event.nativeEvent.contentOffset.y;
-    // In inverted list, offset 0 means at bottom (newest messages)
-    setIsAtBottom(offsetY < 50);
+    // In inverted list, offset > 100 means user scrolled up to see older messages
+    if (offsetY > 100) {
+      userScrolledUp.current = true;
+    } else {
+      userScrolledUp.current = false;
+    }
   }, []);
 
   const sendMessageToGateway = async (content: string, retryMessageId?: string) => {
