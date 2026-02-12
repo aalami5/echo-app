@@ -129,56 +129,72 @@ function parseEvent(event: GatewayCalendarEvent): CalendarEvent {
 }
 
 /**
- * Try to fetch from the fast Calendar API (local network only)
+ * Try to fetch from the fast Calendar API (local network)
+ * Tries Mac Mini's local IP first, then localhost as fallback
  */
 async function fetchFromCalendarApi(
   gatewayToken: string,
   options: { today?: boolean; week?: boolean }
 ): Promise<CalendarEvent[] | null> {
-  // Try localhost first (works when on same network as Mac Mini)
-  const endpoint = options.week 
-    ? `http://localhost:${CALENDAR_API_PORT}/api/calendar/week`
-    : `http://localhost:${CALENDAR_API_PORT}/api/calendar?today=true`;
+  // Mac Mini's local IP address (home network)
+  const MAC_MINI_IP = '10.0.0.244';
+  
+  // Try Mac Mini's local IP first, then localhost
+  const endpoints = options.week 
+    ? [
+        `http://${MAC_MINI_IP}:${CALENDAR_API_PORT}/api/calendar/week`,
+        `http://localhost:${CALENDAR_API_PORT}/api/calendar/week`,
+      ]
+    : [
+        `http://${MAC_MINI_IP}:${CALENDAR_API_PORT}/api/calendar?today=true`,
+        `http://localhost:${CALENDAR_API_PORT}/api/calendar?today=true`,
+      ];
 
-  try {
-    console.log('[Calendar] Trying fast Calendar API...');
-    const startTime = Date.now();
-    
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
-    
-    const response = await fetch(endpoint, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${gatewayToken}`,
-      },
-      signal: controller.signal,
-    });
-    
-    clearTimeout(timeout);
-    
-    if (!response.ok) {
-      console.log('[Calendar] Calendar API returned', response.status);
-      return null;
+  for (const endpoint of endpoints) {
+    try {
+      console.log('[Calendar] Trying Calendar API at:', endpoint);
+      const startTime = Date.now();
+      
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000); // 3 second timeout per endpoint
+      
+      const response = await fetch(endpoint, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${gatewayToken}`,
+        },
+        signal: controller.signal,
+      });
+      
+      clearTimeout(timeout);
+      
+      if (!response.ok) {
+        console.log('[Calendar] Calendar API returned', response.status);
+        continue; // Try next endpoint
+      }
+
+      const data: CalendarResponse = await response.json();
+      const elapsed = Date.now() - startTime;
+      
+      if (data.error) {
+        console.log('[Calendar] Calendar API error:', data.error);
+        continue; // Try next endpoint
+      }
+
+      const events = (data.events || []).map(parseEvent);
+      events.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+      
+      console.log(`[Calendar] Fast API: ${events.length} events in ${elapsed}ms`);
+      return events;
+    } catch (err) {
+      console.log('[Calendar] Endpoint failed, trying next...', endpoint);
+      continue; // Try next endpoint
     }
-
-    const data: CalendarResponse = await response.json();
-    const elapsed = Date.now() - startTime;
-    
-    if (data.error) {
-      console.log('[Calendar] Calendar API error:', data.error);
-      return null;
-    }
-
-    const events = (data.events || []).map(parseEvent);
-    events.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
-    
-    console.log(`[Calendar] Fast API: ${events.length} events in ${elapsed}ms`);
-    return events;
-  } catch (err) {
-    console.log('[Calendar] Calendar API not available, will use fallback');
-    return null;
   }
+  
+  // All endpoints failed
+  console.log('[Calendar] All Calendar API endpoints failed, will use fallback');
+  return null;
 }
 
 /**
