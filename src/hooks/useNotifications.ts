@@ -11,6 +11,7 @@ import {
   setupNotificationReceivedHandler,
   NotificationData,
 } from '../services/notifications';
+import { useChatStore } from '../stores/chatStore';
 
 export function useNotifications() {
   const [pushToken, setPushToken] = useState<string | null>(null);
@@ -44,8 +45,20 @@ export function useNotifications() {
         router.push('/');
       },
       // Message tap - navigate to chat
-      () => {
+      (messageData) => {
         console.log('Message notification tapped');
+        if (messageData) {
+          const { messages, addMessage } = useChatStore.getState();
+          const isDuplicate = messages.some((msg) => msg.id === messageData.id);
+          if (!isDuplicate) {
+            addMessage({
+              id: messageData.id,
+              role: 'assistant',
+              content: messageData.content,
+              timestamp: messageData.timestamp,
+            });
+          }
+        }
         router.push('/');
       },
       // Brief tap - navigate to home

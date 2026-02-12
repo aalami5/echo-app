@@ -35,6 +35,9 @@ export interface NotificationData {
   title?: string;
   body?: string;
   meetingTime?: string;
+  messageId?: string;
+  messageContent?: string;
+  timestamp?: string;
 }
 
 const DEVICE_PUSH_TOKEN_KEY = 'device_push_token';
@@ -201,7 +204,7 @@ export function setupNotificationReceivedHandler(
  */
 export function setupNotificationResponseHandler(
   onMeetingTap: (eventId: string) => void,
-  onMessageTap: () => void,
+  onMessageTap: (messageData?: { id: string; content: string; timestamp: string }) => void,
   onBriefTap: () => void
 ): Notifications.EventSubscription {
   return Notifications.addNotificationResponseReceivedListener((response) => {
@@ -212,7 +215,10 @@ export function setupNotificationResponseHandler(
       acknowledgeMeetingNotification(data.eventId);
       onMeetingTap(data.eventId);
     } else if (data.type === 'message') {
-      onMessageTap();
+      const messageData = data.messageId && data.messageContent && data.timestamp
+        ? { id: data.messageId, content: data.messageContent, timestamp: data.timestamp }
+        : undefined;
+      onMessageTap(messageData);
     } else if (data.type === 'brief') {
       onBriefTap();
     }
@@ -287,12 +293,16 @@ export async function getCachedDevicePushToken(): Promise<string | null> {
  * Schedule a local notification for a new message (background fallback)
  */
 export async function scheduleMessageNotification(message: string): Promise<string> {
+  const messageId = `msg-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   return await Notifications.scheduleNotificationAsync({
     content: {
       title: 'Echo replied',
       body: message.length > 140 ? `${message.slice(0, 137)}...` : message,
       data: {
         type: 'message',
+        messageId,
+        messageContent: message,
+        timestamp: new Date().toISOString(),
       } as unknown as Record<string, unknown>,
       sound: true,
     },
