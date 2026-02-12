@@ -86,24 +86,30 @@ export default function ChatScreen() {
     }
   }, [isSpeaking, isLoadingAudio, avatarState, setAvatarState]);
 
-  // Auto-scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    }
-  }, [messages.length]);
+  // For inverted FlatList, we reverse the messages so newest appears at top of reversed list (bottom of screen)
+  const reversedMessages = [...messages].reverse();
 
-  // Scroll to bottom on initial load (after persisted messages are loaded)
+  // Track if user has scrolled away from bottom
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const lastMessageCount = useRef(messages.length);
+
+  // Auto-scroll to bottom (index 0 in inverted list) when new messages arrive
   useEffect(() => {
-    if (messages.length > 0) {
-      // Longer delay for initial load to ensure content is rendered
+    if (messages.length > lastMessageCount.current && isAtBottom) {
+      // New message arrived and user was at bottom - scroll to show it
       setTimeout(() => {
-        flatListRef.current?.scrollToEnd({ animated: false });
-      }, 300);
+        flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      }, 50);
     }
-  }, []); // Empty deps = only run on mount
+    lastMessageCount.current = messages.length;
+  }, [messages.length, isAtBottom]);
+
+  // Handle scroll to detect if user is at bottom
+  const handleScroll = useCallback((event: any) => {
+    const offsetY = event.nativeEvent.contentOffset.y;
+    // In inverted list, offset 0 means at bottom (newest messages)
+    setIsAtBottom(offsetY < 50);
+  }, []);
 
   const sendMessageToGateway = async (content: string, retryMessageId?: string) => {
     console.log('[Chat] sendMessageToGateway called with:', content);
@@ -335,11 +341,17 @@ export default function ChatScreen() {
             styles.messageListContent,
             messages.length === 0 && styles.emptyListContent,
           ]}
-          data={messages}
+          data={reversedMessages}
           renderItem={renderMessage}
           keyExtractor={(item) => item.id}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={renderEmptyState}
+          inverted
+          onScroll={handleScroll}
+          scrollEventThrottle={100}
+          maintainVisibleContentPosition={{
+            minIndexForVisible: 0,
+          }}
         />
 
         {/* Text input toggle / input area - above tab bar */}
