@@ -8,13 +8,17 @@
  * - Request queue to serialize gateway requests (no concurrent sends)
  * - Per-message loading state (pendingMessageIds Set)
  * - Connection health only changes on health check, not message failures
+ * 
+ * Build 16:
+ * - Added streaming support for real-time responses
+ * - Immediate acknowledgment ("Echo is thinking...")
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useNetworkStore } from '../stores/networkStore';
-import { GatewayService } from '../services/gateway';
+import { GatewayService, StreamCallback } from '../services/gateway';
 import {
   enqueuePendingGatewayRequest,
   removePendingGatewayRequest,
@@ -43,6 +47,11 @@ interface UseGatewayReturn {
   pendingMessageIds: Set<string>;
   error: string | null;
   sendMessage: (content: string, requestId?: string) => Promise<string | null>;
+  sendMessageStream: (
+    content: string, 
+    onChunk: StreamCallback,
+    requestId?: string
+  ) => Promise<string | null>;
   checkConnection: () => Promise<boolean>;
   isMessagePending: (messageId: string) => boolean;
 }
@@ -249,12 +258,82 @@ export function useGateway(): UseGatewayReturn {
     return result;
   }, [sendMessageInternal]);
 
+  // Internal streaming send function
+  const sendMessageStreamInternal = useCallback(async (
+    content: string,
+    onChunk: StreamCallback,
+    requestId?: string
+  ): Promise<string | null> => {
+    if (!serviceRef.current) {
+      setError('Gateway not configured');
+      return null;
+    }
+
+    const messageId = requestId || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    setPendingMessageIds(prev => new Set(prev).add(messageId));
+    setError(null);
+
+    try {
+      if (requestId) {
+        inFlightRequest.current = { id: requestId, content };
+      }
+
+      const response = await serviceRef.current.sendMessageStream(content, onChunk);
+
+      if (requestId) {
+        await removePendingGatewayRequest(requestId);
+        inFlightRequest.current = null;
+      }
+
+      if (AppState.currentState !== 'active') {
+        await scheduleMessageNotification(response);
+      }
+
+      return response;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to send message';
+      console.error('[useGateway] Streaming message error:', message);
+      setError(message);
+      checkConnection();
+      
+      if (requestId) {
+        if (AppState.currentState === 'active') {
+          await removePendingGatewayRequest(requestId);
+        }
+        inFlightRequest.current = null;
+      }
+      return null;
+    } finally {
+      setPendingMessageIds(prev => {
+        const next = new Set(prev);
+        next.delete(messageId);
+        return next;
+      });
+    }
+  }, [checkConnection]);
+
+  // Queue-wrapped streaming sendMessage
+  const sendMessageStream = useCallback(async (
+    content: string,
+    onChunk: StreamCallback,
+    requestId?: string
+  ): Promise<string | null> => {
+    const result = requestQueueRef.current.then(
+      () => sendMessageStreamInternal(content, onChunk, requestId),
+      () => sendMessageStreamInternal(content, onChunk, requestId)
+    );
+    
+    requestQueueRef.current = result;
+    return result;
+  }, [sendMessageStreamInternal]);
+
   return {
     isConnected,
     isLoading,
     pendingMessageIds,
     error,
     sendMessage,
+    sendMessageStream,
     checkConnection,
     isMessagePending,
   };

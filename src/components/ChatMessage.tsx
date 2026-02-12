@@ -1,5 +1,5 @@
-import React from 'react';
-import { StyleSheet, View, Text, Image, ActivityIndicator, TouchableOpacity } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { StyleSheet, View, Text, Image, ActivityIndicator, TouchableOpacity, Animated, Easing } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import type { Message, MessageStatus } from '../types';
@@ -96,15 +96,23 @@ export function ChatMessage({ message, onRetry, onSpeak }: ChatMessageProps) {
               <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
             )}
             <Text style={textStyle}>{message.content}</Text>
-            {message.streaming && <StreamingIndicator />}
           </LinearGradient>
         ) : (
           <View style={styles.echoBubble}>
             {message.imageUrl && (
               <Image source={{ uri: message.imageUrl }} style={styles.messageImage} />
             )}
-            <Text style={textStyle}>{message.content}</Text>
-            {message.streaming && <StreamingIndicator />}
+            {/* Show thinking indicator when streaming with no content yet */}
+            {message.streaming && !message.content ? (
+              <StreamingIndicator showThinking />
+            ) : (
+              <>
+                <Text style={textStyle}>
+                  {message.content}
+                  {message.streaming && <Text style={styles.streamingCursor}>▋</Text>}
+                </Text>
+              </>
+            )}
           </View>
         )}
       </View>
@@ -135,12 +143,43 @@ export function ChatMessage({ message, onRetry, onSpeak }: ChatMessageProps) {
   );
 }
 
-function StreamingIndicator() {
+function StreamingIndicator({ showThinking = false }: { showThinking?: boolean }) {
+  // Animated opacity for pulsing effect
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: 600,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulseAnim]);
+
   return (
     <View style={styles.streamingContainer}>
-      <View style={[styles.dot, styles.dot1]} />
-      <View style={[styles.dot, styles.dot2]} />
-      <View style={[styles.dot, styles.dot3]} />
+      {showThinking && (
+        <Animated.Text style={[styles.thinkingText, { opacity: pulseAnim }]}>
+          Echo is thinking...
+        </Animated.Text>
+      )}
+      <View style={styles.dotsRow}>
+        <Animated.View style={[styles.dot, { opacity: pulseAnim }]} />
+        <Animated.View style={[styles.dot, { opacity: Animated.add(pulseAnim, new Animated.Value(0.2)) }]} />
+        <Animated.View style={[styles.dot, { opacity: Animated.add(pulseAnim, new Animated.Value(0.4)) }]} />
+      </View>
     </View>
   );
 }
@@ -212,25 +251,28 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs,
   },
   streamingContainer: {
+    alignItems: 'flex-start',
+    paddingVertical: spacing.xs,
+  },
+  thinkingText: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    fontStyle: 'italic',
+    marginBottom: spacing.xs,
+  },
+  dotsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    marginTop: spacing.xs,
   },
   dot: {
     width: 6,
     height: 6,
     borderRadius: 3,
     backgroundColor: colors.primary,
-    opacity: 0.6,
   },
-  dot1: {
-    opacity: 0.4,
-  },
-  dot2: {
-    opacity: 0.6,
-  },
-  dot3: {
+  streamingCursor: {
+    color: colors.primary,
     opacity: 0.8,
   },
 });

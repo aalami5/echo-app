@@ -48,7 +48,7 @@ export default function ChatScreen() {
   const { messages, avatarState, isConnected: storeConnected, setAvatarState, addMessage, updateMessage, setConnected } = useChatStore();
   const { accessToken } = useAuthStore();
   const { refresh: refreshCalendar } = useCalendar();
-  const { isConnected, isLoading: gatewayLoading, sendMessage: gatewaySend, checkConnection } = useGateway();
+  const { isConnected, isLoading: gatewayLoading, sendMessageStream: gatewaySendStream, checkConnection } = useGateway();
   const { setConnected: setNetworkConnected, addToast } = useNetworkStore();
   
   // Sync connection status to stores
@@ -204,17 +204,17 @@ export default function ChatScreen() {
   const sendMessageToGateway = async (content: string, retryMessageId?: string) => {
     console.log('[Chat] sendMessageToGateway called with:', content);
     
-    let messageId: string;
+    let userMessageId: string;
     
     if (retryMessageId) {
       // Retry existing message
-      messageId = retryMessageId;
-      updateMessage(messageId, { status: 'sending' });
+      userMessageId = retryMessageId;
+      updateMessage(userMessageId, { status: 'sending' });
     } else {
-      // Add new user message to chat
-      messageId = Date.now().toString();
+      // Add new user message to chat immediately
+      userMessageId = Date.now().toString();
       const userMessage: Message = {
-        id: messageId,
+        id: userMessageId,
         role: 'user',
         content,
         timestamp: new Date().toISOString(),
@@ -225,31 +225,53 @@ export default function ChatScreen() {
     
     setAvatarState('thinking');
     
-    // Send to Gateway and get response
-    console.log('[Chat] Calling gatewaySend...');
-    const response = await gatewaySend(content, messageId);
-    console.log('[Chat] Gateway response:', response);
+    // Create assistant message placeholder immediately (for instant acknowledgment)
+    const assistantMessageId = (Date.now() + 1).toString();
+    const assistantPlaceholder: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',  // Start empty, will be filled by streaming
+      timestamp: new Date().toISOString(),
+      streaming: true,  // Mark as streaming for UI indicator
+    };
+    addMessage(assistantPlaceholder);
+    console.log('[Chat] Added streaming placeholder message');
+    
+    // Track accumulated content for the callback
+    let accumulatedContent = '';
+    
+    // Stream callback - updates message content incrementally
+    const onChunk = (chunk: string, done: boolean) => {
+      if (chunk) {
+        accumulatedContent += chunk;
+        updateMessage(assistantMessageId, { content: accumulatedContent });
+      }
+      if (done) {
+        // Remove streaming flag when complete
+        updateMessage(assistantMessageId, { streaming: false });
+      }
+    };
+    
+    // Send to Gateway with streaming
+    console.log('[Chat] Calling gatewaySendStream...');
+    const response = await gatewaySendStream(content, onChunk, userMessageId);
+    console.log('[Chat] Streaming complete, final length:', response?.length || 0);
     
     if (response) {
       // Mark user message as sent
-      updateMessage(messageId, { status: 'sent' });
+      updateMessage(userMessageId, { status: 'sent' });
       
-      // Add assistant response to chat
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: response,
-        timestamp: new Date().toISOString(),
-      };
-      addMessage(assistantMessage);
-      console.log('[Chat] Added assistant message to chat');
+      // Ensure final content is set and streaming flag is removed
+      updateMessage(assistantMessageId, { 
+        content: response, 
+        streaming: false 
+      });
+      console.log('[Chat] Finalized assistant message');
       
       // Speak the response if voice is enabled
-      // Avatar state will be managed by useEffect based on isLoadingAudio/isSpeaking
       if (voiceEnabled && autoPlayResponses) {
         try {
           await speak(response);
-          // Don't set idle here - useEffect handles it when speaking ends
           return;
         } catch (e) {
           console.error('[Chat] TTS error:', e);
@@ -257,8 +279,13 @@ export default function ChatScreen() {
       }
     } else {
       console.log('[Chat] No response received from Gateway');
-      // Mark message as failed
-      updateMessage(messageId, { status: 'failed' });
+      // Mark user message as failed
+      updateMessage(userMessageId, { status: 'failed' });
+      // Remove the empty assistant placeholder
+      updateMessage(assistantMessageId, { 
+        content: 'Failed to get response. Please try again.',
+        streaming: false 
+      });
       addToast({
         message: 'Failed to send message. Tap to retry.',
         type: 'error',

@@ -485,23 +485,30 @@ app.post('/notify/meeting', async (req, res) => {
 /**
  * POST /notify/message
  * Send a new message notification
- * Body: { preview?, sender? }
+ * Body: { message, preview?, sender?, messageId? }
  */
 app.post('/notify/message', async (req, res) => {
   try {
-    const { preview, sender } = req.body;
+    const { message, preview, sender, messageId } = req.body;
     
     const notificationTitle = sender ? `💬 ${sender}` : '💬 New Message';
-    const notificationBody = preview || 'You have a new message from Echo';
+    // Use preview for notification body (truncated), but pass full message in data
+    const notificationBody = preview || (message ? (message.length > 140 ? message.slice(0, 137) + '...' : message) : 'You have a new message from Echo');
+    
+    // Generate messageId if not provided
+    const finalMessageId = messageId || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     
     const data = {
       type: 'message',
+      messageId: finalMessageId,
+      messageContent: message || preview || '',
+      timestamp: new Date().toISOString(),
       preview,
       sender,
     };
     
     const result = await sendPushNotifications(notificationTitle, notificationBody, data);
-    res.json({ success: true, ...result });
+    res.json({ success: true, messageId: finalMessageId, ...result });
   } catch (e) {
     console.error('[Notify/Message] Error:', e.message);
     res.status(500).json({ error: e.message });
