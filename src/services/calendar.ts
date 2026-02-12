@@ -129,23 +129,27 @@ function parseEvent(event: GatewayCalendarEvent): CalendarEvent {
 }
 
 /**
- * Try to fetch from the fast Calendar API (local network)
- * Tries Mac Mini's local IP first, then localhost as fallback
+ * Try to fetch from the fast Calendar API
+ * Tries public URL first (always works), then local network fallbacks
  */
 async function fetchFromCalendarApi(
   gatewayToken: string,
   options: { today?: boolean; week?: boolean }
 ): Promise<CalendarEvent[] | null> {
-  // Mac Mini's local IP address (home network)
+  // Public URL via Cloudflare tunnel (works from anywhere)
+  const PUBLIC_URL = 'https://calendar.oppersmedical.com';
+  // Mac Mini's local IP address (home network - slightly faster when available)
   const MAC_MINI_IP = '10.0.0.244';
   
-  // Try Mac Mini's local IP first, then localhost
+  // Try public URL first (always works), then local network fallbacks
   const endpoints = options.week 
     ? [
+        `${PUBLIC_URL}/api/calendar/week`,
         `http://${MAC_MINI_IP}:${CALENDAR_API_PORT}/api/calendar/week`,
         `http://localhost:${CALENDAR_API_PORT}/api/calendar/week`,
       ]
     : [
+        `${PUBLIC_URL}/api/calendar?today=true`,
         `http://${MAC_MINI_IP}:${CALENDAR_API_PORT}/api/calendar?today=true`,
         `http://localhost:${CALENDAR_API_PORT}/api/calendar?today=true`,
       ];

@@ -70,13 +70,19 @@ export function useGateway(): UseGatewayReturn {
     
     const initService = async () => {
       // Wait for settings to load from SecureStore
+      console.log('[useGateway] Waiting for hydration...');
       await waitForHydration();
       
-      if (!mounted) return;
+      if (!mounted) {
+        console.log('[useGateway] Component unmounted during hydration, aborting');
+        return;
+      }
       
       // Get fresh values after hydration
       const { gatewayUrl: url, gatewayToken: token } = useSettingsStore.getState();
-      console.log('[useGateway] After hydration - URL:', url, 'Token:', token ? 'present' : 'missing');
+      console.log('[useGateway] After hydration:');
+      console.log('[useGateway]   URL:', url);
+      console.log('[useGateway]   Token:', token ? `present (${token.length} chars)` : 'MISSING');
       
       if (url && token) {
         console.log('[useGateway] Creating GatewayService...');
@@ -86,11 +92,14 @@ export function useGateway(): UseGatewayReturn {
           userId: `echo-app-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         });
         // Check connection on init
-        checkConnection();
+        console.log('[useGateway] Running initial health check...');
+        const healthy = await checkConnection();
+        console.log('[useGateway] Initial health check result:', healthy);
       } else {
-        console.log('[useGateway] Missing URL or token, service not created');
+        console.log('[useGateway] MISSING URL or token, service NOT created');
         serviceRef.current = null;
         setIsConnected(false);
+        setError(url ? 'Gateway token not configured' : 'Gateway URL not configured');
       }
     };
     
@@ -197,6 +206,8 @@ export function useGateway(): UseGatewayReturn {
       return response;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send message';
+      console.error('[useGateway] Message send error:', message);
+      console.error('[useGateway] Full error:', err);
       setError(message);
       
       // DON'T flip isConnected on message send failure

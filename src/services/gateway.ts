@@ -9,8 +9,8 @@ import axios from 'axios';
 import { AppState } from 'react-native';
 import { getCachedDevicePushToken } from './notifications';
 
-// Request timeout in milliseconds (20 seconds - fail faster)
-const REQUEST_TIMEOUT_MS = 20000;
+// Request timeout in milliseconds (60 seconds - allow time for complex AI responses)
+const REQUEST_TIMEOUT_MS = 60000;
 
 interface GatewayConfig {
   baseUrl: string;
@@ -87,12 +87,21 @@ export class GatewayService {
    */
   async sendMessage(content: string, history: ChatMessage[] = []): Promise<string> {
     const { baseUrl: rawUrl, token, agentId, userId } = this.config;
-    const baseUrl = rawUrl.trim();
+    const baseUrl = rawUrl.trim().replace(/\/+$/, ''); // Normalize URL
     const devicePushToken = await getCachedDevicePushToken();
     const appState = AppState.currentState;
     
-    console.log('[Gateway] Sending message:', content);
+    console.log('[Gateway] Sending message:', content.slice(0, 100));
     console.log('[Gateway] URL:', `${baseUrl}/v1/chat/completions`);
+    console.log('[Gateway] Token present:', !!token, 'length:', token?.length || 0);
+    
+    // Validate config before sending
+    if (!baseUrl) {
+      throw new Error('Gateway URL not configured');
+    }
+    if (!token) {
+      throw new Error('Gateway token not configured');
+    }
     
     const messages: ChatMessage[] = [
       ...history,
@@ -121,9 +130,19 @@ export class GatewayService {
     );
 
     if (!response.ok) {
-      const error = await response.text();
-      console.error('[Gateway] API error:', response.status, error);
-      throw new Error(`Gateway error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('[Gateway] API error:', response.status, errorText);
+      
+      // Provide more helpful error messages
+      if (response.status === 401) {
+        throw new Error('Invalid gateway token. Please check your settings.');
+      } else if (response.status === 403) {
+        throw new Error('Access denied. Token may be expired.');
+      } else if (response.status === 502 || response.status === 503 || response.status === 504) {
+        throw new Error('Gateway temporarily unavailable. Please try again.');
+      } else {
+        throw new Error(`Gateway error: ${response.status}`);
+      }
     }
 
     const result: ChatCompletionResponse = await response.json();
@@ -139,14 +158,22 @@ export class GatewayService {
   }
 
   /**
-   * Check if the Gateway is reachable
+   * Check if the Gateway is reachable and token is valid
    */
   async healthCheck(): Promise<boolean> {
     // Trim URL and remove any trailing slashes
     const url = this.config.baseUrl.trim().replace(/\/+$/, '');
+    const token = this.config.token;
+    
     console.log('[Gateway] Health check starting');
     console.log('[Gateway] Base URL:', JSON.stringify(url));
-    console.log('[Gateway] Token length:', this.config.token?.length || 0);
+    console.log('[Gateway] Token present:', !!token, 'length:', token?.length || 0);
+    
+    // Basic validation
+    if (!url || !token) {
+      console.error('[Gateway] Health check failed: missing URL or token');
+      return false;
+    }
     
     try {
       // Use simple fetch GET to /ping endpoint (avoids CORS preflight)
