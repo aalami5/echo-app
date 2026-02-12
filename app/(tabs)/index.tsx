@@ -280,8 +280,18 @@ export default function ChatScreen() {
     }, 1500);
   };
 
+  const handleSpeakMessage = useCallback((content: string) => {
+    if (voiceConfigured && content) {
+      speak(content);
+    }
+  }, [voiceConfigured, speak]);
+
   const renderMessage = ({ item }: { item: Message }) => (
-    <ChatMessage message={item} onRetry={handleRetryMessage} />
+    <ChatMessage 
+      message={item} 
+      onRetry={handleRetryMessage} 
+      onSpeak={handleSpeakMessage}
+    />
   );
 
   const renderEmptyState = () => (

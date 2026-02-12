@@ -9,6 +9,7 @@ import { useScaledTypography } from '../hooks/useScaledTypography';
 interface ChatMessageProps {
   message: Message;
   onRetry?: (messageId: string) => void;
+  onSpeak?: (content: string) => void;
 }
 
 function MessageStatusIndicator({ 
@@ -49,7 +50,7 @@ function MessageStatusIndicator({
   }
 }
 
-export function ChatMessage({ message, onRetry }: ChatMessageProps) {
+export function ChatMessage({ message, onRetry, onSpeak }: ChatMessageProps) {
   const isFromUser = message.role === 'user';
   const typography = useScaledTypography();
 
@@ -69,6 +70,12 @@ export function ChatMessage({ message, onRetry }: ChatMessageProps) {
 
   const handleRetry = () => {
     onRetry?.(message.id);
+  };
+
+  const handleSpeak = () => {
+    if (message.content && onSpeak) {
+      onSpeak(message.content);
+    }
   };
 
   return (
@@ -102,6 +109,15 @@ export function ChatMessage({ message, onRetry }: ChatMessageProps) {
         )}
       </View>
       <View style={[styles.metaRow, isFromUser && styles.metaRowRight]}>
+        {!isFromUser && onSpeak && (
+          <TouchableOpacity
+            onPress={handleSpeak}
+            style={styles.speakerButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="volume-medium-outline" size={16} color={colors.textTertiary} />
+          </TouchableOpacity>
+        )}
         <Text style={timestampStyle}>
           {new Date(message.timestamp).toLocaleTimeString([], { 
             hour: '2-digit', 
@@ -190,6 +206,10 @@ const styles = StyleSheet.create({
   retryText: {
     fontSize: 10,
     color: colors.error,
+  },
+  speakerButton: {
+    padding: spacing.xs,
+    marginRight: spacing.xs,
   },
   streamingContainer: {
     flexDirection: 'row',
