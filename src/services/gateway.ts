@@ -6,6 +6,8 @@
  */
 
 import axios from 'axios';
+import { AppState } from 'react-native';
+import { getCachedDevicePushToken } from './notifications';
 
 interface GatewayConfig {
   baseUrl: string;
@@ -56,6 +58,8 @@ export class GatewayService {
   async sendMessage(content: string, history: ChatMessage[] = []): Promise<string> {
     const { baseUrl: rawUrl, token, agentId, userId } = this.config;
     const baseUrl = rawUrl.trim();
+    const devicePushToken = await getCachedDevicePushToken();
+    const appState = AppState.currentState;
     
     console.log('[Gateway] Sending message:', content);
     console.log('[Gateway] URL:', `${baseUrl}/v1/chat/completions`);
@@ -70,7 +74,9 @@ export class GatewayService {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+        'X-App-State': appState || 'unknown',
+        ...(devicePushToken ? { 'X-APNS-Token': devicePushToken } : {}),
       },
       body: JSON.stringify({
         model: `openclaw:${agentId}`,

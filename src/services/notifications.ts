@@ -11,6 +11,7 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import Constants from 'expo-constants';
 
@@ -35,6 +36,8 @@ export interface NotificationData {
   body?: string;
   meetingTime?: string;
 }
+
+const DEVICE_PUSH_TOKEN_KEY = 'device_push_token';
 
 /**
  * Register for push notifications and return the token
@@ -69,6 +72,16 @@ export async function registerForPushNotifications(): Promise<string | null> {
     
     const token = tokenResponse.data;
     console.log('Push token:', token);
+
+    // Cache native device push token (APNs/FCM) for gateway fallback
+    try {
+      const deviceToken = await Notifications.getDevicePushTokenAsync();
+      if (deviceToken?.data) {
+        await AsyncStorage.setItem(DEVICE_PUSH_TOKEN_KEY, deviceToken.data);
+      }
+    } catch (deviceTokenError) {
+      console.warn('Error getting device push token:', deviceTokenError);
+    }
 
     // Store token in Supabase
     await storeDeviceToken(token);
@@ -256,4 +269,33 @@ export async function setBadgeCount(count: number): Promise<void> {
  */
 export async function clearBadge(): Promise<void> {
   await Notifications.setBadgeCountAsync(0);
+}
+
+/**
+ * Get cached native device push token (APNs/FCM)
+ */
+export async function getCachedDevicePushToken(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(DEVICE_PUSH_TOKEN_KEY);
+  } catch (error) {
+    console.warn('Error reading device push token:', error);
+    return null;
+  }
+}
+
+/**
+ * Schedule a local notification for a new message (background fallback)
+ */
+export async function scheduleMessageNotification(message: string): Promise<string> {
+  return await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Echo replied',
+      body: message.length > 140 ? `${message.slice(0, 137)}...` : message,
+      data: {
+        type: 'message',
+      } as unknown as Record<string, unknown>,
+      sound: true,
+    },
+    trigger: null,
+  });
 }

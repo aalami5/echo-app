@@ -6,9 +6,16 @@
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { AppState } from 'react-native';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useNetworkStore } from '../stores/networkStore';
 import { GatewayService } from '../services/gateway';
+import {
+  enqueuePendingGatewayRequest,
+  removePendingGatewayRequest,
+  registerGatewayBackgroundTask,
+} from '../services/gatewayBackground';
+import { scheduleMessageNotification } from '../services/notifications';
 
 // Wait for Zustand store to hydrate from SecureStore
 const waitForHydration = (): Promise<void> => {
@@ -29,7 +36,7 @@ interface UseGatewayReturn {
   isConnected: boolean;
   isLoading: boolean;
   error: string | null;
-  sendMessage: (content: string) => Promise<string | null>;
+  sendMessage: (content: string, requestId?: string) => Promise<string | null>;
   checkConnection: () => Promise<boolean>;
 }
 
@@ -40,6 +47,7 @@ export function useGateway(): UseGatewayReturn {
   const [error, setError] = useState<string | null>(null);
   
   const serviceRef = useRef<GatewayService | null>(null);
+  const inFlightRequest = useRef<{ id: string; content: string } | null>(null);
 
   // Initialize or update the service when settings change
   useEffect(() => {
@@ -78,6 +86,25 @@ export function useGateway(): UseGatewayReturn {
     };
   }, [gatewayUrl, gatewayToken]);
 
+  useEffect(() => {
+    registerGatewayBackgroundTask();
+  }, []);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state !== 'active' && inFlightRequest.current) {
+        enqueuePendingGatewayRequest({
+          id: inFlightRequest.current.id,
+          content: inFlightRequest.current.content,
+          createdAt: new Date().toISOString(),
+          retryCount: 0,
+        });
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+
   const { setLatency, setConnected: setNetworkConnected } = useNetworkStore();
 
   const checkConnection = useCallback(async (): Promise<boolean> => {
@@ -110,7 +137,7 @@ export function useGateway(): UseGatewayReturn {
     }
   }, [setLatency, setNetworkConnected]);
 
-  const sendMessage = useCallback(async (content: string): Promise<string | null> => {
+  const sendMessage = useCallback(async (content: string, requestId?: string): Promise<string | null> => {
     if (!serviceRef.current) {
       setError('Gateway not configured');
       return null;
@@ -120,13 +147,33 @@ export function useGateway(): UseGatewayReturn {
     setError(null);
 
     try {
+      if (requestId) {
+        inFlightRequest.current = { id: requestId, content };
+      }
+
       const response = await serviceRef.current.sendMessage(content);
       setIsConnected(true);
+
+      if (requestId) {
+        await removePendingGatewayRequest(requestId);
+        inFlightRequest.current = null;
+      }
+
+      if (AppState.currentState !== 'active') {
+        await scheduleMessageNotification(response);
+      }
+
       return response;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send message';
       setError(message);
       setIsConnected(false);
+      if (requestId) {
+        if (AppState.currentState === 'active') {
+          await removePendingGatewayRequest(requestId);
+        }
+        inFlightRequest.current = null;
+      }
       return null;
     } finally {
       setIsLoading(false);

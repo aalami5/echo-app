@@ -10,6 +10,7 @@ import {
   Platform,
   Keyboard,
   Image,
+  AppState,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +31,12 @@ import { useGateway } from '../../src/hooks/useGateway';
 import { useVoiceChat } from '../../src/hooks/useVoiceChat';
 import { colors, spacing, typography, borderRadius } from '../../src/constants/theme';
 import type { Message } from '../../src/types';
+import {
+  drainPendingGatewayResponses,
+  listPendingGatewayRequests,
+  processPendingGatewayRequests,
+  removePendingGatewayRequest,
+} from '../../src/services/gatewayBackground';
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
@@ -142,6 +149,58 @@ export default function ChatScreen() {
     }
   }, []);
 
+  const applyPendingResponses = useCallback(async () => {
+    const pendingResponses = await drainPendingGatewayResponses();
+    if (pendingResponses.length === 0) return;
+
+    for (const response of pendingResponses) {
+      updateMessage(response.requestId, { status: 'sent' });
+      const assistantMessage: Message = {
+        id: (Date.now() + Math.random()).toString(),
+        role: 'assistant',
+        content: response.content,
+        timestamp: response.createdAt,
+      };
+      addMessage(assistantMessage);
+    }
+  }, [addMessage, updateMessage]);
+
+  const recoverPendingRequests = useCallback(async () => {
+    const pendingRequests = await listPendingGatewayRequests();
+    if (pendingRequests.length === 0) return;
+
+    if (gatewayLoading) return;
+
+    const responses = await processPendingGatewayRequests();
+    if (responses.length > 0) {
+      await applyPendingResponses();
+    }
+
+    // Mark any still-pending requests as failed so user can retry
+    const remaining = await listPendingGatewayRequests();
+    for (const request of remaining) {
+      updateMessage(request.id, { status: 'failed' });
+      await removePendingGatewayRequest(request.id);
+    }
+  }, [applyPendingResponses, gatewayLoading, updateMessage]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', async (state) => {
+      if (state === 'active') {
+        await checkConnection();
+        await applyPendingResponses();
+        await recoverPendingRequests();
+      }
+    });
+
+    return () => subscription.remove();
+  }, [applyPendingResponses, checkConnection, recoverPendingRequests]);
+
+  useEffect(() => {
+    applyPendingResponses();
+    recoverPendingRequests();
+  }, [applyPendingResponses, recoverPendingRequests]);
+
   const sendMessageToGateway = async (content: string, retryMessageId?: string) => {
     console.log('[Chat] sendMessageToGateway called with:', content);
     
@@ -168,7 +227,7 @@ export default function ChatScreen() {
     
     // Send to Gateway and get response
     console.log('[Chat] Calling gatewaySend...');
-    const response = await gatewaySend(content);
+    const response = await gatewaySend(content, messageId);
     console.log('[Chat] Gateway response:', response);
     
     if (response) {
