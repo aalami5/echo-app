@@ -9,6 +9,9 @@ import axios from 'axios';
 import { AppState } from 'react-native';
 import { getCachedDevicePushToken } from './notifications';
 
+// Request timeout in milliseconds (30 seconds)
+const REQUEST_TIMEOUT_MS = 30000;
+
 interface GatewayConfig {
   baseUrl: string;
   token: string;
@@ -41,6 +44,33 @@ interface ChatCompletionResponse {
   };
 }
 
+/**
+ * Create a fetch request with timeout using AbortController
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = REQUEST_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeoutMs / 1000} seconds`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export class GatewayService {
   private config: GatewayConfig;
 
@@ -69,22 +99,26 @@ export class GatewayService {
       { role: 'user', content }
     ];
 
-    const response = await fetch(`${baseUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-        'X-App-State': appState || 'unknown',
-        ...(devicePushToken ? { 'X-APNS-Token': devicePushToken } : {}),
+    const response = await fetchWithTimeout(
+      `${baseUrl}/v1/chat/completions`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          'X-App-State': appState || 'unknown',
+          ...(devicePushToken ? { 'X-APNS-Token': devicePushToken } : {}),
+        },
+        body: JSON.stringify({
+          model: `openclaw:${agentId}`,
+          messages,
+          stream: false,
+          user: userId,
+        }),
       },
-      body: JSON.stringify({
-        model: `openclaw:${agentId}`,
-        messages,
-        stream: false,
-        user: userId,
-      }),
-    });
+      REQUEST_TIMEOUT_MS
+    );
 
     if (!response.ok) {
       const error = await response.text();
@@ -119,12 +153,17 @@ export class GatewayService {
       const pingUrl = url + '/ping';
       console.log('[Gateway] Pinging:', JSON.stringify(pingUrl));
       
-      const response = await fetch(pingUrl, {
-        method: 'GET',
-        headers: {
-          'Accept': 'text/plain',
+      // Use shorter timeout for health checks (10 seconds)
+      const response = await fetchWithTimeout(
+        pingUrl,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/plain',
+          },
         },
-      });
+        10000
+      );
       
       console.log('[Gateway] Ping response status:', response.status);
       
@@ -134,12 +173,16 @@ export class GatewayService {
       
       // If /ping doesn't exist, try the base URL
       console.log('[Gateway] Trying base URL...');
-      const baseResponse = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Accept': 'text/html,application/json',
+      const baseResponse = await fetchWithTimeout(
+        url,
+        {
+          method: 'GET',
+          headers: {
+            'Accept': 'text/html,application/json',
+          },
         },
-      });
+        10000
+      );
       
       console.log('[Gateway] Base URL response status:', baseResponse.status);
       return baseResponse.ok;

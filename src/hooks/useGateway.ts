@@ -3,6 +3,11 @@
  * 
  * React hook for connecting to the OpenClaw Gateway.
  * Uses HTTP API for reliable communication.
+ * 
+ * Build 13 fixes:
+ * - Request queue to serialize gateway requests (no concurrent sends)
+ * - Per-message loading state (pendingMessageIds Set)
+ * - Connection health only changes on health check, not message failures
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -35,19 +40,29 @@ const waitForHydration = (): Promise<void> => {
 interface UseGatewayReturn {
   isConnected: boolean;
   isLoading: boolean;
+  pendingMessageIds: Set<string>;
   error: string | null;
   sendMessage: (content: string, requestId?: string) => Promise<string | null>;
   checkConnection: () => Promise<boolean>;
+  isMessagePending: (messageId: string) => boolean;
 }
 
 export function useGateway(): UseGatewayReturn {
   const { gatewayUrl, gatewayToken } = useSettingsStore();
   const [isConnected, setIsConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Per-message loading state: track which message IDs are pending
+  const [pendingMessageIds, setPendingMessageIds] = useState<Set<string>>(new Set());
   
   const serviceRef = useRef<GatewayService | null>(null);
   const inFlightRequest = useRef<{ id: string; content: string } | null>(null);
+  
+  // Request queue: chain promises to serialize requests
+  const requestQueueRef = useRef<Promise<string | null>>(Promise.resolve(null));
+
+  // Computed isLoading for backward compatibility
+  const isLoading = pendingMessageIds.size > 0;
 
   // Initialize or update the service when settings change
   useEffect(() => {
@@ -120,6 +135,7 @@ export function useGateway(): UseGatewayReturn {
       const healthy = await serviceRef.current.healthCheck();
       const latencyMs = Date.now() - startTime;
       
+      // Only update connection state based on health check results
       setIsConnected(healthy);
       setNetworkConnected(healthy);
       setError(healthy ? null : 'Gateway unreachable');
@@ -137,13 +153,26 @@ export function useGateway(): UseGatewayReturn {
     }
   }, [setLatency, setNetworkConnected]);
 
-  const sendMessage = useCallback(async (content: string, requestId?: string): Promise<string | null> => {
+  // Helper to check if a specific message is pending
+  const isMessagePending = useCallback((messageId: string): boolean => {
+    return pendingMessageIds.has(messageId);
+  }, [pendingMessageIds]);
+
+  // Internal send function (called within the queue)
+  const sendMessageInternal = useCallback(async (
+    content: string,
+    requestId?: string
+  ): Promise<string | null> => {
     if (!serviceRef.current) {
       setError('Gateway not configured');
       return null;
     }
 
-    setIsLoading(true);
+    // Generate a message ID if not provided
+    const messageId = requestId || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    // Add to pending set
+    setPendingMessageIds(prev => new Set(prev).add(messageId));
     setError(null);
 
     try {
@@ -152,7 +181,9 @@ export function useGateway(): UseGatewayReturn {
       }
 
       const response = await serviceRef.current.sendMessage(content);
-      setIsConnected(true);
+      
+      // Success: DON'T flip isConnected here
+      // Connection state is only determined by health checks
 
       if (requestId) {
         await removePendingGatewayRequest(requestId);
@@ -167,7 +198,12 @@ export function useGateway(): UseGatewayReturn {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to send message';
       setError(message);
-      setIsConnected(false);
+      
+      // DON'T flip isConnected on message send failure
+      // Instead, trigger a health check to determine actual connection state
+      console.log('[useGateway] Message send failed, triggering health check');
+      checkConnection();
+      
       if (requestId) {
         if (AppState.currentState === 'active') {
           await removePendingGatewayRequest(requestId);
@@ -176,15 +212,39 @@ export function useGateway(): UseGatewayReturn {
       }
       return null;
     } finally {
-      setIsLoading(false);
+      // Remove from pending set
+      setPendingMessageIds(prev => {
+        const next = new Set(prev);
+        next.delete(messageId);
+        return next;
+      });
     }
-  }, []);
+  }, [checkConnection]);
+
+  // Queue-wrapped sendMessage to serialize requests
+  const sendMessage = useCallback(async (
+    content: string,
+    requestId?: string
+  ): Promise<string | null> => {
+    // Chain this request to the queue - ensures only one runs at a time
+    const result = requestQueueRef.current.then(
+      () => sendMessageInternal(content, requestId),
+      () => sendMessageInternal(content, requestId) // Also run on rejection
+    );
+    
+    // Update the queue reference
+    requestQueueRef.current = result;
+    
+    return result;
+  }, [sendMessageInternal]);
 
   return {
     isConnected,
     isLoading,
+    pendingMessageIds,
     error,
     sendMessage,
     checkConnection,
+    isMessagePending,
   };
 }
