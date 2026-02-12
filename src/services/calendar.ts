@@ -1,9 +1,9 @@
 /**
  * Calendar Service
  * 
- * Fetches calendar events from the Gateway.
- * The Gateway (Echo) uses gog to fetch from Google Calendar
- * and returns structured JSON.
+ * Fetches calendar events using the fastest available method:
+ * 1. Direct Calendar API (local network) - ~800ms
+ * 2. Gateway chat completions (remote) - fallback, slower
  */
 
 import { CalendarEvent } from '../stores/calendarStore';
@@ -32,7 +32,12 @@ interface GatewayCalendarEvent {
 interface CalendarResponse {
   events: GatewayCalendarEvent[];
   error?: string;
+  fetchedAt?: string;
+  elapsed?: number;
 }
+
+// Calendar API port (runs alongside Gateway)
+const CALENDAR_API_PORT = 18791;
 
 /**
  * Parse a gateway calendar event into our app's format
@@ -124,26 +129,76 @@ function parseEvent(event: GatewayCalendarEvent): CalendarEvent {
 }
 
 /**
- * Fetch calendar events from the Gateway
+ * Try to fetch from the fast Calendar API (local network only)
  */
-export async function fetchCalendarEvents(
+async function fetchFromCalendarApi(
+  gatewayToken: string,
+  options: { today?: boolean; week?: boolean }
+): Promise<CalendarEvent[] | null> {
+  // Try localhost first (works when on same network as Mac Mini)
+  const endpoint = options.week 
+    ? `http://localhost:${CALENDAR_API_PORT}/api/calendar/week`
+    : `http://localhost:${CALENDAR_API_PORT}/api/calendar?today=true`;
+
+  try {
+    console.log('[Calendar] Trying fast Calendar API...');
+    const startTime = Date.now();
+    
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+    
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${gatewayToken}`,
+      },
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeout);
+    
+    if (!response.ok) {
+      console.log('[Calendar] Calendar API returned', response.status);
+      return null;
+    }
+
+    const data: CalendarResponse = await response.json();
+    const elapsed = Date.now() - startTime;
+    
+    if (data.error) {
+      console.log('[Calendar] Calendar API error:', data.error);
+      return null;
+    }
+
+    const events = (data.events || []).map(parseEvent);
+    events.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+    
+    console.log(`[Calendar] Fast API: ${events.length} events in ${elapsed}ms`);
+    return events;
+  } catch (err) {
+    console.log('[Calendar] Calendar API not available, will use fallback');
+    return null;
+  }
+}
+
+/**
+ * Fallback: fetch via Gateway chat completions (works remotely)
+ */
+async function fetchFromGateway(
   gatewayUrl: string,
   gatewayToken: string,
-  options: { from?: string; to?: string; today?: boolean } = { today: true }
+  options: { today?: boolean }
 ): Promise<CalendarEvent[]> {
   const baseUrl = gatewayUrl.trim().replace(/\/+$/, '');
   
-  // Build the request - ask Echo for calendar data in JSON format
   let prompt = '[CALENDAR_SYNC_REQUEST] ';
   if (options.today) {
     prompt += 'Fetch today\'s calendar events. ';
-  } else {
-    if (options.from) prompt += `From ${options.from}. `;
-    if (options.to) prompt += `To ${options.to}. `;
   }
   prompt += 'Return ONLY the raw JSON from gog, no markdown.';
 
-  console.log('[Calendar] Fetching events from Gateway...');
+  console.log('[Calendar] Using Gateway fallback...');
+  const startTime = Date.now();
   
   const response = await fetch(`${baseUrl}/v1/chat/completions`, {
     method: 'POST',
@@ -156,7 +211,7 @@ export async function fetchCalendarEvents(
       messages: [
         { 
           role: 'system', 
-          content: 'When you see [CALENDAR_SYNC_REQUEST], run `gog calendar list --today --json` and return ONLY the raw JSON output. No markdown, no explanation, no code blocks - just the JSON object starting with {.' 
+          content: 'When you see [CALENDAR_SYNC_REQUEST], run `gog calendar events primary --from today --to tomorrow --json --account aalami@gmail.com` and return ONLY the raw JSON output. No markdown, no explanation, no code blocks - just the JSON object starting with {.' 
         },
         { role: 'user', content: prompt }
       ],
@@ -164,6 +219,9 @@ export async function fetchCalendarEvents(
       user: 'echo-app-oliver',
     }),
   });
+
+  const elapsed = Date.now() - startTime;
+  console.log(`[Calendar] Gateway response in ${elapsed}ms`);
 
   if (!response.ok) {
     const error = await response.text();
@@ -178,10 +236,7 @@ export async function fetchCalendarEvents(
     throw new Error('No calendar data received');
   }
 
-  console.log('[Calendar] Raw response:', content.slice(0, 200));
-
   // Parse the JSON response
-  // Handle potential markdown code blocks
   let jsonStr = content.trim();
   if (jsonStr.startsWith('```')) {
     jsonStr = jsonStr.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '');
@@ -195,15 +250,30 @@ export async function fetchCalendarEvents(
     }
 
     const events = (data.events || []).map(parseEvent);
-    
-    // Sort by start time
     events.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
     
-    console.log('[Calendar] Parsed', events.length, 'events');
+    console.log(`[Calendar] Gateway: ${events.length} events`);
     return events;
   } catch (parseError) {
     console.error('[Calendar] Failed to parse response:', parseError);
-    console.error('[Calendar] Content was:', jsonStr.slice(0, 500));
     throw new Error('Failed to parse calendar data');
   }
+}
+
+/**
+ * Fetch calendar events using the fastest available method
+ */
+export async function fetchCalendarEvents(
+  gatewayUrl: string,
+  gatewayToken: string,
+  options: { from?: string; to?: string; today?: boolean; week?: boolean } = { today: true }
+): Promise<CalendarEvent[]> {
+  // Try fast Calendar API first (local network)
+  const fastResult = await fetchFromCalendarApi(gatewayToken, options);
+  if (fastResult !== null) {
+    return fastResult;
+  }
+  
+  // Fallback to Gateway (remote access)
+  return fetchFromGateway(gatewayUrl, gatewayToken, { today: options.today });
 }
