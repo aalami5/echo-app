@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
+import Constants from 'expo-constants';
 import { useAuthStore } from '../../src/stores/authStore';
 import { useChatStore } from '../../src/stores/chatStore';
 import { useSettingsStore, TextScale } from '../../src/stores/settingsStore';
@@ -512,7 +513,9 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         {/* Version */}
-        <Text style={styles.version}>Echo App v0.1.0</Text>
+        <Text style={styles.version}>
+          Echo App v{Constants.expoConfig?.version || '1.0.0'} (Build {Constants.expoConfig?.ios?.buildNumber || 'dev'})
+        </Text>
         <Text style={styles.versionSub}>Gateway: Mac mini • Channel: WhatsApp</Text>
         <View style={{ height: insets.bottom + spacing.xl + 60 }} />
       </ScrollView>

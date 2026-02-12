@@ -83,7 +83,7 @@ export function useGateway(): UseGatewayReturn {
         serviceRef.current = new GatewayService({
           baseUrl: url,
           token: token,
-          userId: 'echo-app-oliver',
+          userId: `echo-app-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
         });
         // Check connection on init
         checkConnection();

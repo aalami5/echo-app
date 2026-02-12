@@ -9,8 +9,8 @@ import axios from 'axios';
 import { AppState } from 'react-native';
 import { getCachedDevicePushToken } from './notifications';
 
-// Request timeout in milliseconds (30 seconds)
-const REQUEST_TIMEOUT_MS = 30000;
+// Request timeout in milliseconds (20 seconds - fail faster)
+const REQUEST_TIMEOUT_MS = 20000;
 
 interface GatewayConfig {
   baseUrl: string;
