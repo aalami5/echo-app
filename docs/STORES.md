@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** February 7, 2026 (evening)
+**Last Updated:** February 11, 2026
 
 ---
 
@@ -209,6 +209,63 @@ Manages authentication state (minimal, for future use).
 | `isLoading` | `boolean` | ❌ | Loading state |
 
 **Note:** Auth is currently bypassed (app is single-user).
+
+---
+
+### networkStore
+
+Manages network connection state and toast notifications.
+
+**File:** `src/stores/networkStore.ts`
+
+**State:**
+
+| Field | Type | Persisted | Description |
+|-------|------|-----------|-------------|
+| `isConnected` | `boolean` | ❌ | Gateway connection status |
+| `connectionQuality` | `'good' \| 'fair' \| 'poor'` | ❌ | Signal strength tier |
+| `toasts` | `Toast[]` | ❌ | Active toast notifications |
+
+**Actions:**
+
+```typescript
+setConnected(connected: boolean): void
+setConnectionQuality(quality: 'good' | 'fair' | 'poor'): void
+addToast(toast: Omit<Toast, 'id'>): string
+removeToast(id: string): void
+clearToasts(): void
+```
+
+**Types:**
+
+```typescript
+interface Toast {
+  id: string;
+  type: 'success' | 'error' | 'info' | 'warning';
+  message: string;
+  duration?: number;  // Auto-dismiss in ms
+}
+```
+
+**Usage:**
+
+```typescript
+import { useNetworkStore } from '../stores/networkStore';
+
+function Component() {
+  const { isConnected, addToast } = useNetworkStore();
+  
+  const handleError = () => {
+    addToast({
+      type: 'error',
+      message: 'Failed to send message',
+      duration: 3000,
+    });
+  };
+}
+```
+
+**Note:** Not persisted — connection state is re-established on app launch.
 
 ---
 

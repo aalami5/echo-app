@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** February 7, 2026 (evening)
+**Last Updated:** February 11, 2026
 
 ---
 
@@ -207,6 +207,50 @@ Displays the next upcoming calendar event.
 
 ```tsx
 <NextMeeting />
+```
+
+---
+
+### NetworkIndicator
+
+Displays connection quality with signal strength bars.
+
+**File:** `src/components/NetworkIndicator.tsx`
+
+**Features:**
+- 3-tier visual indicator (good/fair/poor)
+- Auto-updates from networkStore
+- Compact signal bar design
+
+**Usage:**
+
+```tsx
+<NetworkIndicator />
+```
+
+---
+
+### ToastContainer
+
+Overlay for ephemeral toast notifications.
+
+**File:** `src/components/ToastContainer.tsx`
+
+**Features:**
+- Stacked notifications with animations
+- Auto-dismiss with configurable duration
+- 4 types: success, error, info, warning
+- Tap to dismiss early
+
+**Usage:**
+
+```tsx
+// Add to root layout
+<ToastContainer />
+
+// Trigger toasts from anywhere
+const { addToast } = useNetworkStore();
+addToast({ type: 'success', message: 'Message sent!', duration: 2000 });
 ```
 
 ---

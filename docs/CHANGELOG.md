@@ -9,6 +9,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Network Status UI** (Build #5) — Real-time connection feedback
+  - `NetworkIndicator` component with 3-tier signal strength
+  - `ToastContainer` for ephemeral notifications
+  - Message status indicators (sending/sent/failed)
+  - New `networkStore` for connection state management
 - **Push Notifications** (Build #4) — Native push notification infrastructure
   - Meeting reminders (15/10/5 min with acknowledgment)
   - Message preview notifications
@@ -41,6 +46,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   - Thinking animation now matches idle pacing
 
 ### Fixed
+- **Chat scroll behavior** (Builds 6-10) — Reliable scroll-to-latest
+  - Switched to inverted FlatList for natural chat UX
+  - Removed problematic `maintainVisibleContentPosition` on iOS
+  - Fixed snap-back issues when scrolling manually
+  - Removed `selectable` prop causing FlatList flickering on iOS
+  - Always scrolls to latest message on new arrivals
 - **Voice animation timing** — Animation now syncs with actual audio playback
   - Added `isLoadingAudio` state for TTS fetch tracking
   - Shows "Preparing voice..." while fetching audio

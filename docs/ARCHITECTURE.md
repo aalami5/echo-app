@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** February 10, 2026
+**Last Updated:** February 11, 2026
 
 ---
 
@@ -23,7 +23,7 @@ Echo App is a React Native (Expo) application that provides Oliver with a privat
 │  │         │               │                    │            │  │
 │  │  ┌──────▼───────────────▼────────────────────▼──────────┐│  │
 │  │  │              Zustand Stores (Persistent)              ││  │
-│  │  │  chatStore │ patientsStore │ settingsStore │ authStore││  │
+│  │  │  chatStore │ patientsStore │ settingsStore │ networkStore ││
 │  │  └──────────────────────┬────────────────────────────────┘│  │
 │  │                         │                                 │  │
 │  │  ┌──────────────────────▼────────────────────────────────┐│  │
@@ -96,7 +96,9 @@ echo-app/
 │   │   ├── Avatar.tsx            # Animated Echo avatar
 │   │   ├── ChatMessage.tsx       # Message bubbles
 │   │   ├── ImagePicker.tsx       # Photo selection modal
-│   │   └── NextMeeting.tsx       # Calendar card
+│   │   ├── NetworkIndicator.tsx  # Connection quality bars
+│   │   ├── NextMeeting.tsx       # Calendar card
+│   │   └── ToastContainer.tsx    # Ephemeral notifications
 │   │
 │   ├── constants/
 │   │   └── theme.ts              # Design tokens (colors, spacing)
@@ -124,7 +126,8 @@ echo-app/
 │   │   ├── patientsStore.ts      # Patient list (persisted)
 │   │   ├── settingsStore.ts      # App settings (persisted)
 │   │   ├── calendarStore.ts      # Calendar events
-│   │   └── websocketStore.ts     # Connection state
+│   │   ├── networkStore.ts       # Connection state + toasts
+│   │   └── websocketStore.ts     # Legacy connection state
 │   │
 │   └── types/
 │       └── index.ts              # TypeScript type definitions
@@ -319,6 +322,16 @@ Patient data is stored **locally only** by design:
 - Export to CSV for backup
 - Keychain backup provides some redundancy
 
+### 5. Inverted FlatList for Chat
+
+**Chose:** `inverted={true}` with reversed messages array
+
+**Why:**
+- Native iOS chat behavior (newest at bottom)
+- Reliable scroll-to-bottom without `maintainVisibleContentPosition` bugs
+- Simpler auto-scroll logic (`scrollToOffset({ offset: 0 })`)
+- Avoids snap-back issues when manually scrolling
+
 ---
 
 ## Performance Considerations
@@ -391,13 +404,13 @@ Uses `expo-server-sdk` for push delivery.
 ### Completed
 
 1. **Push Notifications** ✅ — Expo push via APNs for meeting reminders, messages, daily briefs
+2. **Network Status UI** ✅ — Connection quality indicator, message status, toast notifications (Build #5)
 
 ### Planned Additions
 
 1. **Streaming Responses** — SSE for real-time message display
 2. **iCloud Sync** — Optional encrypted backup for settings
 3. **Widget Extension** — Quick voice input from home screen
-4. **Network Status UI** — Connection quality, message status indicators (Build #5)
 
 ### Not Planned
 
