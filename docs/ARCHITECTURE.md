@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** February 11, 2026
+**Last Updated:** February 12, 2026
 
 ---
 
@@ -405,12 +405,16 @@ Uses `expo-server-sdk` for push delivery.
 
 1. **Push Notifications** ✅ — Expo push via APNs for meeting reminders, messages, daily briefs
 2. **Network Status UI** ✅ — Connection quality indicator, message status, toast notifications (Build #5)
+3. **Immediate Response UX** ✅ — Instant feedback + background task handling (Builds 12-16)
+   - Immediate "thinking" placeholder while AI processes
+   - Background task wrapper ensures completion even when backgrounded
+   - Local push notification when response arrives in background
+   - Replaced streaming approach with simpler request/response + visual feedback
 
 ### Planned Additions
 
-1. **Streaming Responses** — SSE for real-time message display
-2. **iCloud Sync** — Optional encrypted backup for settings
-3. **Widget Extension** — Quick voice input from home screen
+1. **iCloud Sync** — Optional encrypted backup for settings
+2. **Widget Extension** — Quick voice input from home screen
 
 ### Not Planned
 

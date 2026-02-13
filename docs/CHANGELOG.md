@@ -9,6 +9,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Immediate Response UX** (Build #16) — Instant feedback while waiting for AI
+  - User message shows with 'sending' status immediately
+  - "Got it, working on this..." placeholder appears instantly
+  - Pulsing animation while AI is processing
+  - Local push notification when response arrives in background
+  - New `ThinkingIndicator` component in ChatMessage
+- **Background Task Support** (Build #12) — Reliable iOS background handling
+  - Background task wrapper ensures API calls complete when app backgrounded
+  - Push notification fallback for responses arriving while suspended
+  - Foreground recovery: responses appear immediately on resume
+  - APNs token pass-through for gateway awareness
+  - Added `expo-background-fetch` and `expo-task-manager` dependencies
+- **TTS Speaker Button** (Build #11) — Tap speaker icon on Echo's messages for voice playback
 - **Network Status UI** (Build #5) — Real-time connection feedback
   - `NetworkIndicator` component with 3-tier signal strength
   - `ToastContainer` for ephemeral notifications
@@ -46,6 +59,22 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   - Thinking animation now matches idle pacing
 
 ### Fixed
+- **Gateway reliability** (Builds 13-16) — Robust connection handling
+  - Request queue serializes gateway calls (prevents race conditions)
+  - 60s timeout with AbortController (up from 20s)
+  - Per-message loading state (no more global "thinking" stuck)
+  - Health check on send failure for accurate connection status
+  - URL normalization (strips trailing slashes)
+  - Better error messages for auth failures (401/403)
+  - Unique session ID per device (prevents queue conflicts)
+- **Calendar speed** (Build #15) — Fast calendar API endpoint
+  - Direct API on port 18791 (~800ms vs 10-20s via AI)
+  - Tries public URL first, then local IP, then fallback to gateway
+  - 3s timeout per endpoint for quick failover
+- **Notification tap** (Build #13) — Tapping notification shows message in chat
+  - Notifications include messageId, messageContent, timestamp
+  - Message appears immediately in chat when tapped
+- **Build number visible** (Build #14) — Version shown in Settings screen
 - **Chat scroll behavior** (Builds 6-10) — Reliable scroll-to-latest
   - Switched to inverted FlatList for natural chat UX
   - Removed problematic `maintainVisibleContentPosition` on iOS

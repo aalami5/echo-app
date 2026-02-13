@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** February 11, 2026
+**Last Updated:** February 12, 2026
 
 ---
 
@@ -173,19 +173,35 @@ Displays a single message bubble.
 | Prop | Type | Description |
 |------|------|-------------|
 | `message` | `Message` | Message data |
+| `onSpeak` | `(text: string) => void` | TTS callback for speaker button |
 
 **Features:**
 - User messages aligned right (cyan background)
 - Assistant messages aligned left (surface background)
 - Image preview for attached photos
 - Timestamp display
+- **Speaker button** on assistant messages (tap for TTS playback)
+- **ThinkingIndicator** for "thinking" status messages
+  - Pulsing dots animation while AI is processing
+  - Shows placeholder text: "Got it, working on this..."
+
+**Message Status States:**
+- `sending` — Message in flight
+- `sent` — Delivered successfully
+- `failed` — Error occurred (shows "Tap to retry")
+- `thinking` — AI is processing (shows ThinkingIndicator)
 
 **Usage:**
 
 ```tsx
 <FlatList
   data={messages}
-  renderItem={({ item }) => <ChatMessage message={item} />}
+  renderItem={({ item }) => (
+    <ChatMessage 
+      message={item} 
+      onSpeak={handleSpeak}
+    />
+  )}
   keyExtractor={(item) => item.id}
 />
 ```
