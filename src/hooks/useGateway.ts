@@ -176,6 +176,9 @@ export function useGateway(): UseGatewayReturn {
       return false;
     }
 
+    // Set state to 'connecting' before checking (for retry UI feedback)
+    updateConnectionState('connecting');
+
     try {
       const startTime = Date.now();
       const healthy = await serviceRef.current.healthCheck();

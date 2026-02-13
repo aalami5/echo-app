@@ -68,7 +68,7 @@ function RootLayoutNav() {
   const { pushToken, isRegistered, processQueuedNotifications } = useNotifications();
   
   // Initialize gateway connection (this triggers the connection state updates)
-  useGateway();
+  const { checkConnection } = useGateway();
 
   // Load stored auth on app start
   useEffect(() => {
@@ -104,9 +104,15 @@ function RootLayoutNav() {
     processQueuedNotifications();
   };
 
+  // Retry connection from splash screen
+  const handleRetry = () => {
+    checkConnection();
+  };
+
   // Determine if we should show splash
-  // Show splash if: authenticated AND (not connected or still showing splash animation)
-  const shouldShowSplash = isAuthenticated && showSplash && connectionState !== 'failed';
+  // Show splash if: authenticated AND still showing splash animation
+  // Note: Keep showing on 'failed' state so user sees error (splash has error UI)
+  const shouldShowSplash = isAuthenticated && showSplash;
 
   return (
     <ThemeProvider value={EchoDarkTheme}>
@@ -118,7 +124,7 @@ function RootLayoutNav() {
         
         {/* Connection splash overlay */}
         {shouldShowSplash && (
-          <ConnectionSplash onReady={handleSplashReady} />
+          <ConnectionSplash onReady={handleSplashReady} onRetry={handleRetry} />
         )}
       </View>
     </ThemeProvider>

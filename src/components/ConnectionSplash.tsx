@@ -13,6 +13,7 @@ import {
   Easing,
   Dimensions,
   Text,
+  TouchableOpacity,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -23,9 +24,10 @@ const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface ConnectionSplashProps {
   onReady?: () => void;
+  onRetry?: () => void;
 }
 
-export function ConnectionSplash({ onReady }: ConnectionSplashProps) {
+export function ConnectionSplash({ onReady, onRetry }: ConnectionSplashProps) {
   const insets = useSafeAreaInsets();
   const { state, error, markSplashShown, canDismissSplash } = useConnectionStore();
   
@@ -452,6 +454,17 @@ export function ConnectionSplash({ onReady }: ConnectionSplashProps) {
         ]}>
           {getStatusText()}
         </Text>
+        
+        {/* Retry button when failed */}
+        {state === 'failed' && onRetry && (
+          <TouchableOpacity
+            style={styles.retryButton}
+            onPress={onRetry}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.retryButtonText}>Tap to Retry</Text>
+          </TouchableOpacity>
+        )}
       </Animated.View>
       
       {/* Echo branding */}
@@ -508,6 +521,19 @@ const styles = StyleSheet.create({
   },
   statusTextError: {
     color: colors.error,
+  },
+  retryButton: {
+    marginTop: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.primaryMuted,
+  },
+  retryButtonText: {
+    fontSize: typography.sm,
+    color: colors.primaryMuted,
+    fontWeight: '600',
   },
   branding: {
     position: 'absolute',
