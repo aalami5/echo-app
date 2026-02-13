@@ -278,6 +278,28 @@ export async function clearBadge(): Promise<void> {
 }
 
 /**
+ * Get all delivered notifications from notification center
+ * These are notifications that arrived but weren't tapped
+ */
+export async function getDeliveredNotifications(): Promise<Notifications.Notification[]> {
+  return await Notifications.getPresentedNotificationsAsync();
+}
+
+/**
+ * Dismiss a specific notification from notification center
+ */
+export async function dismissNotification(identifier: string): Promise<void> {
+  await Notifications.dismissNotificationAsync(identifier);
+}
+
+/**
+ * Dismiss all notifications from notification center
+ */
+export async function dismissAllNotifications(): Promise<void> {
+  await Notifications.dismissAllNotificationsAsync();
+}
+
+/**
  * Get cached native device push token (APNs/FCM)
  */
 export async function getCachedDevicePushToken(): Promise<string | null> {
