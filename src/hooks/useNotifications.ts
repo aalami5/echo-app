@@ -58,10 +58,43 @@ export function useNotifications() {
     });
 
     // Handle incoming notifications while app is foregrounded
+    // Build 18: Actually add messages to chat when received in foreground
     notificationListener.current = setupNotificationReceivedHandler((notification) => {
       const data = notification.request.content.data as unknown as NotificationData;
-      console.log('Notification received:', data);
-      // Could show an in-app toast here
+      console.log('[Notifications] Foreground notification received:', data);
+      
+      // If it's a message notification, add it to chat
+      if (data.type === 'message' && data.messageId && data.messageContent) {
+        const { state, queueNotification } = useConnectionStore.getState();
+        const { messages, addMessage } = useChatStore.getState();
+        
+        // Check for duplicates
+        const isDuplicate = messages.some((msg) => msg.id === data.messageId);
+        if (isDuplicate) {
+          console.log('[Notifications] Skipping duplicate message:', data.messageId);
+          return;
+        }
+        
+        if (state === 'connected') {
+          // Connected - add immediately to chat
+          console.log('[Notifications] Adding foreground message to chat:', data.messageId);
+          addMessage({
+            id: data.messageId,
+            role: 'assistant',
+            content: data.messageContent,
+            timestamp: data.timestamp || new Date().toISOString(),
+          });
+        } else {
+          // Not connected - queue for later
+          console.log('[Notifications] Queuing foreground notification (not connected)');
+          queueNotification({
+            id: data.messageId,
+            type: 'message',
+            content: data.messageContent,
+            timestamp: data.timestamp || new Date().toISOString(),
+          });
+        }
+      }
     });
 
     // Handle notification taps
