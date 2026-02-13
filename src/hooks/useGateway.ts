@@ -12,12 +12,17 @@
  * Build 16:
  * - Immediate acknowledgment + push notification on complete
  * - Removed streaming (simpler request/response flow)
+ * 
+ * Build 17:
+ * - Connection splash screen integration
+ * - Notification queue support
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useNetworkStore } from '../stores/networkStore';
+import { useConnectionStore } from '../stores/connectionStore';
 import { GatewayService } from '../services/gateway';
 import {
   enqueuePendingGatewayRequest,
@@ -68,6 +73,9 @@ export function useGateway(): UseGatewayReturn {
   // Computed isLoading for backward compatibility
   const isLoading = pendingMessageIds.size > 0;
 
+  // Get connection store actions
+  const { setState: setConnectionState } = useConnectionStore();
+
   // Initialize or update the service when settings change
   useEffect(() => {
     let mounted = true;
@@ -75,6 +83,7 @@ export function useGateway(): UseGatewayReturn {
     const initService = async () => {
       // Wait for settings to load from SecureStore
       console.log('[useGateway] Waiting for hydration...');
+      setConnectionState('initializing');
       await waitForHydration();
       
       if (!mounted) {
@@ -90,6 +99,7 @@ export function useGateway(): UseGatewayReturn {
       
       if (url && token) {
         console.log('[useGateway] Creating GatewayService...');
+        setConnectionState('connecting');
         serviceRef.current = new GatewayService({
           baseUrl: url,
           token: token,
@@ -99,11 +109,19 @@ export function useGateway(): UseGatewayReturn {
         console.log('[useGateway] Running initial health check...');
         const healthy = await checkConnection();
         console.log('[useGateway] Initial health check result:', healthy);
+        
+        // Update connection state
+        if (healthy) {
+          setConnectionState('connected');
+        } else {
+          setConnectionState('failed', 'Gateway unreachable');
+        }
       } else {
         console.log('[useGateway] MISSING URL or token, service NOT created');
         serviceRef.current = null;
         setIsConnected(false);
         setError(url ? 'Gateway token not configured' : 'Gateway URL not configured');
+        setConnectionState('failed', url ? 'Gateway token not configured' : 'Gateway URL not configured');
       }
     };
     
@@ -136,10 +154,13 @@ export function useGateway(): UseGatewayReturn {
   const { setLatency, setConnected: setNetworkConnected } = useNetworkStore();
 
   const checkConnection = useCallback(async (): Promise<boolean> => {
+    const { setState: updateConnectionState } = useConnectionStore.getState();
+    
     if (!serviceRef.current) {
       setIsConnected(false);
       setNetworkConnected(false);
       setError('Gateway not configured');
+      updateConnectionState('failed', 'Gateway not configured');
       return false;
     }
 
@@ -153,8 +174,12 @@ export function useGateway(): UseGatewayReturn {
       setNetworkConnected(healthy);
       setError(healthy ? null : 'Gateway unreachable');
       
+      // Update connection store
       if (healthy) {
         setLatency(latencyMs);
+        updateConnectionState('connected');
+      } else {
+        updateConnectionState('failed', 'Gateway unreachable');
       }
       
       return healthy;
@@ -162,6 +187,7 @@ export function useGateway(): UseGatewayReturn {
       setIsConnected(false);
       setNetworkConnected(false);
       setError('Connection failed');
+      updateConnectionState('failed', 'Connection failed');
       return false;
     }
   }, [setLatency, setNetworkConnected]);

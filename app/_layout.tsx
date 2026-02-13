@@ -3,10 +3,14 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { View } from 'react-native';
 import 'react-native-reanimated';
 import { useAuthStore } from '../src/stores/authStore';
 import { useNotifications } from '../src/hooks/useNotifications';
+import { useGateway } from '../src/hooks/useGateway';
+import { useConnectionStore } from '../src/stores/connectionStore';
+import { ConnectionSplash } from '../src/components/ConnectionSplash';
 import { colors } from '../src/constants/theme';
 
 export { ErrorBoundary } from 'expo-router';
@@ -57,9 +61,14 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const { isAuthenticated, isLoading, loadStoredAuth } = useAuthStore();
+  const connectionState = useConnectionStore((s) => s.state);
+  const [showSplash, setShowSplash] = useState(true);
   
   // Register for push notifications
-  const { pushToken, isRegistered } = useNotifications();
+  const { pushToken, isRegistered, processQueuedNotifications } = useNotifications();
+  
+  // Initialize gateway connection (this triggers the connection state updates)
+  useGateway();
 
   // Load stored auth on app start
   useEffect(() => {
@@ -88,12 +97,30 @@ function RootLayoutNav() {
     }
   }, [isAuthenticated, isLoading, segments]);
 
+  // Process queued notifications when splash dismisses
+  const handleSplashReady = () => {
+    setShowSplash(false);
+    // Process any queued notifications
+    processQueuedNotifications();
+  };
+
+  // Determine if we should show splash
+  // Show splash if: authenticated AND (not connected or still showing splash animation)
+  const shouldShowSplash = isAuthenticated && showSplash && connectionState !== 'failed';
+
   return (
     <ThemeProvider value={EchoDarkTheme}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="login" options={{ presentation: 'modal' }} />
-      </Stack>
+      <View style={{ flex: 1, backgroundColor: colors.background }}>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="login" options={{ presentation: 'modal' }} />
+        </Stack>
+        
+        {/* Connection splash overlay */}
+        {shouldShowSplash && (
+          <ConnectionSplash onReady={handleSplashReady} />
+        )}
+      </View>
     </ThemeProvider>
   );
 }
