@@ -183,12 +183,13 @@ export class GatewayService {
       console.log('[Gateway] Pinging:', JSON.stringify(pingUrl));
       
       // Use shorter timeout for health checks (10 seconds)
+      // Accept any content type - server may return HTML
       const response = await fetchWithTimeout(
         pingUrl,
         {
           method: 'GET',
           headers: {
-            'Accept': 'text/plain',
+            'Accept': '*/*',
           },
         },
         10000

@@ -70,6 +70,10 @@ const secureStorage = {
   },
 };
 
+// Default gateway config (baked into build)
+const DEFAULT_GATEWAY_URL = process.env.EXPO_PUBLIC_GATEWAY_URL || 'https://echo.oppersmedical.com';
+const DEFAULT_GATEWAY_TOKEN = process.env.EXPO_PUBLIC_GATEWAY_TOKEN || null;
+
 export const useSettingsStore = create<SettingsState>()(
   persist(
     (set) => ({
@@ -81,8 +85,8 @@ export const useSettingsStore = create<SettingsState>()(
       autoPlayResponses: true,
       hapticFeedback: true,
       textScale: 'normal',
-      gatewayUrl: process.env.EXPO_PUBLIC_GATEWAY_URL || 'https://echo.oppersmedical.com',
-      gatewayToken: null,
+      gatewayUrl: DEFAULT_GATEWAY_URL,
+      gatewayToken: DEFAULT_GATEWAY_TOKEN,
       
       // Actions
       setOpenAIKey: (key) => set({ openaiApiKey: key }),
@@ -115,6 +119,17 @@ export const useSettingsStore = create<SettingsState>()(
         gatewayUrl: state.gatewayUrl,
         gatewayToken: state.gatewayToken,
       }),
+      // Restore defaults if stored values are null but defaults exist
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          if (!state.gatewayUrl && DEFAULT_GATEWAY_URL) {
+            state.gatewayUrl = DEFAULT_GATEWAY_URL;
+          }
+          if (!state.gatewayToken && DEFAULT_GATEWAY_TOKEN) {
+            state.gatewayToken = DEFAULT_GATEWAY_TOKEN;
+          }
+        }
+      },
     }
   )
 );
