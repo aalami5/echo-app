@@ -13,21 +13,20 @@
  * - Immediate acknowledgment + push notification on complete
  * - Removed streaming (simpler request/response flow)
  * 
- * Build 17:
- * - Connection splash screen integration
- * - Notification queue support
- * 
  * Build 19:
  * - 30-second quick response timeout for long tasks
  * - Returns __LONG_TASK__ marker when timeout, continues in background
  * - Adds response to chat + sends push when delayed response arrives
+ * 
+ * Build 23:
+ * - Removed connection splash screen dependencies
+ * - Simplified initialization
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useNetworkStore } from '../stores/networkStore';
-import { useConnectionStore } from '../stores/connectionStore';
 import { useChatStore } from '../stores/chatStore';
 import { GatewayService } from '../services/gateway';
 import {
@@ -42,10 +41,6 @@ export const LONG_TASK_MARKER = '__LONG_TASK__';
 
 // How long to wait before treating as a long task (30 seconds)
 const QUICK_RESPONSE_TIMEOUT_MS = 30000;
-
-// Global singleton for GatewayService (shared across all useGateway calls)
-let globalGatewayService: GatewayService | null = null;
-let globalInitPromise: Promise<void> | null = null;
 
 // Wait for Zustand store to hydrate from SecureStore
 const waitForHydration = (): Promise<void> => {
@@ -80,6 +75,7 @@ export function useGateway(): UseGatewayReturn {
   // Per-message loading state: track which message IDs are pending
   const [pendingMessageIds, setPendingMessageIds] = useState<Set<string>>(new Set());
   
+  const serviceRef = useRef<GatewayService | null>(null);
   const inFlightRequest = useRef<{ id: string; content: string } | null>(null);
   
   // Request queue: chain promises to serialize requests
@@ -88,87 +84,43 @@ export function useGateway(): UseGatewayReturn {
   // Computed isLoading for backward compatibility
   const isLoading = pendingMessageIds.size > 0;
 
-  // Get connection store actions
-  const { setState: setConnectionState } = useConnectionStore();
-
-  // Initialize or update the service when settings change (singleton pattern)
+  // Initialize or update the service when settings change
   useEffect(() => {
     let mounted = true;
     
     const initService = async () => {
-      // If already initializing, wait for that to complete
-      if (globalInitPromise) {
-        console.log('[useGateway] Initialization already in progress, waiting...');
-        await globalInitPromise;
-        // Sync local state with connection store
-        const state = useConnectionStore.getState().state;
-        setIsConnected(state === 'connected');
+      // Wait for settings to load from SecureStore
+      console.log('[useGateway] Waiting for hydration...');
+      await waitForHydration();
+      
+      if (!mounted) {
+        console.log('[useGateway] Component unmounted during hydration, aborting');
         return;
       }
       
-      // If already connected with valid service, just sync state
-      const currentState = useConnectionStore.getState().state;
-      if (currentState === 'connected' && globalGatewayService) {
-        console.log('[useGateway] Already connected, syncing state');
-        setIsConnected(true);
-        return;
+      // Get fresh values after hydration
+      const { gatewayUrl: url, gatewayToken: token } = useSettingsStore.getState();
+      console.log('[useGateway] After hydration:');
+      console.log('[useGateway]   URL:', url);
+      console.log('[useGateway]   Token:', token ? `present (${token.length} chars)` : 'MISSING');
+      
+      if (url && token) {
+        console.log('[useGateway] Creating GatewayService...');
+        serviceRef.current = new GatewayService({
+          baseUrl: url,
+          token: token,
+          userId: `echo-app-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        });
+        // Check connection on init
+        console.log('[useGateway] Running initial health check...');
+        const healthy = await checkConnection();
+        console.log('[useGateway] Initial health check result:', healthy);
+      } else {
+        console.log('[useGateway] MISSING URL or token, service NOT created');
+        serviceRef.current = null;
+        setIsConnected(false);
+        setError(url ? 'Gateway token not configured' : 'Gateway URL not configured');
       }
-      
-      // Start initialization (store promise globally to prevent duplicates)
-      globalInitPromise = (async () => {
-        try {
-          // Wait for settings to load from SecureStore
-          console.log('[useGateway] Waiting for hydration...');
-          setConnectionState('initializing');
-          await waitForHydration();
-          
-          if (!mounted) {
-            console.log('[useGateway] Component unmounted during hydration, aborting');
-            return;
-          }
-          
-          // Get fresh values after hydration
-          const { gatewayUrl: url, gatewayToken: token } = useSettingsStore.getState();
-          console.log('[useGateway] After hydration:');
-          console.log('[useGateway]   URL:', url);
-          console.log('[useGateway]   Token:', token ? `present (${token.length} chars)` : 'MISSING');
-          
-          if (url && token) {
-            console.log('[useGateway] Creating GatewayService...');
-            setConnectionState('connecting');
-            globalGatewayService = new GatewayService({
-              baseUrl: url,
-              token: token,
-              userId: `echo-app-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            });
-            // Check connection on init
-            console.log('[useGateway] Running initial health check...');
-            const healthy = await checkConnectionInternal();
-            console.log('[useGateway] Initial health check result:', healthy);
-            
-            // Update connection state
-            if (healthy) {
-              setConnectionState('connected');
-              if (mounted) setIsConnected(true);
-            } else {
-              setConnectionState('failed', 'Gateway unreachable');
-              if (mounted) setIsConnected(false);
-            }
-          } else {
-            console.log('[useGateway] MISSING URL or token, service NOT created');
-            globalGatewayService = null;
-            if (mounted) {
-              setIsConnected(false);
-              setError(url ? 'Gateway token not configured' : 'Gateway URL not configured');
-            }
-            setConnectionState('failed', url ? 'Gateway token not configured' : 'Gateway URL not configured');
-          }
-        } finally {
-          globalInitPromise = null;
-        }
-      })();
-      
-      await globalInitPromise;
     };
     
     initService();
@@ -199,35 +151,17 @@ export function useGateway(): UseGatewayReturn {
 
   const { setLatency, setConnected: setNetworkConnected } = useNetworkStore();
 
-  // Internal check that works during initialization (before React state is set up)
-  const checkConnectionInternal = async (): Promise<boolean> => {
-    if (!globalGatewayService) {
-      return false;
-    }
-    try {
-      return await globalGatewayService.healthCheck();
-    } catch {
-      return false;
-    }
-  };
-
   const checkConnection = useCallback(async (): Promise<boolean> => {
-    const { setState: updateConnectionState } = useConnectionStore.getState();
-    
-    if (!globalGatewayService) {
+    if (!serviceRef.current) {
       setIsConnected(false);
       setNetworkConnected(false);
       setError('Gateway not configured');
-      updateConnectionState('failed', 'Gateway not configured');
       return false;
     }
 
-    // Set state to 'connecting' before checking (for retry UI feedback)
-    updateConnectionState('connecting');
-
     try {
       const startTime = Date.now();
-      const healthy = await globalGatewayService.healthCheck();
+      const healthy = await serviceRef.current.healthCheck();
       const latencyMs = Date.now() - startTime;
       
       // Only update connection state based on health check results
@@ -235,12 +169,8 @@ export function useGateway(): UseGatewayReturn {
       setNetworkConnected(healthy);
       setError(healthy ? null : 'Gateway unreachable');
       
-      // Update connection store
       if (healthy) {
         setLatency(latencyMs);
-        updateConnectionState('connected');
-      } else {
-        updateConnectionState('failed', 'Gateway unreachable');
       }
       
       return healthy;
@@ -248,7 +178,6 @@ export function useGateway(): UseGatewayReturn {
       setIsConnected(false);
       setNetworkConnected(false);
       setError('Connection failed');
-      updateConnectionState('failed', 'Connection failed');
       return false;
     }
   }, [setLatency, setNetworkConnected]);
@@ -264,7 +193,7 @@ export function useGateway(): UseGatewayReturn {
     content: string,
     requestId?: string
   ): Promise<string | null> => {
-    if (!globalGatewayService) {
+    if (!serviceRef.current) {
       setError('Gateway not configured');
       return null;
     }
@@ -291,7 +220,7 @@ export function useGateway(): UseGatewayReturn {
         }, QUICK_RESPONSE_TIMEOUT_MS);
       });
 
-      const requestPromise = globalGatewayService.sendMessage(content);
+      const requestPromise = serviceRef.current.sendMessage(content);
 
       // Race: whoever finishes first wins
       const raceResult = await Promise.race([requestPromise, timeoutPromise]);

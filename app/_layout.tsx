@@ -3,14 +3,10 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { useEffect } from 'react';
 import 'react-native-reanimated';
 import { useAuthStore } from '../src/stores/authStore';
 import { useNotifications } from '../src/hooks/useNotifications';
-import { useGateway } from '../src/hooks/useGateway';
-import { useConnectionStore } from '../src/stores/connectionStore';
-import { ConnectionSplash } from '../src/components/ConnectionSplash';
 import { colors } from '../src/constants/theme';
 
 export { ErrorBoundary } from 'expo-router';
@@ -61,14 +57,9 @@ function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
   const { isAuthenticated, isLoading, loadStoredAuth } = useAuthStore();
-  const connectionState = useConnectionStore((s) => s.state);
-  const [showSplash, setShowSplash] = useState(true);
   
   // Register for push notifications
-  const { pushToken, isRegistered, processQueuedNotifications } = useNotifications();
-  
-  // Initialize gateway connection (this triggers the connection state updates)
-  const { checkConnection } = useGateway();
+  const { pushToken, isRegistered } = useNotifications();
 
   // Load stored auth on app start
   useEffect(() => {
@@ -97,36 +88,12 @@ function RootLayoutNav() {
     }
   }, [isAuthenticated, isLoading, segments]);
 
-  // Process queued notifications when splash dismisses
-  const handleSplashReady = () => {
-    setShowSplash(false);
-    // Process any queued notifications
-    processQueuedNotifications();
-  };
-
-  // Retry connection from splash screen
-  const handleRetry = () => {
-    checkConnection();
-  };
-
-  // Determine if we should show splash
-  // Show splash if: authenticated AND still showing splash animation
-  // Note: Keep showing on 'failed' state so user sees error (splash has error UI)
-  const shouldShowSplash = isAuthenticated && showSplash;
-
   return (
     <ThemeProvider value={EchoDarkTheme}>
-      <View style={{ flex: 1, backgroundColor: colors.background }}>
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(tabs)" />
-          <Stack.Screen name="login" options={{ presentation: 'modal' }} />
-        </Stack>
-        
-        {/* Connection splash overlay */}
-        {shouldShowSplash && (
-          <ConnectionSplash onReady={handleSplashReady} onRetry={handleRetry} />
-        )}
-      </View>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="login" options={{ presentation: 'modal' }} />
+      </Stack>
     </ThemeProvider>
   );
 }
