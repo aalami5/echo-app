@@ -27,7 +27,7 @@ import { ImagePickerModal } from '../../src/components/ImagePicker';
 import { NextMeeting } from '../../src/components/NextMeeting';
 import { NetworkIndicator } from '../../src/components/NetworkIndicator';
 import { ToastContainer } from '../../src/components/ToastContainer';
-import { useGateway } from '../../src/hooks/useGateway';
+import { useGateway, LONG_TASK_MARKER } from '../../src/hooks/useGateway';
 import { useVoiceChat } from '../../src/hooks/useVoiceChat';
 import { colors, spacing, typography, borderRadius } from '../../src/constants/theme';
 import type { Message } from '../../src/types';
@@ -242,7 +242,16 @@ export default function ChatScreen() {
     const response = await gatewaySend(content, userMessageId);
     console.log('[Chat] Response received, length:', response?.length || 0);
     
-    if (response) {
+    if (response === LONG_TASK_MARKER) {
+      // Build 19: Long task - still working in background
+      console.log('[Chat] Long task detected - updating placeholder');
+      updateMessage(userMessageId, { status: 'sent' });
+      updateMessage(assistantMessageId, { 
+        content: "Working on this... I'll notify you when ready 🔔",
+        status: undefined,  // Remove thinking status (stops loading indicator)
+      });
+      // Don't show error - response will arrive via push notification
+    } else if (response) {
       // Mark user message as sent
       updateMessage(userMessageId, { status: 'sent' });
       

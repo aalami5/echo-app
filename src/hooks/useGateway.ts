@@ -16,6 +16,11 @@
  * Build 17:
  * - Connection splash screen integration
  * - Notification queue support
+ * 
+ * Build 19:
+ * - 30-second quick response timeout for long tasks
+ * - Returns __LONG_TASK__ marker when timeout, continues in background
+ * - Adds response to chat + sends push when delayed response arrives
  */
 
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -23,13 +28,20 @@ import { AppState } from 'react-native';
 import { useSettingsStore } from '../stores/settingsStore';
 import { useNetworkStore } from '../stores/networkStore';
 import { useConnectionStore } from '../stores/connectionStore';
+import { useChatStore } from '../stores/chatStore';
 import { GatewayService } from '../services/gateway';
 import {
   enqueuePendingGatewayRequest,
   removePendingGatewayRequest,
   registerGatewayBackgroundTask,
 } from '../services/gatewayBackground';
-import { scheduleResponseReadyNotification } from '../services/notifications';
+import { scheduleResponseReadyNotification, scheduleMessageNotification } from '../services/notifications';
+
+// Special marker returned when request times out but continues in background
+export const LONG_TASK_MARKER = '__LONG_TASK__';
+
+// How long to wait before treating as a long task (30 seconds)
+const QUICK_RESPONSE_TIMEOUT_MS = 30000;
 
 // Wait for Zustand store to hydrate from SecureStore
 const waitForHydration = (): Promise<void> => {
@@ -198,6 +210,7 @@ export function useGateway(): UseGatewayReturn {
   }, [pendingMessageIds]);
 
   // Internal send function (called within the queue)
+  // Build 19: Returns LONG_TASK_MARKER if request takes > 30s, continues in background
   const sendMessageInternal = useCallback(async (
     content: string,
     requestId?: string
@@ -219,7 +232,83 @@ export function useGateway(): UseGatewayReturn {
         inFlightRequest.current = { id: requestId, content };
       }
 
-      const response = await serviceRef.current.sendMessage(content);
+      // Build 19: Race between actual request and timeout
+      let timedOut = false;
+      
+      const timeoutPromise = new Promise<null>((resolve) => {
+        setTimeout(() => {
+          timedOut = true;
+          resolve(null);
+        }, QUICK_RESPONSE_TIMEOUT_MS);
+      });
+
+      const requestPromise = serviceRef.current.sendMessage(content);
+
+      // Race: whoever finishes first wins
+      const raceResult = await Promise.race([requestPromise, timeoutPromise]);
+
+      if (timedOut) {
+        // Timeout won - return marker, but let request continue in background
+        console.log('[useGateway] Quick response timeout - continuing in background');
+        
+        // Remove from pending immediately (stop loading indicator)
+        setPendingMessageIds(prev => {
+          const next = new Set(prev);
+          next.delete(messageId);
+          return next;
+        });
+        
+        // Continue waiting for actual response in background
+        requestPromise.then(async (response) => {
+          console.log('[useGateway] Delayed response arrived:', response?.length || 0, 'chars');
+          
+          if (response) {
+            // Add response to chat store directly
+            const { addMessage } = useChatStore.getState();
+            const responseMessageId = `delayed-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+            
+            addMessage({
+              id: responseMessageId,
+              role: 'assistant',
+              content: response,
+              timestamp: new Date().toISOString(),
+            });
+            
+            // Send push notification
+            await scheduleMessageNotification(response);
+            console.log('[useGateway] Added delayed response to chat + sent push notification');
+          }
+          
+          // Clean up
+          if (requestId) {
+            await removePendingGatewayRequest(requestId);
+            inFlightRequest.current = null;
+          }
+        }).catch(async (err) => {
+          console.error('[useGateway] Delayed request failed:', err);
+          
+          // Add error message to chat
+          const { addMessage } = useChatStore.getState();
+          addMessage({
+            id: `error-${Date.now()}`,
+            role: 'assistant',
+            content: 'Sorry, the request failed after working on it. Please try again.',
+            timestamp: new Date().toISOString(),
+          });
+          
+          await scheduleResponseReadyNotification();
+          
+          if (requestId) {
+            await removePendingGatewayRequest(requestId);
+            inFlightRequest.current = null;
+          }
+        });
+        
+        return LONG_TASK_MARKER;
+      }
+
+      // Normal case: got response within timeout
+      const response = raceResult;
       
       // Success: DON'T flip isConnected here
       // Connection state is only determined by health checks
@@ -254,7 +343,7 @@ export function useGateway(): UseGatewayReturn {
       }
       return null;
     } finally {
-      // Remove from pending set
+      // Remove from pending set (only if not already removed by timeout)
       setPendingMessageIds(prev => {
         const next = new Set(prev);
         next.delete(messageId);
