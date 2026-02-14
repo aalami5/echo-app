@@ -9,6 +9,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Auto-Sync Missed Notifications** (Build #24) — App syncs any missed notifications on launch
+- **Baked-in Gateway Credentials** (Build #22) — Gateway URL and token embedded in build
+  - No manual configuration needed for production builds
+  - Settings still available for development/override
+- **Quick Response Timeout** (Build #19) — 30-second timeout for responsive UX on long tasks
+- **Foreground Notification Chat Integration** (Build #18) — Notifications received while app is open now appear directly in chat
 - **Immediate Response UX** (Build #16) — Instant feedback while waiting for AI
   - User message shows with 'sending' status immediately
   - "Got it, working on this..." placeholder appears instantly
@@ -59,6 +65,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
   - Thinking animation now matches idle pacing
 
 ### Fixed
+- **Connection Splash Removed** (Build #23) — Splash screen removed for instant app launch
+  - Connection happens seamlessly in background
+  - No more blocking UI during gateway connect
+- **Duplicate useGateway Fix** (Build #21) — Prevents multiple gateway initializations causing connection failure
+- **Splash Screen Edge Cases** (Build #20) — Properly hides splash on connection failure
 - **Gateway reliability** (Builds 13-16) — Robust connection handling
   - Request queue serializes gateway calls (prevents race conditions)
   - 60s timeout with AbortController (up from 20s)

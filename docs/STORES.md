@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** February 11, 2026
+**Last Updated:** February 13, 2026
 
 ---
 
@@ -266,6 +266,51 @@ function Component() {
 ```
 
 **Note:** Not persisted — connection state is re-established on app launch.
+
+---
+
+### connectionStore
+
+Manages gateway connection state for app launch flow.
+
+**File:** `src/stores/connectionStore.ts`
+
+**State:**
+
+| Field | Type | Persisted | Description |
+|-------|------|-----------|-------------|
+| `state` | `ConnectionState` | ❌ | `'initializing'` \| `'connecting'` \| `'connected'` \| `'failed'` |
+| `error` | `string \| null` | ❌ | Error message if failed |
+| `minSplashTimeMs` | `number` | ❌ | Minimum splash display time (1500ms) |
+| `splashShownAt` | `number \| null` | ❌ | Timestamp when splash was shown |
+| `pendingNotifications` | `PendingNotification[]` | ❌ | Notifications queued during connection |
+
+**Actions:**
+
+```typescript
+setState(state: ConnectionState, error?: string): void
+markSplashShown(): void
+canDismissSplash(): boolean
+queueNotification(notification: PendingNotification): void
+drainNotifications(): PendingNotification[]
+clearNotifications(): void
+```
+
+**Types:**
+
+```typescript
+type ConnectionState = 'initializing' | 'connecting' | 'connected' | 'failed';
+
+interface PendingNotification {
+  id: string;
+  type: 'message' | 'meeting' | 'brief';
+  content?: string;
+  timestamp: string;
+  eventId?: string;
+}
+```
+
+**Note:** As of Build 23, the splash screen is removed, but this store still tracks connection state for notification queueing.
 
 ---
 

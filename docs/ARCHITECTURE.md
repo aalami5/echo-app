@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** February 12, 2026
+**Last Updated:** February 13, 2026
 
 ---
 
@@ -270,6 +270,9 @@ export const useStore = create(
 - All traffic over HTTPS via Cloudflare Tunnel
 - Gateway URL: `https://echo.oppersmedical.com`
 - Bearer token authentication for API calls
+- **Baked-in Credentials** (Build 22): Gateway URL and token embedded in build
+  - Eliminates need for manual configuration on fresh install
+  - Settings still allow override for development
 
 ### PHI Considerations
 
@@ -331,6 +334,18 @@ Patient data is stored **locally only** by design:
 - Reliable scroll-to-bottom without `maintainVisibleContentPosition` bugs
 - Simpler auto-scroll logic (`scrollToOffset({ offset: 0 })`)
 - Avoids snap-back issues when manually scrolling
+
+### 6. No Connection Splash Screen
+
+**Chose:** Instant app launch, connect in background (Build 23)
+
+**Why:**
+- Users expect immediate app access
+- Connection can happen silently while chat loads
+- Missed notifications are auto-synced on launch (Build 24)
+- Failed connections handled gracefully with retry
+
+**History:** Builds 17-22 experimented with a "breathing crystal ball" splash screen during connection, but user testing showed it felt slower than necessary.
 
 ---
 
