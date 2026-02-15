@@ -21,9 +21,17 @@ interface GatewayConfig {
   userId?: string;
 }
 
+interface ChatMessageContent {
+  type: 'text' | 'image_url';
+  text?: string;
+  image_url?: {
+    url: string;  // Can be data:image/...;base64,... or a URL
+  };
+}
+
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string;
+  content: string | ChatMessageContent[];
 }
 
 interface ChatCompletionResponse {
@@ -86,8 +94,18 @@ export class GatewayService {
 
   /**
    * Send a message to the Gateway and get a response (non-streaming)
+   * 
+   * @param content - Text content to send
+   * @param history - Previous messages for context
+   * @param imageBase64 - Optional base64-encoded image (without data: prefix)
+   * @param imageMimeType - MIME type of the image (e.g., 'image/jpeg')
    */
-  async sendMessage(content: string, history: ChatMessage[] = []): Promise<string> {
+  async sendMessage(
+    content: string,
+    history: ChatMessage[] = [],
+    imageBase64?: string,
+    imageMimeType?: string
+  ): Promise<string> {
     const { baseUrl: rawUrl, token, agentId, userId } = this.config;
     const baseUrl = rawUrl.trim().replace(/\/+$/, ''); // Normalize URL
     const devicePushToken = await getCachedDevicePushToken();
@@ -96,6 +114,7 @@ export class GatewayService {
     console.log('[Gateway] Sending message:', content.slice(0, 100));
     console.log('[Gateway] URL:', `${baseUrl}/v1/chat/completions`);
     console.log('[Gateway] Token present:', !!token, 'length:', token?.length || 0);
+    console.log('[Gateway] Has image:', !!imageBase64, 'type:', imageMimeType || 'none');
     
     // Validate config before sending
     if (!baseUrl) {
@@ -105,9 +124,28 @@ export class GatewayService {
       throw new Error('Gateway token not configured');
     }
     
+    // Build message content - use multipart format if image is included
+    let userContent: string | ChatMessageContent[];
+    
+    if (imageBase64 && imageMimeType) {
+      // Multipart content with text and image
+      userContent = [
+        { type: 'text', text: content },
+        { 
+          type: 'image_url', 
+          image_url: { 
+            url: `data:${imageMimeType};base64,${imageBase64}` 
+          } 
+        }
+      ];
+    } else {
+      // Text-only content
+      userContent = content;
+    }
+    
     const messages: ChatMessage[] = [
       ...history,
-      { role: 'user', content }
+      { role: 'user', content: userContent }
     ];
 
     const response = await fetchWithTimeout(

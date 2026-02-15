@@ -57,12 +57,17 @@ const waitForHydration = (): Promise<void> => {
   });
 };
 
+export interface ImageData {
+  base64: string;      // Base64-encoded image (without data: prefix)
+  mimeType: string;    // e.g., 'image/jpeg'
+}
+
 interface UseGatewayReturn {
   isConnected: boolean;
   isLoading: boolean;
   pendingMessageIds: Set<string>;
   error: string | null;
-  sendMessage: (content: string, requestId?: string) => Promise<string | null>;
+  sendMessage: (content: string, requestId?: string, image?: ImageData) => Promise<string | null>;
   checkConnection: () => Promise<boolean>;
   isMessagePending: (messageId: string) => boolean;
 }
@@ -191,7 +196,8 @@ export function useGateway(): UseGatewayReturn {
   // Build 19: Returns LONG_TASK_MARKER if request takes > 30s, continues in background
   const sendMessageInternal = useCallback(async (
     content: string,
-    requestId?: string
+    requestId?: string,
+    image?: ImageData
   ): Promise<string | null> => {
     if (!serviceRef.current) {
       setError('Gateway not configured');
@@ -220,7 +226,12 @@ export function useGateway(): UseGatewayReturn {
         }, QUICK_RESPONSE_TIMEOUT_MS);
       });
 
-      const requestPromise = serviceRef.current.sendMessage(content);
+      const requestPromise = serviceRef.current.sendMessage(
+        content,
+        [],  // history (empty for now)
+        image?.base64,
+        image?.mimeType
+      );
 
       // Race: whoever finishes first wins
       const raceResult = await Promise.race([requestPromise, timeoutPromise]);
@@ -333,12 +344,13 @@ export function useGateway(): UseGatewayReturn {
   // Queue-wrapped sendMessage to serialize requests
   const sendMessage = useCallback(async (
     content: string,
-    requestId?: string
+    requestId?: string,
+    image?: ImageData
   ): Promise<string | null> => {
     // Chain this request to the queue - ensures only one runs at a time
     const result = requestQueueRef.current.then(
-      () => sendMessageInternal(content, requestId),
-      () => sendMessageInternal(content, requestId) // Also run on rejection
+      () => sendMessageInternal(content, requestId, image),
+      () => sendMessageInternal(content, requestId, image) // Also run on rejection
     );
     
     // Update the queue reference

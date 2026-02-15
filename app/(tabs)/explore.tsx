@@ -20,6 +20,7 @@ import { useAuthStore } from '../../src/stores/authStore';
 import { useChatStore } from '../../src/stores/chatStore';
 import { useSettingsStore, TextScale } from '../../src/stores/settingsStore';
 import { useCalendar } from '../../src/hooks/useCalendar';
+import { useCalendarStore } from '../../src/stores/calendarStore';
 import { usePatientSync } from '../../src/hooks/usePatientSync';
 import { useScaledTypography, TEXT_SCALE_LABELS } from '../../src/hooks/useScaledTypography';
 import { VOICES, VoiceName } from '../../src/services/elevenlabs';
@@ -52,6 +53,7 @@ export default function SettingsScreen() {
   } = useSettingsStore();
   const scaledTypography = useScaledTypography();
   const { isLoading: calendarSyncing, lastFetched: lastCalendarSync, refresh: refreshCalendar, error: calendarError } = useCalendar();
+  const calendarStore = useCalendarStore();
   const { isSyncing: patientSyncing, lastSynced: lastPatientSync, syncNow: syncPatients, error: patientSyncError, patientCount } = usePatientSync();
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showOpenAIKey, setShowOpenAIKey] = useState(false);
@@ -84,6 +86,26 @@ export default function SettingsScreen() {
     if (patientSyncError) {
       Alert.alert('Sync Error', patientSyncError);
     }
+  };
+
+  const handleClearCalendarCache = async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      'Clear Calendar Cache',
+      'This will remove all cached calendar events. They will be re-synced from Google Calendar.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            calendarStore.setEvents([]);
+            await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            Alert.alert('Cache Cleared', 'Calendar events have been cleared. Pull to refresh on the Today tab to reload.');
+          },
+        },
+      ]
+    );
   };
 
   const formatLastSync = (date: Date | number | null) => {
@@ -474,7 +496,19 @@ export default function SettingsScreen() {
                 />
               }
             />
+            <Divider />
+            <SettingsRow 
+              icon="trash-outline"
+              label="Clear Calendar Cache"
+              value={`${calendarStore.events.length} events`}
+              valueColor={colors.textTertiary}
+              showChevron
+              onPress={handleClearCalendarCache}
+            />
           </View>
+          <Text style={styles.sectionHint}>
+            Clearing cache removes locally stored events. Pull to refresh to reload from Google.
+          </Text>
         </View>
 
         {/* Privacy Section */}

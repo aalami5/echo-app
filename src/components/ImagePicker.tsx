@@ -14,13 +14,14 @@ import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 
 interface ImagePickerProps {
-  onImageSelected: (uri: string, base64?: string) => void;
+  onImageSelected: (uri: string, base64?: string, mimeType?: string) => void;
   onCancel: () => void;
 }
 
 export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps) {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
+  const [imageMimeType, setImageMimeType] = useState<string | null>(null);
 
   const pickImage = async (useCamera: boolean) => {
     try {
@@ -56,8 +57,11 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
           }));
 
       if (!result.canceled && result.assets[0]) {
-        setSelectedImage(result.assets[0].uri);
-        setImageBase64(result.assets[0].base64 || null);
+        const asset = result.assets[0];
+        setSelectedImage(asset.uri);
+        setImageBase64(asset.base64 || null);
+        // expo-image-picker provides mimeType, fallback to jpeg
+        setImageMimeType(asset.mimeType || 'image/jpeg');
       }
     } catch (error) {
       console.log('Error picking image:', error);
@@ -68,7 +72,7 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
   const handleConfirm = async () => {
     if (selectedImage) {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      onImageSelected(selectedImage, imageBase64 || undefined);
+      onImageSelected(selectedImage, imageBase64 || undefined, imageMimeType || undefined);
     }
   };
 
@@ -76,6 +80,7 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setSelectedImage(null);
     setImageBase64(null);
+    setImageMimeType(null);
     onCancel();
   };
 

@@ -201,8 +201,13 @@ export default function ChatScreen() {
     recoverPendingRequests();
   }, [applyPendingResponses, recoverPendingRequests]);
 
-  const sendMessageToGateway = async (content: string, retryMessageId?: string) => {
+  const sendMessageToGateway = async (
+    content: string, 
+    retryMessageId?: string,
+    image?: { base64: string; mimeType: string }
+  ) => {
     console.log('[Chat] sendMessageToGateway called with:', content);
+    console.log('[Chat] Has image:', !!image);
     
     let userMessageId: string;
     
@@ -239,7 +244,7 @@ export default function ChatScreen() {
     
     // Send to Gateway (non-streaming, waits for complete response)
     console.log('[Chat] Calling gatewaySend...');
-    const response = await gatewaySend(content, userMessageId);
+    const response = await gatewaySend(content, userMessageId, image);
     console.log('[Chat] Response received, length:', response?.length || 0);
     
     if (response === LONG_TASK_MARKER) {
@@ -338,26 +343,83 @@ export default function ChatScreen() {
     }
   };
 
-  const handleImageSelected = (uri: string, base64?: string) => {
+  const handleImageSelected = async (uri: string, base64?: string, mimeType?: string) => {
     setShowImagePicker(false);
-    // Add image message to chat
+    
+    // Add image message to chat immediately
+    const imageMessageId = Date.now().toString();
     const imageMessage: Message = {
-      id: Date.now().toString(),
+      id: imageMessageId,
       role: 'user',
-      content: '[Photo for analysis]',
+      content: 'What do you see in this image?',
       timestamp: new Date().toISOString(),
       imageUrl: uri,
+      status: 'sending',
     };
     addMessage(imageMessage);
     
-    // When connected, send for analysis
-    // For now just add locally
-    setAvatarState('thinking');
-    
-    // Simulate Echo response about analyzing
-    setTimeout(() => {
+    // If we have base64 data, send to gateway for analysis
+    if (base64 && mimeType) {
+      setAvatarState('thinking');
+      
+      // Create assistant placeholder
+      const assistantMessageId = (Date.now() + 1).toString();
+      const assistantPlaceholder: Message = {
+        id: assistantMessageId,
+        role: 'assistant',
+        content: 'Analyzing your image...',
+        timestamp: new Date().toISOString(),
+        status: 'thinking',
+      };
+      addMessage(assistantPlaceholder);
+      
+      // Send to gateway with image
+      const response = await gatewaySend(
+        'What do you see in this image?',
+        imageMessageId,
+        { base64, mimeType }
+      );
+      
+      if (response === LONG_TASK_MARKER) {
+        updateMessage(imageMessageId, { status: 'sent' });
+        updateMessage(assistantMessageId, {
+          content: "Analyzing image... I'll notify you when ready 🔔",
+          status: undefined,
+        });
+      } else if (response) {
+        updateMessage(imageMessageId, { status: 'sent' });
+        updateMessage(assistantMessageId, {
+          content: response,
+          status: undefined,
+        });
+        
+        // Speak response if enabled
+        if (voiceEnabled && autoPlayResponses) {
+          try {
+            await speak(response);
+          } catch (e) {
+            console.error('[Chat] TTS error:', e);
+          }
+        }
+      } else {
+        updateMessage(imageMessageId, { status: 'failed' });
+        updateMessage(assistantMessageId, {
+          content: 'Failed to analyze image. Please try again.',
+          status: undefined,
+        });
+      }
+      
       setAvatarState('idle');
-    }, 1500);
+    } else {
+      // No base64 available - just mark as sent locally
+      updateMessage(imageMessageId, { status: 'sent' });
+      addMessage({
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: "I can see you shared an image, but I wasn't able to process it. Try again?",
+        timestamp: new Date().toISOString(),
+      });
+    }
   };
 
   const handleSpeakMessage = useCallback((content: string) => {
