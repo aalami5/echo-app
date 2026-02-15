@@ -37,6 +37,7 @@ const AUTH_TOKEN = process.env.OPENCLAW_GATEWAY_TOKEN || process.env.AUTH_TOKEN;
 // Data file path
 const DATA_DIR = process.env.DATA_DIR || path.join(process.env.HOME, '.openclaw/workspace/data');
 const DATA_FILE = path.join(DATA_DIR, 'patients.json');
+const MESSAGES_FILE = path.join(DATA_DIR, 'pending-messages.json');
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -47,6 +48,77 @@ if (!fs.existsSync(DATA_DIR)) {
 if (!fs.existsSync(DATA_FILE)) {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ patients: {}, callDays: {}, callDayOrder: [], lastSync: null }, null, 2));
 }
+
+// Initialize empty messages file if it doesn't exist
+if (!fs.existsSync(MESSAGES_FILE)) {
+  fs.writeFileSync(MESSAGES_FILE, JSON.stringify({ messages: [] }, null, 2));
+}
+
+// ===============================================
+// Message Queue Functions
+// ===============================================
+
+/**
+ * Load pending messages from file
+ */
+const loadMessages = () => {
+  try {
+    const raw = fs.readFileSync(MESSAGES_FILE, 'utf8');
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error('[Messages] Error loading:', e.message);
+    return { messages: [] };
+  }
+};
+
+/**
+ * Save messages to file
+ */
+const saveMessages = (data) => {
+  fs.writeFileSync(MESSAGES_FILE, JSON.stringify(data, null, 2));
+};
+
+/**
+ * Add a message to the pending queue
+ */
+const queueMessage = (messageId, content, timestamp) => {
+  const data = loadMessages();
+  // Avoid duplicates
+  if (!data.messages.find(m => m.id === messageId)) {
+    data.messages.push({
+      id: messageId,
+      content,
+      timestamp,
+      createdAt: new Date().toISOString(),
+    });
+    // Keep only last 50 messages
+    if (data.messages.length > 50) {
+      data.messages = data.messages.slice(-50);
+    }
+    saveMessages(data);
+    console.log(`[Messages] Queued message ${messageId}`);
+  }
+};
+
+/**
+ * Get all pending messages (not yet acknowledged)
+ */
+const getPendingMessages = () => {
+  const data = loadMessages();
+  return data.messages;
+};
+
+/**
+ * Acknowledge messages by IDs (remove from queue)
+ */
+const acknowledgeMessages = (messageIds) => {
+  const data = loadMessages();
+  const before = data.messages.length;
+  data.messages = data.messages.filter(m => !messageIds.includes(m.id));
+  saveMessages(data);
+  console.log(`[Messages] Acknowledged ${before - data.messages.length} messages`);
+  return before - data.messages.length;
+};
 
 // Middleware
 app.use(cors());
@@ -424,6 +496,7 @@ async function sendPushNotifications(title, body, data = {}) {
 /**
  * POST /notify
  * Send a generic push notification
+ * If data.type === 'message' and data.messageContent exists, also queue for sync
  */
 app.post('/notify', async (req, res) => {
   try {
@@ -431,6 +504,11 @@ app.post('/notify', async (req, res) => {
     
     if (!title || !body) {
       return res.status(400).json({ error: 'Missing required fields: title, body' });
+    }
+    
+    // If this is a message notification with content, queue it for sync
+    if (data && data.type === 'message' && data.messageId && data.messageContent) {
+      queueMessage(data.messageId, data.messageContent, data.timestamp || new Date().toISOString());
     }
     
     const result = await sendPushNotifications(title, body, data || {});
@@ -484,7 +562,7 @@ app.post('/notify/meeting', async (req, res) => {
 
 /**
  * POST /notify/message
- * Send a new message notification
+ * Send a new message notification + queue for sync
  * Body: { message, preview?, sender?, messageId? }
  */
 app.post('/notify/message', async (req, res) => {
@@ -497,15 +575,19 @@ app.post('/notify/message', async (req, res) => {
     
     // Generate messageId if not provided
     const finalMessageId = messageId || `msg-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const timestamp = new Date().toISOString();
     
     const data = {
       type: 'message',
       messageId: finalMessageId,
       messageContent: message || preview || '',
-      timestamp: new Date().toISOString(),
+      timestamp,
       preview,
       sender,
     };
+    
+    // Queue message for sync (in case push notification isn't received)
+    queueMessage(finalMessageId, message || preview || '', timestamp);
     
     const result = await sendPushNotifications(notificationTitle, notificationBody, data);
     res.json({ success: true, messageId: finalMessageId, ...result });
@@ -556,6 +638,52 @@ app.get('/notify/tokens', async (req, res) => {
     res.json({ count: tokens.length });
   } catch (e) {
     console.error('[Notify/Tokens] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ===============================================
+// Message Sync Routes (for app to fetch missed messages)
+// ===============================================
+
+/**
+ * GET /messages/pending
+ * Get all pending messages that haven't been acknowledged
+ * App should call this on launch/foreground to sync missed messages
+ */
+app.get('/messages/pending', (req, res) => {
+  try {
+    const messages = getPendingMessages();
+    res.json({ 
+      messages,
+      count: messages.length,
+    });
+  } catch (e) {
+    console.error('[Messages/Pending] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+/**
+ * POST /messages/ack
+ * Acknowledge messages by IDs (removes them from pending queue)
+ * Body: { messageIds: string[] }
+ */
+app.post('/messages/ack', (req, res) => {
+  try {
+    const { messageIds } = req.body;
+    
+    if (!messageIds || !Array.isArray(messageIds)) {
+      return res.status(400).json({ error: 'Missing required field: messageIds (array)' });
+    }
+    
+    const acknowledged = acknowledgeMessages(messageIds);
+    res.json({ 
+      success: true, 
+      acknowledged,
+    });
+  } catch (e) {
+    console.error('[Messages/Ack] Error:', e.message);
     res.status(500).json({ error: e.message });
   }
 });

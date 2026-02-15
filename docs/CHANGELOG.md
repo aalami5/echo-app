@@ -9,6 +9,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Server-Side Message Sync** (Build #25) — Reliable message delivery even when push fails
+  - Server queues messages in `pending-messages.json` (last 50 retained)
+  - New endpoints: `GET /messages/pending`, `POST /messages/ack`
+  - App fetches pending messages on launch + foreground
+  - Dual sync: server queue + notification center for maximum reliability
+  - Automatically acknowledges messages after syncing to chat
 - **Auto-Sync Missed Notifications** (Build #24) — App syncs any missed notifications on launch
 - **Baked-in Gateway Credentials** (Build #22) — Gateway URL and token embedded in build
   - No manual configuration needed for production builds

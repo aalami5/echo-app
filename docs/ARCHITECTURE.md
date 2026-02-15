@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** February 13, 2026
+**Last Updated:** February 14, 2026
 
 ---
 
@@ -407,10 +407,51 @@ Chat store limits to **100 persisted messages** to prevent:
 
 The sync server (`server/index.js`) includes endpoints:
 - `POST /notify/meeting` — Send meeting reminder
-- `POST /notify/message` — Send message preview
+- `POST /notify/message` — Send message preview (also queues for sync)
 - `POST /notify/brief` — Send daily brief
+- `GET /messages/pending` — Get queued messages for sync (Build 25)
+- `POST /messages/ack` — Acknowledge synced messages (Build 25)
 
 Uses `expo-server-sdk` for push delivery.
+
+### Message Sync (Build 25)
+
+Push notifications can fail (device offline, iOS limits, etc). Build 25 adds server-side message queuing:
+
+```
+┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
+│   OpenClaw       │      │   Sync Server    │      │   Echo App       │
+│   Gateway        │      │   (Mac Mini)     │      │   (iOS device)   │
+└────────┬─────────┘      └────────┬─────────┘      └────────┬─────────┘
+         │                         │                         │
+         │ POST /notify/message    │                         │
+         │ ───────────────────────>│                         │
+         │                         │                         │
+         │                         │ 1. Queue message locally│
+         │                         │    (pending-messages.json)
+         │                         │                         │
+         │                         │ 2. Send push notification
+         │                         │ ───────────────────────>│
+         │                         │                         │
+         │                         │ (Push may fail or delay)│
+         │                         │                         │
+         │                         │     App launches/foregrounds
+         │                         │                         │
+         │                         │ GET /messages/pending   │
+         │                         │ <───────────────────────│
+         │                         │                         │
+         │                         │ Return queued messages  │
+         │                         │ ───────────────────────>│
+         │                         │                         │
+         │                         │ POST /messages/ack      │
+         │                         │ <───────────────────────│
+         │                         │                         │
+```
+
+This ensures messages appear in chat even if:
+- Push notification is delayed or dropped
+- App was force-killed (no notification center access)
+- iOS purged notifications from notification center
 
 ---
 
