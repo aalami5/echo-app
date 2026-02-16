@@ -133,6 +133,20 @@ export const useCalendarStore = create<CalendarStore>()(
       }),
       onRehydrateStorage: () => (state) => {
         if (state) {
+          // Clear stale cache from a previous day to prevent ghost events
+          const { lastFetched } = state;
+          if (lastFetched) {
+            const cachedDate = new Date(lastFetched);
+            const now = new Date();
+            const isSameDay =
+              cachedDate.getFullYear() === now.getFullYear() &&
+              cachedDate.getMonth() === now.getMonth() &&
+              cachedDate.getDate() === now.getDate();
+            if (!isSameDay) {
+              console.log('[Calendar] Cache is from a previous day — clearing stale events');
+              state.setEvents([]);
+            }
+          }
           state.setHasHydrated(true);
         }
       },

@@ -1,11 +1,11 @@
 /**
  * OpenClaw Gateway API Service
  * 
- * Connects to the Gateway's OpenAI-compatible HTTP API
- * for sending messages and receiving responses.
+ * Connects to the Gateway's HTTP APIs for sending messages.
  * 
- * Build 16: Immediate acknowledgment + push notification on complete
- *           (Removed streaming in favor of simpler request/response)
+ * Build 24: Use OpenResponses API for images
+ *           - OpenAI Chat Completions API doesn't support images
+ *           - OpenResponses API properly handles input_image items
  */
 
 import { AppState } from 'react-native';
@@ -21,17 +21,9 @@ interface GatewayConfig {
   userId?: string;
 }
 
-interface ChatMessageContent {
-  type: 'text' | 'image_url';
-  text?: string;
-  image_url?: {
-    url: string;  // Can be data:image/...;base64,... or a URL
-  };
-}
-
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
-  content: string | ChatMessageContent[];
+  content: string;
 }
 
 interface ChatCompletionResponse {
@@ -50,6 +42,40 @@ interface ChatCompletionResponse {
   usage?: {
     prompt_tokens: number;
     completion_tokens: number;
+    total_tokens: number;
+  };
+}
+
+// OpenResponses API types
+interface OpenResponsesInputItem {
+  type: 'message' | 'input_image' | 'input_file';
+  role?: string;
+  content?: string;
+  source?: {
+    type: 'base64' | 'url';
+    media_type?: string;
+    data?: string;
+    url?: string;
+  };
+}
+
+interface OpenResponsesResponse {
+  id: string;
+  object: string;
+  created_at: number;
+  model: string;
+  output: Array<{
+    type: string;
+    id?: string;
+    role?: string;
+    content?: Array<{
+      type: string;
+      text?: string;
+    }>;
+  }>;
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
     total_tokens: number;
   };
 }
@@ -93,7 +119,10 @@ export class GatewayService {
   }
 
   /**
-   * Send a message to the Gateway and get a response (non-streaming)
+   * Send a message to the Gateway and get a response
+   * 
+   * Uses OpenResponses API when images are included (for proper image support),
+   * falls back to OpenAI Chat Completions API for text-only messages.
    * 
    * @param content - Text content to send
    * @param history - Previous messages for context
@@ -112,8 +141,6 @@ export class GatewayService {
     const appState = AppState.currentState;
     
     console.log('[Gateway] Sending message:', content.slice(0, 100));
-    console.log('[Gateway] URL:', `${baseUrl}/v1/chat/completions`);
-    console.log('[Gateway] Token present:', !!token, 'length:', token?.length || 0);
     console.log('[Gateway] Has image:', !!imageBase64, 'type:', imageMimeType || 'none');
     
     // Validate config before sending
@@ -123,29 +150,144 @@ export class GatewayService {
     if (!token) {
       throw new Error('Gateway token not configured');
     }
-    
-    // Build message content - use multipart format if image is included
-    let userContent: string | ChatMessageContent[];
-    
+
+    // Use OpenResponses API for images (it properly supports them)
     if (imageBase64 && imageMimeType) {
-      // Multipart content with text and image
-      userContent = [
-        { type: 'text', text: content },
-        { 
-          type: 'image_url', 
-          image_url: { 
-            url: `data:${imageMimeType};base64,${imageBase64}` 
-          } 
-        }
-      ];
-    } else {
-      // Text-only content
-      userContent = content;
+      return this.sendMessageWithImage(baseUrl, token, agentId!, userId!, content, imageBase64, imageMimeType, devicePushToken, appState);
     }
+    
+    // Use OpenAI Chat Completions API for text-only (simpler response format)
+    return this.sendMessageTextOnly(baseUrl, token, agentId!, userId!, content, history, devicePushToken, appState);
+  }
+
+  /**
+   * Send message with image using OpenResponses API
+   */
+  private async sendMessageWithImage(
+    baseUrl: string,
+    token: string,
+    agentId: string,
+    userId: string,
+    content: string,
+    imageBase64: string,
+    imageMimeType: string,
+    devicePushToken: string | null,
+    appState: string | null
+  ): Promise<string> {
+    console.log('[Gateway] Using OpenResponses API for image');
+    console.log('[Gateway] URL:', `${baseUrl}/v1/responses`);
+
+    // Build input items: text message + image
+    const input: OpenResponsesInputItem[] = [
+      {
+        type: 'message',
+        role: 'user',
+        content: content,
+      },
+      {
+        type: 'input_image',
+        source: {
+          type: 'base64',
+          media_type: imageMimeType,
+          data: imageBase64,
+        },
+      },
+    ];
+
+    const response = await fetchWithTimeout(
+      `${baseUrl}/v1/responses`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+          'x-openclaw-agent-id': agentId,
+          'X-App-State': appState || 'unknown',
+          ...(devicePushToken ? { 'X-APNS-Token': devicePushToken } : {}),
+        },
+        body: JSON.stringify({
+          model: `openclaw:${agentId}`,
+          input,
+          stream: false,
+          user: userId,
+        }),
+      },
+      REQUEST_TIMEOUT_MS
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Gateway] OpenResponses API error:', response.status, errorText);
+      
+      if (response.status === 401) {
+        throw new Error('Invalid gateway token. Please check your settings.');
+      } else if (response.status === 403) {
+        throw new Error('Access denied. Token may be expired.');
+      } else if (response.status === 400) {
+        // Parse error for more details
+        try {
+          const errorJson = JSON.parse(errorText);
+          throw new Error(errorJson.error?.message || `Bad request: ${errorText}`);
+        } catch {
+          throw new Error(`Bad request: ${errorText}`);
+        }
+      } else if (response.status === 502 || response.status === 503 || response.status === 504) {
+        throw new Error('Gateway temporarily unavailable. Please try again.');
+      } else {
+        throw new Error(`Gateway error: ${response.status}`);
+      }
+    }
+
+    const result: OpenResponsesResponse = await response.json();
+    console.log('[Gateway] OpenResponses result:', JSON.stringify(result).slice(0, 300));
+    
+    // Extract text from the response output
+    const textContent = result.output
+      ?.filter(item => item.type === 'message' && item.role === 'assistant')
+      ?.flatMap(item => item.content || [])
+      ?.filter(c => c.type === 'text' || c.type === 'output_text')
+      ?.map(c => c.text || '')
+      ?.join('');
+    
+    if (!textContent) {
+      // Try alternative response format
+      const altText = result.output
+        ?.filter(item => item.type === 'text')
+        ?.map(item => (item as any).text || '')
+        ?.join('');
+      
+      if (altText) {
+        return altText;
+      }
+      
+      console.error('[Gateway] No text in response:', JSON.stringify(result));
+      throw new Error('No response from Gateway');
+    }
+
+    console.log('[Gateway] Response text:', textContent.slice(0, 200));
+    return textContent;
+  }
+
+  /**
+   * Send text-only message using OpenAI Chat Completions API
+   */
+  private async sendMessageTextOnly(
+    baseUrl: string,
+    token: string,
+    agentId: string,
+    userId: string,
+    content: string,
+    history: ChatMessage[],
+    devicePushToken: string | null,
+    appState: string | null
+  ): Promise<string> {
+    console.log('[Gateway] Using Chat Completions API (text-only)');
+    console.log('[Gateway] URL:', `${baseUrl}/v1/chat/completions`);
     
     const messages: ChatMessage[] = [
       ...history,
-      { role: 'user', content: userContent }
+      { role: 'user', content }
     ];
 
     const response = await fetchWithTimeout(
@@ -171,9 +313,8 @@ export class GatewayService {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[Gateway] API error:', response.status, errorText);
+      console.error('[Gateway] Chat Completions API error:', response.status, errorText);
       
-      // Provide more helpful error messages
       if (response.status === 401) {
         throw new Error('Invalid gateway token. Please check your settings.');
       } else if (response.status === 403) {
@@ -186,14 +327,14 @@ export class GatewayService {
     }
 
     const result: ChatCompletionResponse = await response.json();
-    console.log('[Gateway] Response received:', JSON.stringify(result).slice(0, 200));
+    console.log('[Gateway] Chat Completions result:', JSON.stringify(result).slice(0, 200));
     
     if (!result.choices || result.choices.length === 0) {
       throw new Error('No response from Gateway');
     }
 
     const responseText = result.choices[0].message.content;
-    console.log('[Gateway] Assistant response:', responseText);
+    console.log('[Gateway] Response text:', responseText.slice(0, 200));
     return responseText;
   }
 
@@ -221,7 +362,6 @@ export class GatewayService {
       console.log('[Gateway] Pinging:', JSON.stringify(pingUrl));
       
       // Use shorter timeout for health checks (10 seconds)
-      // Accept any content type - server may return HTML
       const response = await fetchWithTimeout(
         pingUrl,
         {
