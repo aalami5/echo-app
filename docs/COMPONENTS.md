@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** February 13, 2026
+**Last Updated:** February 15, 2026
 
 ---
 
@@ -281,7 +281,7 @@ Modal for selecting photos from camera or library.
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `onImageSelected` | `(uri: string, base64?: string) => void` | Selection callback |
+| `onImageSelected` | `(uri: string, base64?: string, mimeType?: string) => void` | Selection callback (base64 + mimeType used for vision analysis) |
 | `onCancel` | `() => void` | Cancel callback |
 
 **Usage:**

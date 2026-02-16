@@ -9,6 +9,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Added
+- **Image Analysis Support** (Build #26-27) — Send photos to Echo for vision analysis
+  - ImagePicker passes base64 + mimeType to gateway handler
+  - GatewayService builds OpenAI-compatible multipart content with `image_url`
+  - Shows "Analyzing your image..." placeholder while processing
+  - Handles long tasks (>30s) with push notification on completion
 - **Server-Side Message Sync** (Build #25) — Reliable message delivery even when push fails
   - Server queues messages in `pending-messages.json` (last 50 retained)
   - New endpoints: `GET /messages/pending`, `POST /messages/ack`

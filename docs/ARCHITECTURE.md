@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** February 14, 2026
+**Last Updated:** February 15, 2026
 
 ---
 
@@ -204,6 +204,29 @@ echo-app/
                     ▼
 7. Playback complete
    Avatar state → "idle"
+```
+
+---
+
+### Image Analysis Flow (Build 26)
+
+```
+1. User taps image picker → selects photo
+                    │
+                    ▼
+2. ImagePicker returns base64 + mimeType
+                    │
+                    ▼
+3. useGateway builds OpenAI-compatible multipart content
+   Content: [{ type: "image_url", image_url: { url: "data:{mime};base64,..." } }]
+                    │
+                    ▼
+4. GatewayService sends to /v1/chat/completions
+   Shows "Analyzing your image..." placeholder
+                    │
+                    ▼
+5. Response received → displayed in chat
+   If >30s, push notification sent on completion
 ```
 
 ---
