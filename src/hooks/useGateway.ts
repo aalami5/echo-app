@@ -247,8 +247,20 @@ export function useGateway(): UseGatewayReturn {
           return next;
         });
         
-        // Continue waiting for actual response in background
-        requestPromise.then(async (response) => {
+        // Re-send the request WITHOUT the abort timeout so it can run indefinitely
+        const noAbortPromise = serviceRef.current!.sendMessage(
+          content,
+          [],
+          image?.base64,
+          image?.mimeType,
+          true // noTimeout
+        );
+        
+        // Also ignore the original requestPromise (it may abort, that's fine)
+        requestPromise.catch(() => { /* original may abort — ignored */ });
+        
+        // Continue waiting for the no-abort request in background
+        noAbortPromise.then(async (response) => {
           console.log('[useGateway] Delayed response arrived:', response?.length || 0, 'chars');
           
           if (response) {
@@ -274,18 +286,43 @@ export function useGateway(): UseGatewayReturn {
             inFlightRequest.current = null;
           }
         }).catch(async (err) => {
-          console.error('[useGateway] Delayed request failed:', err);
+          console.error('[useGateway] Delayed request failed, polling for response:', err);
           
-          // Add error message to chat
-          const { addMessage } = useChatStore.getState();
-          addMessage({
-            id: `error-${Date.now()}`,
-            role: 'assistant',
-            content: 'Sorry, the request failed after working on it. Please try again.',
-            timestamp: new Date().toISOString(),
-          });
+          // Fallback: poll for ~2 minutes before giving up
+          const pollIntervalMs = 30000;
+          const maxPolls = 4; // 4 × 30s = 2 minutes
+          const { messages: existingMessages } = useChatStore.getState();
+          const existingIds = new Set(existingMessages.map((m: any) => m.id));
           
-          await scheduleResponseReadyNotification();
+          let found = false;
+          for (let i = 0; i < maxPolls; i++) {
+            await new Promise(resolve => setTimeout(resolve, pollIntervalMs));
+            console.log(`[useGateway] Polling for delayed response (${i + 1}/${maxPolls})...`);
+            
+            // Check if a new assistant message appeared (e.g. via push notification)
+            const { messages: currentMessages } = useChatStore.getState();
+            const newAssistantMsg = currentMessages.find(
+              (m: any) => m.role === 'assistant' && !existingIds.has(m.id)
+            );
+            if (newAssistantMsg) {
+              console.log('[useGateway] Found new assistant message during poll, stopping');
+              found = true;
+              break;
+            }
+          }
+          
+          if (!found) {
+            // After polling, show a softer message
+            const { addMessage } = useChatStore.getState();
+            addMessage({
+              id: `error-${Date.now()}`,
+              role: 'assistant',
+              content: 'This is taking longer than expected. I\'ll notify you when it\'s ready.',
+              timestamp: new Date().toISOString(),
+            });
+            
+            await scheduleResponseReadyNotification();
+          }
           
           if (requestId) {
             await removePendingGatewayRequest(requestId);

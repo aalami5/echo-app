@@ -82,12 +82,18 @@ interface OpenResponsesResponse {
 
 /**
  * Create a fetch request with timeout using AbortController
+ * Pass timeoutMs = 0 to disable timeout (no abort).
  */
 async function fetchWithTimeout(
   url: string,
   options: RequestInit,
   timeoutMs: number = REQUEST_TIMEOUT_MS
 ): Promise<Response> {
+  // No timeout — just fetch directly
+  if (timeoutMs <= 0) {
+    return fetch(url, options);
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -133,14 +139,16 @@ export class GatewayService {
     content: string,
     history: ChatMessage[] = [],
     imageBase64?: string,
-    imageMimeType?: string
+    imageMimeType?: string,
+    noTimeout?: boolean
   ): Promise<string> {
     const { baseUrl: rawUrl, token, agentId, userId } = this.config;
     const baseUrl = rawUrl.trim().replace(/\/+$/, ''); // Normalize URL
     const devicePushToken = await getCachedDevicePushToken();
     const appState = AppState.currentState;
+    const timeoutMs = noTimeout ? 0 : REQUEST_TIMEOUT_MS;
     
-    console.log('[Gateway] Sending message:', content.slice(0, 100));
+    console.log('[Gateway] Sending message:', content.slice(0, 100), noTimeout ? '(no timeout)' : '');
     console.log('[Gateway] Has image:', !!imageBase64, 'type:', imageMimeType || 'none');
     
     // Validate config before sending
@@ -153,11 +161,11 @@ export class GatewayService {
 
     // Use OpenResponses API for images (it properly supports them)
     if (imageBase64 && imageMimeType) {
-      return this.sendMessageWithImage(baseUrl, token, agentId!, userId!, content, imageBase64, imageMimeType, devicePushToken, appState);
+      return this.sendMessageWithImage(baseUrl, token, agentId!, userId!, content, imageBase64, imageMimeType, devicePushToken, appState, timeoutMs);
     }
     
     // Use OpenAI Chat Completions API for text-only (simpler response format)
-    return this.sendMessageTextOnly(baseUrl, token, agentId!, userId!, content, history, devicePushToken, appState);
+    return this.sendMessageTextOnly(baseUrl, token, agentId!, userId!, content, history, devicePushToken, appState, timeoutMs);
   }
 
   /**
@@ -172,7 +180,8 @@ export class GatewayService {
     imageBase64: string,
     imageMimeType: string,
     devicePushToken: string | null,
-    appState: string | null
+    appState: string | null,
+    timeoutMs: number = REQUEST_TIMEOUT_MS
   ): Promise<string> {
     console.log('[Gateway] Using OpenResponses API for image');
     console.log('[Gateway] URL:', `${baseUrl}/v1/responses`);
@@ -213,7 +222,7 @@ export class GatewayService {
           user: userId,
         }),
       },
-      REQUEST_TIMEOUT_MS
+      timeoutMs
     );
 
     if (!response.ok) {
@@ -280,7 +289,8 @@ export class GatewayService {
     content: string,
     history: ChatMessage[],
     devicePushToken: string | null,
-    appState: string | null
+    appState: string | null,
+    timeoutMs: number = REQUEST_TIMEOUT_MS
   ): Promise<string> {
     console.log('[Gateway] Using Chat Completions API (text-only)');
     console.log('[Gateway] URL:', `${baseUrl}/v1/chat/completions`);
@@ -308,7 +318,7 @@ export class GatewayService {
           user: userId,
         }),
       },
-      REQUEST_TIMEOUT_MS
+      timeoutMs
     );
 
     if (!response.ok) {
