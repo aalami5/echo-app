@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** February 13, 2026
+**Last Updated:** February 16, 2026
 
 ---
 
@@ -328,7 +328,7 @@ Caches calendar events fetched from Google Calendar.
 | `isLoading` | `boolean` | ❌ | Fetch status |
 | `lastFetch` | `number \| null` | ❌ | Last refresh timestamp |
 
-**Note:** Events are fetched on-demand and not persisted.
+**Note:** Events are fetched on-demand and not persisted. On rehydration, if the cache is from a different day, events are cleared and a fresh fetch is triggered to prevent stale/ghost events.
 
 ---
 

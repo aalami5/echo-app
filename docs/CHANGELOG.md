@@ -8,6 +8,9 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+- **Stale Calendar Cache Clearing** (Build #28) — Cached events from a previous day are now cleared on app rehydration, preventing ghost events (e.g. old recurring meetings) from persisting across days
+
 ### Added
 - **Image Analysis Support** (Build #26-27) — Send photos to Echo for vision analysis
   - ImagePicker passes base64 + mimeType to gateway handler
