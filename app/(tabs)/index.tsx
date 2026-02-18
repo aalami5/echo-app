@@ -343,15 +343,17 @@ export default function ChatScreen() {
     }
   };
 
-  const handleImageSelected = async (uri: string, base64?: string, mimeType?: string) => {
+  const handleImageSelected = async (uri: string, base64?: string, mimeType?: string, caption?: string) => {
     setShowImagePicker(false);
+    
+    const messageText = caption || 'What do you see in this image?';
     
     // Add image message to chat immediately
     const imageMessageId = Date.now().toString();
     const imageMessage: Message = {
       id: imageMessageId,
       role: 'user',
-      content: 'What do you see in this image?',
+      content: messageText,
       timestamp: new Date().toISOString(),
       imageUrl: uri,
       status: 'sending',
@@ -375,7 +377,7 @@ export default function ChatScreen() {
       
       // Send to gateway with image
       const response = await gatewaySend(
-        'What do you see in this image?',
+        messageText,
         imageMessageId,
         { base64, mimeType }
       );

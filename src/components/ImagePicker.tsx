@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -7,6 +7,9 @@ import {
   Image,
   Modal,
   Alert,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import * as ExpoImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,7 +17,7 @@ import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 
 interface ImagePickerProps {
-  onImageSelected: (uri: string, base64?: string, mimeType?: string) => void;
+  onImageSelected: (uri: string, base64?: string, mimeType?: string, caption?: string) => void;
   onCancel: () => void;
 }
 
@@ -22,6 +25,8 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
+  const [caption, setCaption] = useState('');
+  const captionRef = useRef<TextInput>(null);
 
   const pickImage = async (useCamera: boolean) => {
     try {
@@ -72,7 +77,8 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
   const handleConfirm = async () => {
     if (selectedImage) {
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-      onImageSelected(selectedImage, imageBase64 || undefined, imageMimeType || undefined);
+      const trimmed = caption.trim();
+      onImageSelected(selectedImage, imageBase64 || undefined, imageMimeType || undefined, trimmed || undefined);
     }
   };
 
@@ -101,12 +107,30 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
           </View>
 
           {selectedImage ? (
+            <KeyboardAvoidingView
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              keyboardVerticalOffset={0}
+            >
             <View style={styles.previewContainer}>
               <Image source={{ uri: selectedImage }} style={styles.preview} />
+              <View style={styles.captionContainer}>
+                <TextInput
+                  ref={captionRef}
+                  style={styles.captionInput}
+                  placeholder="Add a message... (optional)"
+                  placeholderTextColor={colors.textSecondary}
+                  value={caption}
+                  onChangeText={setCaption}
+                  multiline
+                  maxLength={500}
+                  returnKeyType="done"
+                  blurOnSubmit
+                />
+              </View>
               <View style={styles.previewActions}>
                 <TouchableOpacity
                   style={styles.previewButton}
-                  onPress={() => setSelectedImage(null)}
+                  onPress={() => { setSelectedImage(null); setCaption(''); }}
                 >
                   <Ionicons name="refresh" size={20} color={colors.textSecondary} />
                   <Text style={styles.previewButtonText}>Change</Text>
@@ -117,11 +141,12 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
                 >
                   <Ionicons name="send" size={20} color={colors.textInverse} />
                   <Text style={[styles.previewButtonText, styles.sendButtonText]}>
-                    Send for Analysis
+                    Send
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
+            </KeyboardAvoidingView>
           ) : (
             <View style={styles.options}>
               <TouchableOpacity
@@ -220,6 +245,20 @@ const styles = StyleSheet.create({
     height: 300,
     borderRadius: borderRadius.lg,
     backgroundColor: colors.background,
+  },
+  captionContainer: {
+    marginTop: spacing.sm,
+  },
+  captionInput: {
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    fontSize: typography.base,
+    color: colors.textPrimary,
+    minHeight: 44,
+    maxHeight: 100,
   },
   previewActions: {
     flexDirection: 'row',

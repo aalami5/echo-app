@@ -47,10 +47,21 @@ interface ChatCompletionResponse {
 }
 
 // OpenResponses API types
+interface OpenResponsesContentPart {
+  type: 'input_text' | 'input_image' | 'input_file';
+  text?: string;
+  source?: {
+    type: 'base64' | 'url';
+    media_type?: string;
+    data?: string;
+    url?: string;
+  };
+}
+
 interface OpenResponsesInputItem {
   type: 'message' | 'input_image' | 'input_file';
   role?: string;
-  content?: string;
+  content?: string | OpenResponsesContentPart[];
   source?: {
     type: 'base64' | 'url';
     media_type?: string;
@@ -186,20 +197,25 @@ export class GatewayService {
     console.log('[Gateway] Using OpenResponses API for image');
     console.log('[Gateway] URL:', `${baseUrl}/v1/responses`);
 
-    // Build input items: text message + image
+    // Build input: image goes INSIDE the message content array (not top-level)
     const input: OpenResponsesInputItem[] = [
       {
         type: 'message',
         role: 'user',
-        content: content,
-      },
-      {
-        type: 'input_image',
-        source: {
-          type: 'base64',
-          media_type: imageMimeType,
-          data: imageBase64,
-        },
+        content: [
+          {
+            type: 'input_text',
+            text: content,
+          },
+          {
+            type: 'input_image',
+            source: {
+              type: 'base64',
+              media_type: imageMimeType,
+              data: imageBase64,
+            },
+          },
+        ],
       },
     ];
 
