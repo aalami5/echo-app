@@ -9,6 +9,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Fixed
+- **Background Request Reliability** — Removed abort timeout for long-running background requests; re-sends without timeout so tasks can complete indefinitely. Added fallback polling (4×30s) if the no-timeout request also fails, checking for new assistant messages before showing an error.
 - **Stale Calendar Cache Clearing** (Build #28) — Cached events from a previous day are now cleared on app rehydration, preventing ghost events (e.g. old recurring meetings) from persisting across days
 
 ### Added
