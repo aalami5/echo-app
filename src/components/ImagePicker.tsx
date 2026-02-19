@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
   View,
@@ -10,6 +10,9 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
+  Keyboard,
+  Dimensions,
 } from 'react-native';
 import * as ExpoImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
@@ -26,7 +29,21 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
   const [imageBase64, setImageBase64] = useState<string | null>(null);
   const [imageMimeType, setImageMimeType] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const captionRef = useRef<TextInput>(null);
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardWillShow', () => {
+      setKeyboardVisible(true);
+      // Scroll to bottom so caption is visible
+      setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100);
+    });
+    const hideSub = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardVisible(false);
+    });
+    return () => { showSub.remove(); hideSub.remove(); };
+  }, []);
 
   const pickImage = async (useCamera: boolean) => {
     try {
@@ -97,7 +114,11 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
       animationType="slide"
       onRequestClose={handleCancel}
     >
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
+        <TouchableOpacity style={styles.overlayDismiss} activeOpacity={1} onPress={handleCancel} />
         <View style={styles.container}>
           <View style={styles.header}>
             <Text style={styles.title}>Add Photo</Text>
@@ -107,12 +128,18 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
           </View>
 
           {selectedImage ? (
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={0}
+            <ScrollView
+              ref={scrollRef}
+              style={styles.scrollContainer}
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}
             >
-            <View style={styles.previewContainer}>
-              <Image source={{ uri: selectedImage }} style={styles.preview} />
+              <Image
+                source={{ uri: selectedImage }}
+                style={[styles.preview, keyboardVisible && styles.previewSmall]}
+              />
               <View style={styles.captionContainer}>
                 <TextInput
                   ref={captionRef}
@@ -130,7 +157,7 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
               <View style={styles.previewActions}>
                 <TouchableOpacity
                   style={styles.previewButton}
-                  onPress={() => { setSelectedImage(null); setCaption(''); }}
+                  onPress={() => { setSelectedImage(null); setCaption(''); Keyboard.dismiss(); }}
                 >
                   <Ionicons name="refresh" size={20} color={colors.textSecondary} />
                   <Text style={styles.previewButtonText}>Change</Text>
@@ -145,8 +172,7 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-            </KeyboardAvoidingView>
+            </ScrollView>
           ) : (
             <View style={styles.options}>
               <TouchableOpacity
@@ -173,7 +199,7 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
             </View>
           )}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -184,11 +210,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'flex-end',
   },
+  overlayDismiss: {
+    flex: 1,
+  },
   container: {
     backgroundColor: colors.surface,
     borderTopLeftRadius: borderRadius.xl,
     borderTopRightRadius: borderRadius.xl,
     paddingBottom: spacing.xl,
+    maxHeight: '85%',
   },
   header: {
     flexDirection: 'row',
@@ -237,14 +267,20 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: spacing.xs,
   },
-  previewContainer: {
+  scrollContainer: {
+    flexGrow: 0,
+  },
+  scrollContent: {
     padding: spacing.md,
   },
   preview: {
     width: '100%',
-    height: 300,
+    height: 250,
     borderRadius: borderRadius.lg,
     backgroundColor: colors.background,
+  },
+  previewSmall: {
+    height: 120,
   },
   captionContainer: {
     marginTop: spacing.sm,
