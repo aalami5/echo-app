@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** February 15, 2026
+**Last Updated:** February 18, 2026
 
 ---
 
@@ -273,7 +273,7 @@ addToast({ type: 'success', message: 'Message sent!', duration: 2000 });
 
 ### ImagePickerModal
 
-Modal for selecting photos from camera or library.
+Modal for selecting photos from camera or library. Includes a caption input field and keyboard-aware scrolling for the image preview.
 
 **File:** `src/components/ImagePicker.tsx`
 
@@ -281,8 +281,13 @@ Modal for selecting photos from camera or library.
 
 | Prop | Type | Description |
 |------|------|-------------|
-| `onImageSelected` | `(uri: string, base64?: string, mimeType?: string) => void` | Selection callback (base64 + mimeType used for vision analysis) |
+| `onImageSelected` | `(uri: string, base64?: string, mimeType?: string, caption?: string) => void` | Selection callback (base64 + mimeType for vision, caption for context) |
 | `onCancel` | `() => void` | Cancel callback |
+
+**Features:**
+- Optional caption/question input (defaults to "What do you see in this image?")
+- Image preview scrolls up and shrinks when keyboard opens (Build #31 fix)
+- Camera and photo library source selection
 
 **Usage:**
 

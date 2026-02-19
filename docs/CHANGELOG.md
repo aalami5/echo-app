@@ -9,10 +9,15 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 ## [Unreleased]
 
 ### Fixed
+- **Keyboard Covering Image Preview** (Build #31) — Image preview now scrolls up and shrinks when keyboard opens, preventing caption input from being hidden behind the keyboard
+- **Image Send API Format** (Build #29) — Fixed OpenResponses API format: `input_image` goes inside message content array instead of top-level
 - **Background Request Reliability** — Removed abort timeout for long-running background requests; re-sends without timeout so tasks can complete indefinitely. Added fallback polling (4×30s) if the no-timeout request also fails, checking for new assistant messages before showing an error.
 - **Stale Calendar Cache Clearing** (Build #28) — Cached events from a previous day are now cleared on app rehydration, preventing ghost events (e.g. old recurring meetings) from persisting across days
 
 ### Added
+- **Image Caption Input** (Build #29) — Caption/question text field added to image picker
+  - Optional caption before sending; defaults to "What do you see in this image?"
+  - Simplified button label from "Send for Analysis" to "Send"
 - **Image Analysis Support** (Build #26-27) — Send photos to Echo for vision analysis
   - ImagePicker passes base64 + mimeType to gateway handler
   - GatewayService builds OpenAI-compatible multipart content with `image_url`
