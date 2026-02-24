@@ -126,8 +126,28 @@ export default function ChatScreen() {
       if (latestMessage.role === 'user') {
         userScrolledUp.current = false;
       }
+      
+      // Auto-play TTS for new assistant messages from notifications/sync
+      // (Live chat responses already call speak() directly in sendMessageToGateway)
+      if (
+        latestMessage.role === 'assistant' &&
+        voiceEnabled &&
+        autoPlayResponses &&
+        voiceConfigured &&
+        latestMessage.content &&
+        !latestMessage.content.startsWith('Failed to') &&
+        !isSpeaking &&
+        !isLoadingAudio
+      ) {
+        // Check if this message came from notification sync (not live chat)
+        // Live chat messages have status transitions; notification messages don't
+        if (!latestMessage.status) {
+          console.log('[Chat] Auto-playing TTS for notification message:', latestMessage.id);
+          speak(latestMessage.content);
+        }
+      }
     }
-  }, [messages, scrollToBottom]);
+  }, [messages, scrollToBottom, voiceEnabled, autoPlayResponses, voiceConfigured, speak, isSpeaking, isLoadingAudio]);
 
   // Scroll to bottom on initial mount
   useEffect(() => {
