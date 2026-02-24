@@ -25,9 +25,12 @@ Notifications.setNotificationHandler({
 });
 
 export interface NotificationData {
-  type: 'meeting_reminder' | 'new_message' | 'daily_brief';
+  type: 'meeting_reminder' | 'new_message' | 'message' | 'daily_brief';
   eventId?: string;
   messagePreview?: string;
+  messageId?: string;
+  messageContent?: string;
+  timestamp?: string;
   minutesBefore?: number;
 }
 
@@ -156,7 +159,7 @@ export async function isReminderAcknowledged(eventId: string): Promise<boolean> 
  */
 export function setupNotificationResponseHandler(
   onMeetingTap: (eventId: string) => void,
-  onMessageTap: () => void,
+  onMessageTap: (messageData: { id: string; content: string; timestamp: string } | null) => void,
   onBriefTap: () => void
 ): Notifications.EventSubscription {
   return Notifications.addNotificationResponseReceivedListener((response) => {
@@ -170,8 +173,17 @@ export function setupNotificationResponseHandler(
           onMeetingTap(data.eventId);
         }
         break;
+      case 'message':
       case 'new_message':
-        onMessageTap();
+        if (data.messageId && data.messageContent) {
+          onMessageTap({
+            id: data.messageId,
+            content: data.messageContent,
+            timestamp: data.timestamp || new Date().toISOString(),
+          });
+        } else {
+          onMessageTap(null);
+        }
         break;
       case 'daily_brief':
         onBriefTap();
@@ -231,4 +243,18 @@ export async function getBadgeCount(): Promise<number> {
  */
 export async function setBadgeCount(count: number): Promise<void> {
   await Notifications.setBadgeCountAsync(count);
+}
+
+/**
+ * Get all delivered notifications from notification center
+ */
+export async function getDeliveredNotifications(): Promise<Notifications.Notification[]> {
+  return await Notifications.getPresentedNotificationsAsync();
+}
+
+/**
+ * Dismiss a specific notification from notification center
+ */
+export async function dismissNotification(identifier: string): Promise<void> {
+  await Notifications.dismissNotificationAsync(identifier);
 }

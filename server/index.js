@@ -382,9 +382,34 @@ app.get('/patients/search', (req, res) => {
   }
 });
 
+// Message sync routes under /patients/ prefix (accessible via Cloudflare tunnel)
+app.get('/patients/messages/pending', (req, res) => {
+  try {
+    const messages = getPendingMessages();
+    res.json({ messages, count: messages.length });
+  } catch (e) {
+    console.error('[Messages/Pending] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/patients/messages/ack', (req, res) => {
+  try {
+    const { messageIds } = req.body;
+    if (!messageIds || !Array.isArray(messageIds)) {
+      return res.status(400).json({ error: 'Missing required field: messageIds (array)' });
+    }
+    const acknowledged = acknowledgeMessages(messageIds);
+    res.json({ success: true, acknowledged });
+  } catch (e) {
+    console.error('[Messages/Ack] Error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/patients/:id', (req, res) => {
   // Skip if id is a reserved word (handled by other routes)
-  if (['ping', 'health', 'sync', 'list', 'search'].includes(req.params.id)) {
+  if (['ping', 'health', 'sync', 'list', 'search', 'messages'].includes(req.params.id)) {
     return res.status(404).json({ error: 'Not found' });
   }
   try {
@@ -511,7 +536,14 @@ app.post('/notify', async (req, res) => {
       queueMessage(data.messageId, data.messageContent, data.timestamp || new Date().toISOString());
     }
     
-    const result = await sendPushNotifications(title, body, data || {});
+    // Cap messageContent in push data to avoid APNs 4KB payload limit
+    // Full message is preserved in the server queue for sync
+    let pushData = data || {};
+    if (pushData.messageContent && pushData.messageContent.length > 2000) {
+      pushData = { ...pushData, messageContent: pushData.messageContent.substring(0, 2000) + '\n\n[Full message available in app]' };
+    }
+    
+    const result = await sendPushNotifications(title, body, pushData);
     res.json({ success: true, ...result });
   } catch (e) {
     console.error('[Notify] Error:', e.message);

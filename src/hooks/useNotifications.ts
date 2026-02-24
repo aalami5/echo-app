@@ -102,7 +102,26 @@ async function syncMessagesFromServer(): Promise<number> {
     }
     
     // The sync server runs on port 18790 (same host as gateway on 18789)
-    const syncUrl = gatewayUrl.replace(':18789', ':18790');
+    // When using a tunnel/domain (no explicit port), derive sync URL properly
+    let syncUrl: string;
+    try {
+      const parsed = new URL(gatewayUrl);
+      if (parsed.port === '18789') {
+        // Direct local access - just swap ports
+        parsed.port = '18790';
+        syncUrl = parsed.toString().replace(/\/$/, '');
+      } else if (!parsed.port || parsed.port === '443' || parsed.port === '80') {
+        // Tunnel/domain access - sync server is at same domain, path /patients
+        // The Cloudflare tunnel routes /patients/* to the sync server (port 18790)
+        syncUrl = gatewayUrl.replace(/\/$/, '') + '/patients';
+      } else {
+        // Unknown port - try replacing with 18790
+        parsed.port = '18790';
+        syncUrl = parsed.toString().replace(/\/$/, '');
+      }
+    } catch {
+      syncUrl = gatewayUrl.replace(':18789', ':18790');
+    }
     
     console.log('[Notifications] Fetching pending messages from server...');
     const response = await fetch(`${syncUrl}/messages/pending`, {
@@ -180,6 +199,29 @@ export function useNotifications() {
       if (token) {
         setPushToken(token);
         setIsRegistered(true);
+      }
+    });
+    
+    // Handle cold-start notification tap (app was killed, user tapped notification)
+    // This must be checked before setting up the response listener
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (response) {
+        const data = response.notification.request.content.data as unknown as NotificationData;
+        console.log('[Notifications] Cold-start notification tap detected:', data?.type);
+        
+        if ((data?.type === 'message' || data?.type === 'new_message') && data.messageId && data.messageContent) {
+          const { messages, addMessage } = useChatStore.getState();
+          const isDuplicate = messages.some((msg) => msg.id === data.messageId);
+          if (!isDuplicate) {
+            console.log('[Notifications] Adding cold-start message to chat:', data.messageId);
+            addMessage({
+              id: data.messageId,
+              role: 'assistant',
+              content: data.messageContent,
+              timestamp: data.timestamp || new Date().toISOString(),
+            });
+          }
+        }
       }
     });
     
