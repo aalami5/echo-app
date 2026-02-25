@@ -207,34 +207,34 @@ export function useNotifications() {
     });
     
     // Handle cold-start notification tap (app was killed, user tapped notification)
-    // This must be checked before setting up the response listener
-    Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (response) {
-        const data = response.notification.request.content.data as unknown as NotificationData;
-        console.log('[Notifications] Cold-start notification tap detected:', data?.type);
-        
-        if (data?.messageId && data?.messageContent) {
-          const { messages, addMessage } = useChatStore.getState();
-          const isDuplicate = messages.some((msg) => msg.id === data.messageId);
-          if (!isDuplicate) {
-            console.log('[Notifications] Adding cold-start message to chat:', data.messageId);
-            addMessage({
-              id: data.messageId,
-              role: 'assistant',
-              content: data.messageContent,
-              timestamp: data.timestamp || new Date().toISOString(),
-            });
+    // Wait for store hydration first so the message doesn't get overwritten
+    waitForHydration().then(() => {
+      Notifications.getLastNotificationResponseAsync().then((response) => {
+        if (response) {
+          const data = response.notification.request.content.data as unknown as NotificationData;
+          console.log('[Notifications] Cold-start notification tap detected:', data?.type);
+          
+          if (data?.messageId && data?.messageContent) {
+            const { messages, addMessage } = useChatStore.getState();
+            const isDuplicate = messages.some((msg) => msg.id === data.messageId);
+            if (!isDuplicate) {
+              console.log('[Notifications] Adding cold-start message to chat:', data.messageId);
+              addMessage({
+                id: data.messageId,
+                role: 'assistant',
+                content: data.messageContent,
+                timestamp: data.timestamp || new Date().toISOString(),
+              });
+            }
           }
         }
-      }
+      });
     });
     
     // Sync missed messages on initial mount (app launch)
-    // Try both notification center AND server sync for reliability
+    // Both functions now await hydration internally
     syncMissedNotifications();
     syncMessagesFromServer();
-    // Retry server sync after a delay (cold-start store hydration race)
-    setTimeout(() => syncMessagesFromServer(), 1500);
     
     // Also sync when app comes back to foreground
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
