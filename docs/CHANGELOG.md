@@ -6,6 +6,17 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 33] - 2026-02-24
+
+### Added
+- **TTS Auto-Play for Notification Messages** (Build #33) — Messages arriving via push notifications (morning briefs, reminders, meeting alerts) now trigger ElevenLabs TTS auto-play when voice is enabled. Previously only live chat responses would speak.
+
+### Fixed
+- **Push Message Sync via Cloudflare Tunnel** (Build #33) — Message sync now routes through `/patients/messages/*` path (already tunneled), fixing messages not appearing in app when notifications were tapped
+- **APNs Payload Size Cap** (Build #33) — `messageContent` in push data capped at 2000 chars to avoid APNs 4KB truncation; full messages preserved in server queue for reliable sync
+
+---
+
 ## [Unreleased]
 
 ### Fixed

@@ -87,6 +87,19 @@ curl -X POST http://localhost:18790/notify/brief \
 2. OpenClaw generates summary of the day
 3. Push notification sent with meeting count + first meeting
 
+## Message Sync via Push
+
+When a push notification carries a message (reminders, briefs, alerts):
+
+1. `messageContent` in push `data` is capped at **2000 chars** to stay within APNs 4KB limit
+2. Full messages are preserved in the server's pending-messages queue
+3. Sync routes through `/patients/messages/*` (Cloudflare-tunneled path)
+4. On tap, the app fetches the full message from the server queue if needed
+
+### TTS Auto-Play
+
+When voice is enabled, messages arriving via push notifications automatically trigger ElevenLabs TTS playback (same as live chat responses).
+
 ## Troubleshooting
 
 ### No notifications received
