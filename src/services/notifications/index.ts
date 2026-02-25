@@ -165,29 +165,21 @@ export function setupNotificationResponseHandler(
   return Notifications.addNotificationResponseReceivedListener((response) => {
     const data = response.notification.request.content.data as unknown as NotificationData;
     
-    switch (data.type) {
-      case 'meeting_reminder':
-        if (data.eventId) {
-          // Acknowledge the reminder
-          acknowledgeMeetingReminder(data.eventId);
-          onMeetingTap(data.eventId);
-        }
-        break;
-      case 'message':
-      case 'new_message':
-        if (data.messageId && data.messageContent) {
-          onMessageTap({
-            id: data.messageId,
-            content: data.messageContent,
-            timestamp: data.timestamp || new Date().toISOString(),
-          });
-        } else {
-          onMessageTap(null);
-        }
-        break;
-      case 'daily_brief':
-        onBriefTap();
-        break;
+    if (data.type === 'meeting_reminder') {
+      if (data.eventId) {
+        acknowledgeMeetingReminder(data.eventId);
+        onMeetingTap(data.eventId);
+      }
+    } else if (data.messageId && data.messageContent) {
+      // Any notification with messageId + messageContent → route to chat
+      onMessageTap({
+        id: data.messageId,
+        content: data.messageContent,
+        timestamp: data.timestamp || new Date().toISOString(),
+      });
+    } else {
+      // Fallback: still navigate to chat, server sync will pick up the message
+      onMessageTap(null);
     }
   });
 }

@@ -48,6 +48,10 @@ const secureStorage = {
   },
 };
 
+// Queue for messages that arrive before hydration completes
+let _preHydrationQueue: Message[] = [];
+let _hydrated = false;
+
 export const useChatStore = create<ChatStore>()(
   persist(
     (set) => ({
@@ -55,7 +59,14 @@ export const useChatStore = create<ChatStore>()(
       isConnected: false,
       avatarState: 'idle',
 
-      addMessage: (message) =>
+      addMessage: (message) => {
+        if (!_hydrated) {
+          // Store is still hydrating from SecureStore — queue the message
+          // so it doesn't get overwritten when hydration completes
+          console.log('[Chat] Store not hydrated yet, queuing message:', message.id);
+          _preHydrationQueue.push(message);
+          return;
+        }
         set((state) => {
           const newMessages = [...state.messages, message];
           // Trim to max persisted messages (keep most recent)
@@ -63,7 +74,8 @@ export const useChatStore = create<ChatStore>()(
             return { messages: newMessages.slice(-MAX_PERSISTED_MESSAGES) };
           }
           return { messages: newMessages };
-        }),
+        });
+      },
 
       updateMessage: (id, updates) =>
         set((state) => ({
@@ -85,6 +97,49 @@ export const useChatStore = create<ChatStore>()(
       partialize: (state) => ({
         messages: state.messages,
       }),
+      onRehydrateStorage: () => (state) => {
+        _hydrated = true;
+        // Flush any messages that arrived before hydration
+        if (_preHydrationQueue.length > 0 && state) {
+          console.log(`[Chat] Hydration complete, flushing ${_preHydrationQueue.length} queued messages`);
+          const currentMessages = state.messages || [];
+          const newMessages: Message[] = [];
+          for (const msg of _preHydrationQueue) {
+            const isDuplicate = currentMessages.some((m) => m.id === msg.id) ||
+                                newMessages.some((m) => m.id === msg.id);
+            if (!isDuplicate) {
+              newMessages.push(msg);
+            }
+          }
+          _preHydrationQueue = [];
+          if (newMessages.length > 0) {
+            useChatStore.setState((s) => ({
+              messages: [...s.messages, ...newMessages].slice(-MAX_PERSISTED_MESSAGES),
+            }));
+          }
+        } else {
+          _preHydrationQueue = [];
+        }
+      },
     }
   )
 );
+
+/**
+ * Wait for store hydration to complete.
+ * Use this before any notification sync that reads messages.
+ */
+export function waitForHydration(timeoutMs: number = 5000): Promise<void> {
+  if (_hydrated) return Promise.resolve();
+  return new Promise((resolve) => {
+    const start = Date.now();
+    const check = () => {
+      if (_hydrated || Date.now() - start > timeoutMs) {
+        resolve();
+      } else {
+        setTimeout(check, 50);
+      }
+    };
+    check();
+  });
+}

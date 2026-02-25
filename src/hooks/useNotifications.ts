@@ -20,7 +20,7 @@ import {
   dismissNotification,
   NotificationData,
 } from '../services/notifications';
-import { useChatStore } from '../stores/chatStore';
+import { useChatStore, waitForHydration } from '../stores/chatStore';
 import { useSettingsStore } from '../stores/settingsStore';
 
 /**
@@ -29,6 +29,8 @@ import { useSettingsStore } from '../stores/settingsStore';
  */
 async function syncMissedNotifications(retryCount: number = 0): Promise<number> {
   try {
+    // Wait for store hydration so we don't lose messages to rehydration overwrite
+    await waitForHydration();
     const delivered = await getDeliveredNotifications();
     console.log(`[Notifications] getPresentedNotificationsAsync returned ${delivered.length} notifications (retry: ${retryCount})`);
     
@@ -48,8 +50,8 @@ async function syncMissedNotifications(retryCount: number = 0): Promise<number> 
     for (const notification of delivered) {
       const data = notification.request.content.data as unknown as NotificationData;
       
-      // Only process message notifications with content
-      if (data?.type === 'message' && data.messageId && data.messageContent) {
+      // Process ANY notification with message content (not just type=message)
+      if (data?.messageId && data?.messageContent) {
         // Check for duplicates
         const isDuplicate = messages.some((msg) => msg.id === data.messageId);
         
@@ -94,6 +96,8 @@ async function syncMissedNotifications(retryCount: number = 0): Promise<number> 
  */
 async function syncMessagesFromServer(): Promise<number> {
   try {
+    // Wait for store hydration so we don't lose messages to rehydration overwrite
+    await waitForHydration();
     const { gatewayUrl, gatewayToken } = useSettingsStore.getState();
     
     if (!gatewayUrl || !gatewayToken) {
@@ -209,7 +213,7 @@ export function useNotifications() {
         const data = response.notification.request.content.data as unknown as NotificationData;
         console.log('[Notifications] Cold-start notification tap detected:', data?.type);
         
-        if ((data?.type === 'message' || data?.type === 'new_message') && data.messageId && data.messageContent) {
+        if (data?.messageId && data?.messageContent) {
           const { messages, addMessage } = useChatStore.getState();
           const isDuplicate = messages.some((msg) => msg.id === data.messageId);
           if (!isDuplicate) {
@@ -229,6 +233,8 @@ export function useNotifications() {
     // Try both notification center AND server sync for reliability
     syncMissedNotifications();
     syncMessagesFromServer();
+    // Retry server sync after a delay (cold-start store hydration race)
+    setTimeout(() => syncMessagesFromServer(), 1500);
     
     // Also sync when app comes back to foreground
     const appStateSubscription = AppState.addEventListener('change', (nextAppState) => {
@@ -245,8 +251,8 @@ export function useNotifications() {
       const data = notification.request.content.data as unknown as NotificationData;
       console.log('[Notifications] Foreground notification received:', data);
       
-      // If it's a message notification, add it to chat
-      if (data.type === 'message' && data.messageId && data.messageContent) {
+      // If notification has message content, add it to chat (any type)
+      if (data.messageId && data.messageContent) {
         const { messages, addMessage } = useChatStore.getState();
         
         // Check for duplicates
@@ -274,10 +280,11 @@ export function useNotifications() {
         // Navigate to home tab which shows calendar
         router.push('/');
       },
-      // Message tap - navigate to chat
+      // Message tap - navigate to chat + always server sync for reliability
       (messageData) => {
         console.log('Message notification tapped');
         
+        // Add from push payload immediately if available
         if (messageData) {
           const { messages, addMessage } = useChatStore.getState();
           const isDuplicate = messages.some((msg) => msg.id === messageData.id);
@@ -290,6 +297,11 @@ export function useNotifications() {
             });
           }
         }
+        
+        // Always sync from server on tap — this is the reliable path
+        // Small delay to ensure store is hydrated on cold start
+        setTimeout(() => syncMessagesFromServer(), 300);
+        
         router.push('/');
       },
       // Brief tap - navigate to home

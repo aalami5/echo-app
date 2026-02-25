@@ -531,9 +531,24 @@ app.post('/notify', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields: title, body' });
     }
     
-    // If this is a message notification with content, queue it for sync
-    if (data && data.type === 'message' && data.messageId && data.messageContent) {
-      queueMessage(data.messageId, data.messageContent, data.timestamp || new Date().toISOString());
+    // Queue ALL notifications as messages for reliable sync
+    // The push notification is just a signal; server queue is the source of truth
+    if (data) {
+      const messageId = data.messageId || `notify-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const messageContent = data.messageContent || body || title;
+      const timestamp = data.timestamp || new Date().toISOString();
+      
+      // Store the generated messageId back in data so the push payload includes it
+      data.messageId = messageId;
+      data.messageContent = messageContent;
+      if (!data.type) data.type = 'message';
+      
+      queueMessage(messageId, messageContent, timestamp);
+    } else {
+      // Even with no data object, queue the notification body
+      const messageId = `notify-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      queueMessage(messageId, body || title, new Date().toISOString());
+      req.body.data = { type: 'message', messageId, messageContent: body || title, timestamp: new Date().toISOString() };
     }
     
     // Cap messageContent in push data to avoid APNs 4KB payload limit
