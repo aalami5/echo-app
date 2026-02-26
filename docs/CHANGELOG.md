@@ -6,6 +6,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 34] - 2026-02-25
+
+### Fixed
+- **Notification→Chat Hydration Race** — All notification sync paths (cold-start tap, missed notification scan, server message sync) now await SecureStore hydration before processing, preventing messages from being overwritten by stale rehydrated state
+- **Universal Notification→Chat Handshake** — Server now queues every `/notify` call as a pending message (not just `type=message`); app accepts any notification type with `messageId`+`messageContent`; notification tap triggers server sync for reliable delivery. Fixes morning briefs and other non-message notifications not loading into chat when tapped
+- **Pre-Hydration Message Queue** — chatStore queues messages added during hydration and replays them after rehydration completes, closing the cold-start race window
+
+### Changed
+- `server/index.js` — All `/notify` calls now write to pending messages queue (server is source of truth)
+- `src/stores/chatStore.ts` — Added hydration-aware message queue with `onRehydrateStorage` hook
+- `src/services/notifications/index.ts` — Simplified routing; all notification taps with content go through message handler
+
+---
+
 ## [Build 33] - 2026-02-24
 
 ### Added

@@ -100,6 +100,13 @@ When a push notification carries a message (reminders, briefs, alerts):
 
 When voice is enabled, messages arriving via push notifications automatically trigger ElevenLabs TTS playback (same as live chat responses).
 
+### Hydration-Safe Delivery (Build 34)
+
+On cold start, notification handlers can fire before SecureStore rehydration completes. To prevent messages from being overwritten by stale state:
+1. All notification sync paths (`useNotifications`) await `chatStore._hydrated` before processing
+2. `chatStore` queues any messages added pre-hydration and replays them after rehydration
+3. Server queues **all** `/notify` calls (not just `type=message`) as pending messages — server queue is the source of truth
+
 ## Troubleshooting
 
 ### No notifications received

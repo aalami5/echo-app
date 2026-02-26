@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** February 16, 2026
+**Last Updated:** February 25, 2026
 
 ---
 
@@ -29,6 +29,10 @@ Manages conversation history with Echo.
 | `messages` | `Message[]` | ✅ | Chat history (max 100) |
 | `isConnected` | `boolean` | ❌ | Gateway connection status |
 | `avatarState` | `AvatarState` | ❌ | Current avatar animation state |
+| `_hydrated` | `boolean` | ❌ | Whether SecureStore rehydration is complete |
+| `_preHydrationQueue` | `Message[]` | ❌ | Messages queued before hydration finishes |
+
+**Hydration Safety:** Messages added before rehydration completes are queued in `_preHydrationQueue` and replayed via `onRehydrateStorage`. This prevents cold-start notification messages from being overwritten by stale persisted state.
 
 **Actions:**
 
