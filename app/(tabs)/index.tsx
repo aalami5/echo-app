@@ -23,6 +23,7 @@ import { useNetworkStore } from '../../src/stores/networkStore';
 import { useCalendar } from '../../src/hooks/useCalendar';
 import { Avatar } from '../../src/components/Avatar';
 import { ChatMessage } from '../../src/components/ChatMessage';
+import { MessageDetailSheet } from '../../src/components/MessageDetailSheet';
 import { ImagePickerModal } from '../../src/components/ImagePicker';
 import { NextMeeting } from '../../src/components/NextMeeting';
 import { NetworkIndicator } from '../../src/components/NetworkIndicator';
@@ -44,6 +45,7 @@ export default function ChatScreen() {
   const [showTextInput, setShowTextInput] = useState(false);
   const [textMessage, setTextMessage] = useState('');
   const [showImagePicker, setShowImagePicker] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
   
   const { messages, avatarState, isConnected: storeConnected, setAvatarState, addMessage, updateMessage, setConnected } = useChatStore();
   const { accessToken } = useAuthStore();
@@ -450,11 +452,16 @@ export default function ChatScreen() {
     }
   }, [voiceConfigured, speak]);
 
+  const handleMessageLongPress = useCallback((message: Message) => {
+    setSelectedMessage(message);
+  }, []);
+
   const renderMessage = ({ item }: { item: Message }) => (
     <ChatMessage 
       message={item} 
       onRetry={handleRetryMessage} 
       onSpeak={handleSpeakMessage}
+      onLongPress={handleMessageLongPress}
     />
   );
 
@@ -616,6 +623,14 @@ export default function ChatScreen() {
           onCancel={() => setShowImagePicker(false)}
         />
       )}
+
+      {/* Message Detail Sheet - long press to select text */}
+      <MessageDetailSheet
+        message={selectedMessage}
+        visible={selectedMessage !== null}
+        onClose={() => setSelectedMessage(null)}
+        onSpeak={handleSpeakMessage}
+      />
     </View>
   );
 }

@@ -1,7 +1,8 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, Image, ActivityIndicator, TouchableOpacity, Animated, Easing } from 'react-native';
+import { StyleSheet, View, Text, Image, ActivityIndicator, TouchableOpacity, Animated, Easing, Pressable } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
 import type { Message, MessageStatus } from '../types';
 import { colors, spacing, borderRadius } from '../constants/theme';
 import { useScaledTypography } from '../hooks/useScaledTypography';
@@ -10,6 +11,7 @@ interface ChatMessageProps {
   message: Message;
   onRetry?: (messageId: string) => void;
   onSpeak?: (content: string) => void;
+  onLongPress?: (message: Message) => void;
 }
 
 function MessageStatusIndicator({ 
@@ -50,9 +52,14 @@ function MessageStatusIndicator({
   }
 }
 
-export function ChatMessage({ message, onRetry, onSpeak }: ChatMessageProps) {
+export function ChatMessage({ message, onRetry, onSpeak, onLongPress }: ChatMessageProps) {
   const isFromUser = message.role === 'user';
   const typography = useScaledTypography();
+
+  const handleLongPress = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    onLongPress?.(message);
+  };
 
   // Dynamic text styles based on user's text scale preference
   const textStyle = {
@@ -80,11 +87,15 @@ export function ChatMessage({ message, onRetry, onSpeak }: ChatMessageProps) {
 
   return (
     <View style={[styles.container, isFromUser ? styles.fromUser : styles.fromEcho]}>
-      <View style={[
-        styles.bubble,
-        isFromUser ? styles.bubbleFromUser : styles.bubbleFromEcho,
-        message.status === 'failed' && styles.bubbleFailed,
-      ]}>
+      <Pressable
+        onLongPress={handleLongPress}
+        delayLongPress={400}
+        style={[
+          styles.bubble,
+          isFromUser ? styles.bubbleFromUser : styles.bubbleFromEcho,
+          message.status === 'failed' && styles.bubbleFailed,
+        ]}
+      >
         {isFromUser ? (
           <LinearGradient
             colors={message.status === 'failed' ? ['#3D1A1A', '#2D1515'] : ['#1E3A5F', '#162D4D']}
@@ -110,7 +121,7 @@ export function ChatMessage({ message, onRetry, onSpeak }: ChatMessageProps) {
             )}
           </View>
         )}
-      </View>
+      </Pressable>
       <View style={[styles.metaRow, isFromUser && styles.metaRowRight]}>
         {!isFromUser && onSpeak && (
           <TouchableOpacity
