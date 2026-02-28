@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** February 25, 2026
+**Last Updated:** February 27, 2026
 
 ---
 
@@ -333,6 +333,31 @@ Caches calendar events fetched from Google Calendar.
 | `lastFetch` | `number \| null` | ❌ | Last refresh timestamp |
 
 **Note:** Events are fetched on-demand and not persisted. On rehydration, if the cache is from a different day, events are cleared and a fresh fetch is triggered to prevent stale/ghost events.
+
+---
+
+### dictationStore
+
+Manages OR dictation sessions and the learning system for operative report generation.
+
+**File:** `src/stores/dictationStore.ts`
+
+**State:**
+
+| Field | Type | Persisted | Description |
+|-------|------|-----------|-------------|
+| `transcriptParts` | `TranscriptPart[]` | ❌ | Current session transcript (voice/text/image parts) |
+| `generatedReport` | `string \| null` | ❌ | AI-generated operative report |
+| `isGenerating` | `boolean` | ❌ | Report generation status |
+| `currentProcedureType` | `string \| null` | ❌ | Detected procedure type |
+| `editingCorrections` | `string \| null` | ❌ | Current edit-in-progress text |
+| `corrections` | `CorrectionEntry[]` | ✅ | Saved corrections for learning |
+| `stylePreferences` | `StylePreference[]` | ✅ | Saved style preferences |
+| `savedExamples` | `SavedExample[]` | ✅ | Example reports by procedure type |
+
+**Key Actions:** `addTranscriptPart`, `clearSession`, `setGeneratedReport`, `addCorrection`, `addStylePreference`, `saveAsExample`, `loadPersistedData`
+
+**Note:** Session data (transcript, report) is ephemeral. Learning data (corrections, style preferences, saved examples) is persisted to SecureStore and loaded on init. The learning system feeds prior corrections and preferences into the system prompt for improved future reports.
 
 ---
 

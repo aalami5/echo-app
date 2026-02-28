@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** February 18, 2026
+**Last Updated:** February 27, 2026
 
 ---
 
@@ -329,6 +329,24 @@ On-call patient tracking with:
 - Image scanning for patient info
 - Search functionality
 - CSV export
+
+---
+
+### Dictation Screen
+
+**File:** `app/(tabs)/dictation.tsx`
+
+OR operative report generation with:
+- Voice recording (Whisper transcription)
+- Text input for notes
+- Photo capture for surgical images
+- AI-generated operative reports (ICD-10, CPT codes, work RVUs)
+- Report actions: email, read-back (cloned voice TTS), copy, edit & regenerate
+- Learning system: corrections, style preferences, example reports
+- Session management (clear/new)
+
+**Service:** `src/services/dictationService.ts`
+**Store:** `src/stores/dictationStore.ts`
 
 ---
 

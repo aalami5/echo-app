@@ -6,6 +6,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 35] - 2026-02-27
+
+### Added
+- **OR Dictation Tab** — New "Dictate" tab for generating structured operative reports from voice, text, and photo input
+  - Voice recording via Whisper transcription
+  - AI-generated operative reports with ICD-10 diagnostic codes, CPT procedure codes, and work RVUs
+  - Email, read-back (Oliver's cloned ElevenLabs voice), copy, edit & regenerate actions
+  - Learning system: saves corrections, style preferences, and example reports for improved future output
+  - New `dictationStore` (Zustand + SecureStore) for session and learning data persistence
+  - New `dictationService` for report generation and actions
+  - Matches existing dark navy theme with cyan accents
+
+---
+
 ## [Build 34] - 2026-02-25
 
 ### Fixed
