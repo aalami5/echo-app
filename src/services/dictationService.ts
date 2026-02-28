@@ -30,7 +30,7 @@ STRICT TEMPLATE (use this exact structure for every operative report). Each head
 2. (pulled from the transcript) (CPT XXXXX)
 
 **Surgeon:** Oliver Aalami, MD
-**Assistant:** (list this section only if mentioned in transcript)
+**Assistant:** (if an assistant is mentioned in the transcript, list them here; if NO assistant is mentioned, put "none")
 
 **Anesthesia:** (pulled from the transcript)
 

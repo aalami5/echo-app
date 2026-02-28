@@ -10,7 +10,7 @@
  * - Web search for CPT/ICD-10 codes via Gateway
  */
 
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -62,7 +62,9 @@ export default function DictationScreen() {
   const [newProcName, setNewProcName] = useState('');
   const [newProcCategory, setNewProcCategory] = useState<ProcedureCategory>('other');
   const [editingCustomProc, setEditingCustomProc] = useState<CustomProcedure | null>(null);
+  const [emailSent, setEmailSent] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const {
     transcriptParts,
@@ -86,10 +88,19 @@ export default function DictationScreen() {
   const { gatewayUrl, gatewayToken, openaiApiKey, elevenlabsApiKey } = useSettingsStore();
 
   // Sync screen state with store
-  React.useEffect(() => {
+  useEffect(() => {
     if (isGenerating) setScreenState('generating');
     else if (generatedReport) setScreenState('review');
   }, [isGenerating, generatedReport]);
+
+  // Auto-scroll to bottom when transcript parts are added
+  useEffect(() => {
+    if (transcriptParts.length > 0 && screenState === 'input') {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToEnd({ animated: true });
+      }, 200);
+    }
+  }, [transcriptParts.length, screenState]);
 
   const getGateway = useCallback(() => {
     if (!gatewayUrl || !gatewayToken) {
@@ -200,12 +211,12 @@ export default function DictationScreen() {
   // ─── Report Actions ───
   const handleEmail = async () => {
     const gw = getGateway();
-    if (!gw || !generatedReport) return;
+    if (!gw || !generatedReport || emailSent) return;
     try {
       const msg = buildEmailMessage(generatedReport, selectedProcedures);
       await gw.sendMessage(msg);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Sent', 'Email request sent to Echo.');
+      setEmailSent(true);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to send email.');
     }
@@ -271,6 +282,7 @@ export default function DictationScreen() {
           clearSession();
           setScreenState('input');
           setShowTextInput(false);
+          setEmailSent(false);
         },
       },
     ]);
@@ -487,7 +499,7 @@ export default function DictationScreen() {
 
         {/* ─── INPUT STATE ─── */}
         {screenState === 'input' && (
-          <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
+          <ScrollView ref={scrollViewRef} style={styles.flex} contentContainerStyle={styles.scrollContent}>
             {transcriptParts.length === 0 && (
               <View style={styles.emptyState}>
                 <Ionicons name="mic-outline" size={48} color={colors.textTertiary} />
@@ -518,6 +530,14 @@ export default function DictationScreen() {
               </View>
             ))}
 
+            {/* Generate button — directly after transcript entries */}
+            {transcriptParts.length > 0 && (
+              <TouchableOpacity style={styles.generateButton} onPress={handleGenerate}>
+                <Ionicons name="document-text" size={20} color={colors.textInverse} />
+                <Text style={styles.generateButtonText}>Generate Report</Text>
+              </TouchableOpacity>
+            )}
+
             {/* Procedure tags */}
             {renderProcedureTags()}
 
@@ -528,14 +548,6 @@ export default function DictationScreen() {
                   Selected: {selectedProcedures.join(', ')}
                 </Text>
               </View>
-            )}
-
-            {/* Generate button */}
-            {transcriptParts.length > 0 && (
-              <TouchableOpacity style={styles.generateButton} onPress={handleGenerate}>
-                <Ionicons name="document-text" size={20} color={colors.textInverse} />
-                <Text style={styles.generateButtonText}>Generate Report</Text>
-              </TouchableOpacity>
             )}
 
             {/* Text input area */}
@@ -580,9 +592,19 @@ export default function DictationScreen() {
             </View>
 
             <View style={styles.actionsGrid}>
-              <TouchableOpacity style={styles.actionButton} onPress={handleEmail}>
-                <Ionicons name="mail" size={22} color={colors.primary} />
-                <Text style={styles.actionLabel}>Email</Text>
+              <TouchableOpacity
+                style={[styles.actionButton, emailSent && styles.actionButtonSent]}
+                onPress={handleEmail}
+                disabled={emailSent}
+              >
+                <Ionicons
+                  name={emailSent ? 'checkmark-circle' : 'mail'}
+                  size={22}
+                  color={emailSent ? '#22c55e' : colors.primary}
+                />
+                <Text style={[styles.actionLabel, emailSent && styles.actionLabelSent]}>
+                  {emailSent ? 'Sent ✓' : 'Email'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton} onPress={handleReadBack}>
                 <Ionicons name="volume-high" size={22} color={colors.primary} />
@@ -934,6 +956,12 @@ const styles = StyleSheet.create({
     fontSize: typography.xs,
     color: colors.textSecondary,
     marginTop: spacing.xs,
+  },
+  actionButtonSent: {
+    opacity: 0.6,
+  },
+  actionLabelSent: {
+    color: '#22c55e',
   },
   saveExampleButton: {
     flexDirection: 'row',
