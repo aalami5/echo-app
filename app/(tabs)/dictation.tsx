@@ -93,14 +93,7 @@ export default function DictationScreen() {
     else if (generatedReport) setScreenState('review');
   }, [isGenerating, generatedReport]);
 
-  // Auto-scroll to bottom when transcript parts are added
-  useEffect(() => {
-    if (transcriptParts.length > 0 && screenState === 'input') {
-      setTimeout(() => {
-        scrollViewRef.current?.scrollToEnd({ animated: true });
-      }, 200);
-    }
-  }, [transcriptParts.length, screenState]);
+  // Auto-scroll removed — user prefers staying at top after recording
 
   const getGateway = useCallback(() => {
     if (!gatewayUrl || !gatewayToken) {
@@ -501,13 +494,13 @@ export default function DictationScreen() {
         {screenState === 'input' && (
           <ScrollView ref={scrollViewRef} style={styles.flex} contentContainerStyle={styles.scrollContent}>
             {transcriptParts.length === 0 && (
-              <View style={styles.emptyState}>
-                <Ionicons name="mic-outline" size={48} color={colors.textTertiary} />
+              <TouchableOpacity style={styles.emptyState} onPress={startRecording} activeOpacity={0.7}>
+                <Ionicons name="mic-outline" size={48} color="#14b8a6" />
                 <Text style={styles.emptyText}>Tap the mic to start dictating</Text>
                 <Text style={styles.emptySubtext}>
                   Mix voice, text, and photos to build your transcript
                 </Text>
-              </View>
+              </TouchableOpacity>
             )}
 
             {transcriptParts.map((part) => (
@@ -603,7 +596,7 @@ export default function DictationScreen() {
                   color={emailSent ? '#22c55e' : colors.primary}
                 />
                 <Text style={[styles.actionLabel, emailSent && styles.actionLabelSent]}>
-                  {emailSent ? 'Sent ✓' : 'Email'}
+                  {emailSent ? 'Email Sent' : 'Email'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton} onPress={handleReadBack}>
@@ -740,7 +733,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: spacing.lg,
-    paddingBottom: 120,
+    paddingBottom: 220,
   },
   emptyState: {
     alignItems: 'center',
