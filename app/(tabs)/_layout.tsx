@@ -53,6 +53,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="dictation"
+        options={{
+          title: 'Dictate',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon 
+              name={focused ? 'mic' : 'mic-outline'} 
+              color={color}
+              focused={focused}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="today"
         options={{
           title: 'Today',
