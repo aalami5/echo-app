@@ -145,7 +145,13 @@ export default function ChatScreen() {
         // Live chat messages have status transitions; notification messages don't
         if (!latestMessage.status) {
           console.log('[Chat] Auto-playing TTS for notification message:', latestMessage.id);
-          speak(latestMessage.content);
+          speak(latestMessage.content).catch(() => {
+            addToast({
+              message: '🔇 Voice failed — check ElevenLabs API key in Settings',
+              type: 'warning',
+              duration: 4000,
+            });
+          });
         }
       }
     }
@@ -296,6 +302,11 @@ export default function ChatScreen() {
           return;
         } catch (e) {
           console.error('[Chat] TTS error:', e);
+          addToast({
+            message: '🔇 Voice failed — check ElevenLabs API key in Settings',
+            type: 'warning',
+            duration: 4000,
+          });
         }
       }
     } else {
@@ -423,6 +434,11 @@ export default function ChatScreen() {
             await speak(response);
           } catch (e) {
             console.error('[Chat] TTS error:', e);
+            addToast({
+              message: '🔇 Voice failed — check ElevenLabs API key in Settings',
+              type: 'warning',
+              duration: 4000,
+            });
           }
         }
       } else {
@@ -448,9 +464,15 @@ export default function ChatScreen() {
 
   const handleSpeakMessage = useCallback((content: string) => {
     if (voiceConfigured && content) {
-      speak(content);
+      speak(content).catch(() => {
+        addToast({
+          message: '🔇 Voice failed — check ElevenLabs API key in Settings',
+          type: 'warning',
+          duration: 4000,
+        });
+      });
     }
-  }, [voiceConfigured, speak]);
+  }, [voiceConfigured, speak, addToast]);
 
   const handleMessageLongPress = useCallback((message: Message) => {
     setSelectedMessage(message);

@@ -311,7 +311,7 @@ export function useVoiceChat(): UseVoiceChatResult {
     if (!ttsService.current) {
       console.log('[VoiceChat] TTS not configured');
       setState(s => ({ ...s, error: 'ElevenLabs not configured' }));
-      return;
+      throw new Error('ElevenLabs not configured');
     }
 
     // Set loading state while we fetch audio from ElevenLabs
@@ -337,6 +337,7 @@ export function useVoiceChat(): UseVoiceChatResult {
     } catch (error) {
       console.error('[VoiceChat] Speak error:', error);
       setState(s => ({ ...s, isLoadingAudio: false, isSpeaking: false, error: 'Failed to speak' }));
+      throw error; // Re-throw so callers can show toast
     }
   }, []);
 
