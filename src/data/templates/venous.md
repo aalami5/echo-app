@@ -44,6 +44,134 @@ Patient transferred to recovery in stable condition
 
 ---
 
+### Sample Report 2 - GSV Closure with Venaseal and Sclerotherapy
+
+**PREOPERATIVE DIAGNOSIS:**
+Symptomatic RLE GSV Reflux
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided right distal calf great saphenous vein access
+2. Closure of right GSV from saphenofemoral junction to distal calves with Venaseal glue
+3. Sclerotherapy of large RLE calf tributaries with 0.5% Asclera
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** MAC + local
+
+**ESTIMATED BLOOD LOSS:** Minimal
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+
+**FINDINGS:**
+R saphenofemoral junction was noted to be fully compressible with no intrinsic echoes.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of managed anesthesia care, the right lower extremity was prepped and draped in the usual fashion. We evaluated the right great saphenous veins from the saphenofemoral junction all the way down to the ankle and noted that the veins were fully compressible with no intrinsic echoes. The great saphenous vein was noted to be quite prominent.
+
+We then accessed the great saphenous veins just above the ankle, using ultrasound guidance. We advanced the access needle with a micropuncture system and then advanced the micropuncture wire under ultrasound guidance, followed by placing our 7 French sheath. We then advanced our included venous wire, which was a 0.035 wire, all the way past the saphenofemoral junction and placed our guide catheters, all under ultrasound guidance. We then advanced our primed venous infusion catheter, attached them to the infusion guns, and deployed the Venaseal venous glue starting from 5 cm below the saphenofemoral junction all the way to the sheath exit site, while ensuring we were still in the vein using ultrasound guidance. We used the standard technique for the Venaseal for infusion of the string of beads of glue.
+
+Next we foamed the 0.5% Asclera using the Tessari technique and accessed a large tributary in the calf under ultrasound guidance and injected 2ml of foamed 0.5% Asclera under ultrasound guidance. We could visualize the foam going through the veins. We massaged this area after removing our 25 gauge butterfly needle.
+
+After completion, we confirmed that the right common femoral vein and the saphenofemoral junction was fully compressible with no intrinsic echoes. We held manual compression over the puncture site and dressed the puncture site with steri-strips, followed by gauze, small Tegaderm, then Kerlex gauze, followed by an Ace bandage.
+
+The patient tolerated the procedure well and was brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+### Sample Report 3 - GSV Closure with Venaseal and Microphlebectomies
+
+**PREOPERATIVE DIAGNOSIS:**
+Symptomatic RLE GSV Reflux
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided right distal thigh great saphenous vein access
+2. Closure of right GSV from saphenofemoral junction to distal calves with Venaseal glue
+3. Microphlebectomy of R calf incompetent varicosities / tributary veins x 7
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** MAC + local
+
+**ESTIMATED BLOOD LOSS:** Minimal
+**FLUIDS:** None
+**SPECIMENS:** Vein segments which were discarded
+**DRAINS:** None
+**COMPLICATIONS:** None
+
+**FINDINGS:**
+R saphenofemoral junction was noted to be fully compressible with no intrinsic echoes.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of managed anesthesia care, the right lower extremity was prepped and draped in the usual fashion. We evaluated the right great saphenous veins from the saphenofemoral junction all the way down to the ankle and noted that the vein to be fully compressible with no intrinsic echoes. The great saphenous vein was noted to be quite prominent.
+
+We then accessed the great saphenous veins just above the knee, using ultrasound guidance. We advanced the access needle with a micropuncture system and then advanced the micropuncture wire under ultrasound guidance, followed by placing our 7 French sheath. We then advanced our included venous wire, which was a 0.035 wire, all the way past the saphenofemoral junction and placed our guide catheters, all under ultrasound guidance. We then advanced our primed venous infusion catheter, attached them to the infusion guns, and deployed the Venaseal venous glue starting from 5 cm below the saphenofemoral junction all the way to the sheath exit site, while ensuring we were still in the vein using ultrasound guidance. We used the standard technique for the Venaseal for infusion of the string of beads of glue.
+
+Next we infiltrated the previously marked sites where the patient had large incompetent varicosities / tributaries. We then used an 11 blade to make a nick in the skin then a vein hook to pull the tributary out and mosquito clamps to mobilize the vein segment before tying off each end with 3-0 silk sutures and resecting the vein segment which had been pulled out. Each incision was closed with a 5-0 monocryl suture and we placed steri-strips on the skin.
+
+After completion, we confirmed that the common femoral vein and the saphenofemoral junction was fully compressible with no intrinsic echoes. We dressed the foot/calf and thigh with Kerlex gauze, followed by an Ace bandage.
+
+The patient tolerated the procedure well and was brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+### Sample Report 4 - GSV Closure with RFA and Microphlebectomies
+
+**PREOPERATIVE DIAGNOSIS:**
+Symptomatic LLE GSV Reflux
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided left distal calf great saphenous vein access
+2. Closure of left GSV from saphenofemoral junction to distal calves with Medtronic Closure Fast RFA catheter
+3. Microphlebectomy of L calf incompetent varicosities / tributary veins x 10
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** MAC + local
+
+**ESTIMATED BLOOD LOSS:** Minimal
+**FLUIDS:** None
+**SPECIMENS:** Vein segments which were discarded
+**DRAINS:** None
+**COMPLICATIONS:** None
+
+**FINDINGS:**
+L saphenofemoral junction was noted to be fully compressible with no intrinsic echoes.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of managed anesthesia care, the left lower extremity was prepped and draped in the usual fashion. We evaluated the left great saphenous veins from the saphenofemoral junction all the way down to the ankle and noted that the vein to be fully compressible with no intrinsic echoes. The great saphenous vein was noted to be quite prominent.
+
+We then accessed the great saphenous veins just below the knee, using ultrasound guidance. We advanced the access needle with a micropuncture system and then advanced the micropuncture wire under ultrasound guidance, followed by placing our 7 French sheath. We then advanced our included venous wire, which was a 0.035 wire, all the way past the saphenofemoral junction and advanced our RFA catheter to the saphenofemoral junction.
+
+We then infiltrated tumescence under ultrasound guidance around the GSV from access site to the saphenofemoral junction. Next we initiated the RFA via the catheter using the standard protocol from 2cm below the saphenofemoral junction to the sheath exit site.
+
+Next we infiltrated the previously marked sites where the patient had large incompetent varicosities / tributaries. We then used an 11 blade to make a nick in the skin then a vein hook to pull the tributary out and mosquito clamps to mobilize the vein segment before tying off each end with 3-0 silk sutures and resecting the vein segment which had been pulled out. Each incision was closed with a 5-0 monocryl suture and we placed steri-strips on the skin.
+
+After completion, we confirmed that the common femoral vein and the saphenofemoral junction was fully compressible with no intrinsic echoes. We dressed the foot/calf and thigh with Kerlex gauze, followed by an Ace bandage.
+
+The patient tolerated the procedure well and was brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
 ## Pulmonary Embolism Thrombectomy
 
 ### Sample Report 1

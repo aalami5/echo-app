@@ -243,6 +243,428 @@ Patient transferred to recovery in stable condition
 
 ---
 
+## AV Fistula Aneurysm Excision and Revision
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+1. LUE AVF aneurysm
+2. S/P Kidney transplant
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+LUE AV aneurysm excision and ligation
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** GETA
+
+**ESTIMATED BLOOD LOSS:** 25ml
+**FLUIDS:** None
+**SPECIMENS:** vein aneurysm which was discarded
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Aneurysmal segment was resected. Palpable radial pulse at the wrist at the end of the procedure.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of general anesthesia, the patient's left upper extremity was prepped and draped in the usual fashion. We made an elliptical incision around the two aneurysmal segments of the left upper extremity AV fistula after infiltrating with 1% lidocaine plain mixed with Marcaine.
+
+We used electrocautery to dissect down through the dermis. Of note, because the patient had an active patent fistula, the veins were pressurized, and we had to take extra special care to maintain hemostasis. We used a combination of Metzenbaum scissors and electrocautery to mobilize this segment of the aneurysmal left upper extremity AV fistula. Once we had circumferential control, we lifted the central segment and mobilized the distal and proximal ends. All side branches were doubly ligated with 2-0 silk sutures before being transected.
+
+We were then able to mobilize both the proximal and distal ends. We clamped these ends with profunda clamps and then used 5-0 Prolene sutures in a Blaylock fashion to oversew the stumps. We then removed the clamps to confirm hemostasis and transected the aneurysmal segment, dissecting it completely both proximally and distally.
+
+We reapproximated the skin edges after obtaining hemostasis with 2-0 Vicryl sutures in the deep subcutaneous space, followed by 3-0 Vicryl in the deep dermal space and 4-0 Vicryl in the subcuticular running fashion. We used Steri-Strips on the skin with mast and dressed the wound with 4x4 gauze and acrylic gauze.
+
+The patient tolerated the procedure well and was brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## Infected AV Fistula Ligation and Exploration
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+1. Infected RUE AV Fistula ligation wound
+2. LUE AV Fistula pseudoaneurysm
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+LUE AV fistula ligation wound exploration
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** General (LMA)
+
+**ESTIMATED BLOOD LOSS:** 25ml
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Phlegmon, likely infected, around the arterial anastomotic stump which had been ligated.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of LMA anesthesia, the patient's right upper extremity was prepped and draped in the usual fashion. A tourniquet was placed around the proximal upper arm on the right. We started with a longitudinal incision over the inflamed area extending proximally and distally in the distal upper arm, just above the elbow. A 15 blade was used, and electrocautery was employed to dissect down to the level of the fascia.
+
+We first identified the brachial artery proximal to the forearm and obtained control of this using Metzenbaum scissors and doubly looped vessel loops. We then exposed the brachial artery at the elbow distal to the phlegmon and gained control of this with doubly looped vessel loops as well.
+
+Next, we administered 5000 units of heparin and dissected off the phlegmon.
+
+The patient had a nice radial pulse as well as a nice signal at the wrist after completion. The wound was closed in two layers, first with 3-0 silk followed by 4-0 monocryl in the subcuticular layer.
+
+The patient was extubated and brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## AV Graft Declotting / Thrombectomy
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+1. ESRD
+2. Clotted LUE AV graft
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided access of LUE AVG in arterial and venous directions
+2. Mechanical thrombectomy and chemical thrombolysis of LUE AVG
+3. Balloon angioplasty of arterial (5mmx20mm mustang balloon) and venous anastomosis (7mmx40mm mustang balloon)
+4. LUE AVG angiogram
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local + sedation
+
+**ESTIMATED BLOOD LOSS:** 5 mL
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Clotted graft with venous outflow stenosis noted. Good flow with palpable thrill post-procedure.
+
+**DESCRIPTION OF PROCEDURE:**
+After the LUE was prepped and draped in the usual fashion ultrasound evaluation of the LUE AVG showed intrinsic echoes within the AVG with no color filling. We accessed the venous direction first in the juxta-anastomotic segment after infiltration with 1% lidocaine plain using ultrasound guidance with a micropuncture wire and then advanced a micropuncture wire and placed our micropuncture sheath. Next we advanced a Bentson wire to the venous anastomosis and exchanged for a short 6Fr sheath. Next we selected for the L subclavian vein through a Kumpe catheter with a glide wire. Central venogram confirmed patent subclavian vein and a Bentson wire was placed again. We then performed mechanical thrombectomy using a 6Fr Angiojet after infiltration of 2mg of TPA through our KMP catheter.
+
+Next we accessed the AVG in the arterial direction using a similar approach and placed our short 6Fr sheath. A KMP catheter and glide wire were used to select for the proximal brachial artery. An arterial angiogram showed a patent brachial artery with an occluded LUE AVG. Next we infiltrated the arterial segment of the AVG with 2mg of TPA and performed mechanical thrombectomy using our 6Fr Angiojet. Next we angioplastied the arterial anastomosis with a 5mmx20mm Mustang balloon. An arterial angiogram from the brachial artery showed the graft to be patent with brisk flow. We removed the sheaths after having placed 4-0 Monocryl u-stitches and held manual compression. Both puncture sites were dressed.
+
+The patient tolerated the procedure well and returned to the recovery room with vital signs stable. The AVG may be accessed for dialysis.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## Temporary to Tunneled Dialysis Catheter Exchange
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+Acute renal failure
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Removal of R internal jugular temporary dialysis catheter placement
+2. Placement of a Right internal jugular tunneled dialysis catheter (19 cm Bard)
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local + sedation
+
+**ESTIMATED BLOOD LOSS:** 5 mL
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Both ports withdrew blood easily. Tip of the catheter was in the superior vena cava.
+
+**DESCRIPTION OF PROCEDURE:**
+After the right neck was prepped and draped in the usual fashion 1% lidocaine plain was infiltrated at the planned site of catheter tunneling and around the current indwelling temporary dialysis catheter. A short stiff Amplatz wire was placed into the indwelling catheter under fluoroscopic guidance. The tip was noted to be in the inferior vena cava. The old temporary catheter was removed and the larger of the included dilators was placed to plug the tract. A nick was made in the skin with an 11 blade at the wire entrance site and at the planned tunneling catheter entrance site. We then infiltrated the tunneling tract from two fingerbreadths below the mid-clavicular line to the neck wire access site in a curvi-linear fashion.
+
+The planned tunneling tract was dilated with a mosquito clamp. Next we tunneled the catheter with the included tunneling device from the chest incision to the neck incision.
+
+Next the included two dilators were used to dilate the tract into the internal jugular vein using fluoroscopic guidance up to the peel-away sheath. The inner dilator and wire were removed and the tip of the tunneled catheter was advanced into the SVC up to the right atrium using fluoroscopic guidance. The catheter was not kinked. Both ports withdrew blood easily and were flushed first with normal saline followed by 1,000 units/ml of Heparin. Both ports were capped. A biopatch was placed around the catheter exit site and the catheter was secured with two interrupted 3-0 nylon sutures. The neck incision was closed with two interrupted 3-0 monocryl sutures and the sites were dressed with gauze and tegaderm.
+
+The patient tolerated the procedure well and returned to the recovery room with vital signs stable.
+
+This tunneled dialysis catheter is ok to be used for dialysis.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## Temporary Dialysis Catheter Placement
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+Acute renal failure
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided R CFV access
+2. R CFV 30cm Bard Trialysis catheter placement
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local
+
+**ESTIMATED BLOOD LOSS:** Minimal
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+All ports withdrew blood easily and were flushed with normal saline.
+
+**DESCRIPTION OF PROCEDURE:**
+After the right groin was prepped and draped ultrasound evaluation of the R CFV showed the vein to be fully compressible with no intrinsic echoes. 1% lidocaine plain was infiltrated at the planned site of vein access and an 18 gauge needle was used to access the right common femoral vein using ultrasound guidance. The j-wire was advanced into the femoral vein and a nick was made in the skin with an 11 blade. Next the included two dilators were used to dilate the tract into the femoral vein and the flushed 30cm Bard trialysis catheter was then advanced to the hub. All ports withdrew blood easily and were flushed with normal saline. The catheter was secured with included nylon sutures and dressed.
+
+This temporary dialysis catheter is ready for dialysis.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## Tunneled Dialysis Catheter Removal
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+End-stage renal disease with indwelling tunneled hemodialysis catheter (N18.6, Z99.2, Z45.2)
+
+**POSTOPERATIVE DIAGNOSIS:**
+End-stage renal disease with indwelling tunneled hemodialysis catheter (N18.6, Z99.2, Z45.2)
+
+**PROCEDURE PERFORMED:**
+Removal of tunneled hemodialysis catheter, left internal jugular vein—without subcutaneous port or pump (CPT 36589)
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local infiltration with 1% Xylocaine with epinephrine
+
+**ESTIMATED BLOOD LOSS:** 2 ml
+**FLUIDS:** None
+**SPECIMENS:** Tunneled hemodialysis catheter (discarded)
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** No foley
+
+**FINDINGS:**
+Entire left internal jugular tunneled hemodialysis catheter removed intact after freeing and mobilizing the antimicrobial cuff; no retained fragments; hemostasis achieved; no hematoma or air embolism observed.
+
+**INDICATIONS:**
+End-stage renal disease with an indwelling tunneled hemodialysis catheter requiring removal.
+
+**DESCRIPTION OF PROCEDURE:**
+After informed consent, the patient was positioned supine. The left neck and upper chest were prepped and draped in the usual sterile fashion. Local anesthesia was achieved with infiltration of 1% Xylocaine with epinephrine at the cuff site. A small skin incision was made over the palpable antimicrobial cuff. Using a Kelly clamp and #15 blade, the fibrous capsule surrounding the cuff was carefully divided, and the cuff was circumferentially mobilized from the subcutaneous tunnel. Once completely freed, gentle traction allowed removal of the catheter in its entirety. Manual compression was held at the left internal jugular venotomy site for approximately 10 minutes until hemostasis was secured. The cuff incision was approximated with adhesive strips, and a sterile occlusive dressing was applied over the neck and chest exit site. The patient was observed for an additional 10 minutes without bleeding or hemodynamic instability and was discharged home in stable condition.
+
+**DISPOSITION:**
+Patient discharged home in stable condition
+
+---
+
+## Femoral Temporary Dialysis Catheter Placement
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+Acute renal failure
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided R Common Femoral Vein access
+2. R Common Femoral Vein 30 cm Bard Trialysis catheter placement
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local
+
+**ESTIMATED BLOOD LOSS:** Minimal
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+All ports withdrew blood easily and were flushed with normal saline.
+
+**DESCRIPTION OF PROCEDURE:**
+After the right groin was prepped and draped ultrasound evaluation of the R common femoral vein showed the vein to be fully compressible with no intrinsic echoes. 1% lidocaine plain was infiltrated at the planned site of vein access and a micropuncture needle was used to access the right common femoral vein using ultrasound guidance. After placement of the micropuncture sheath over the micropuncture wire, a j-wire was advanced into the vein at bedside and a nick was made in the skin with an 11 blade. Next the included two dilators were used to dilate the tract into the vein and the flushed Bard trialysis catheter was then advanced to the hub (30cm). All ports withdrew blood easily and were flushed with normal saline. The catheter was secured with included nylon sutures and dressed.
+
+This temporary dialysis catheter is ready for dialysis.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## Femoral Tunneled Dialysis Catheter Placement
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+1. ESRD
+2. Occluded LUE AV graft
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided R common femoral vein access
+2. Placement of a R CFV tunneled dialysis catheter (32cm Bard)
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local + sedation
+
+**ESTIMATED BLOOD LOSS:** 5 mL
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Both ports withdrew blood easily. Tip of the catheter was in the IVC.
+
+**DESCRIPTION OF PROCEDURE:**
+After the right groin was prepped and draped in the usual fashion ultrasound evaluation of the R common femoral vein showed the vein to be fully compressible with no intrinsic echoes. 1% lidocaine plain was infiltrated at the planned site of vein access and a micropuncture needle was used to access the right common femoral vein using ultrasound guidance. The micro-puncture wire was advanced into the iliac vein and a nick was made in the skin with an 11 blade at the wire entrance site. The micropuncture wire and inner dilator were removed and a short stiff Amplatz wire was advanced into the IVC using fluoroscopic guidance. We then infiltrated the tunneling tract from two fingerbreadths below the mid-clavicular line to the neck wire access site in a curvi-linear fashion.
+
+A nick was made at the planned catheter exit site to the right laterally more proximally and the tract was dilated with a mosquito clamp. Next we tunneled the catheter with the included tunneling device from the chest incision to the neck incision.
+
+Next the included two dilators were used to dilate the tract into the internal jugular vein using fluoroscopic guidance up to the peel-away sheath. The inner dilator and wire were removed and the tip of the tunneled catheter was advanced into the IVC up to the right atrium using fluoroscopic guidance. The catheter was not kinked. Both ports withdrew blood easily and were flushed first with normal saline followed by 1,000 units/ml of Heparin. Both ports were capped. A biopatch was placed around the catheter exit site and the catheter was secured with two interrupted 3-0 nylon sutures. The neck incision was closed with two interrupted 3-0 monocryl sutures and the sites were dressed with gauze and tegaderm.
+
+The patient tolerated the procedure well and returned to the recovery room with vital signs stable.
+
+This tunneled dialysis catheter is ok to be used for dialysis.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## Right IJ Tunneled Dialysis Catheter Placement
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+Acute renal failure
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided R internal jugular vein access
+2. Placement of a R internal jugular tunneled dialysis catheter (19cm Bard)
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local + sedation
+
+**ESTIMATED BLOOD LOSS:** 5 mL
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Both ports withdrew blood easily. Tip of the catheter was in the right atrium.
+
+**DESCRIPTION OF PROCEDURE:**
+After the right neck was prepped and draped in the usual fashion ultrasound evaluation of the R internal jugular vein showed the vein to be fully compressible with no intrinsic echoes. 1% lidocaine plain was infiltrated at the planned site of vein access and a micropuncture needle was used to access the right internal jugular vein using ultrasound guidance. The micro-puncture wire was advanced into the jugular vein and a nick was made in the skin with an 11 blade at the wire entrance site. The micropuncture wire and inner dilator were removed and a short stiff Amplatz wire was advanced into the SVC using fluoroscopic guidance. We then infiltrated the tunneling tract from two fingerbreadths below the mid-clavicular line to the neck wire access site in a curvi-linear fashion.
+
+A nick was made at the planned catheter exit site below the mid-clavicular line and the tract was dilated with a mosquito clamp. Next we tunneled the catheter with the included tunneling device from the chest incision to the neck incision.
+
+Next the included two dilators were used to dilate the tract into the internal jugular vein using fluoroscopic guidance up to the peel-away sheath. The inner dilator and wire were removed and the tip of the tunneled catheter was advanced into the SVC up to the right atrium using fluoroscopic guidance. The catheter was not kinked. Both ports withdrew blood easily and were flushed first with normal saline followed by 1,000 units/ml of Heparin. Both ports were capped. A biopatch was placed around the catheter exit site and the catheter was secured with two interrupted 3-0 nylon sutures. The neck incision was closed with two interrupted 3-0 monocryl sutures and the sites were dressed with gauze and tegaderm.
+
+The patient tolerated the procedure well and returned to the recovery room with vital signs stable.
+
+This tunneled dialysis catheter is ok to be used for dialysis.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## Left IJ Tunneled Dialysis Catheter Placement
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+Acute renal failure
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided Left internal jugular vein access
+2. Placement of a Left internal jugular tunneled dialysis catheter (23 cm Bard)
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local + sedation
+
+**ESTIMATED BLOOD LOSS:** 5 mL
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Both ports withdrew blood easily. Tip of the catheter was in the right atrium. She pulled out her temporary dialysis catheter out of her right groin earlier today.
+
+**DESCRIPTION OF PROCEDURE:**
+After the right neck was prepped and draped in the usual fashion ultrasound evaluation of the L internal jugular vein showed the vein to be fully compressible with no intrinsic echoes. 1% lidocaine plain was infiltrated at the planned site of vein access and a micropuncture needle was used to access the right internal jugular vein using ultrasound guidance. The micro-puncture wire was advanced into the jugular vein and a nick was made in the skin with an 11 blade at the wire entrance site. The micropuncture wire and inner dilator were removed and a short stiff Amplatz wire was advanced into the SVC using fluoroscopic guidance. We then infiltrated the tunneling tract from two fingerbreadths below the mid-clavicular line to the neck wire access site in a curvi-linear fashion.
+
+A nick was made at the planned catheter exit site below the mid-clavicular line and the tract was dilated with a mosquito clamp. Next we tunneled the catheter with the included tunneling device from the chest incision to the neck incision.
+
+Next the included two dilators were used to dilate the tract into the internal jugular vein using fluoroscopic guidance up to the peel-away sheath. The inner dilator and wire were removed and the tip of the tunneled catheter was advanced into the SVC up to the right atrium using fluoroscopic guidance. The catheter was not kinked. Both ports withdrew blood easily and were flushed first with normal saline followed by 1,000 units/ml of Heparin. Both ports were capped. A biopatch was placed around the catheter exit site and the catheter was secured with two interrupted 3-0 nylon sutures. The neck incision was closed with two interrupted 3-0 monocryl sutures and the sites were dressed with gauze and tegaderm.
+
+The patient tolerated the procedure well and returned to the recovery room with vital signs stable.
+
+This tunneled dialysis catheter is ok to be used for dialysis.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
 ## AV Graft Placement
 
 ### Sample Report 1

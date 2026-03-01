@@ -194,3 +194,242 @@ Patient transferred to recovery in stable condition
 
 **DISPOSITION:**
 [e.g., Patient to follow up in wound clinic in 1 week, offloading boot applied]
+
+---
+
+### Sample Report 2
+
+**PREOPERATIVE DIAGNOSIS:**
+RLE Open Wound
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. RLE calf wound debridement
+2. Wound vac placement
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** MAC + local
+
+**ESTIMATED BLOOD LOSS:** Minimal
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Necrotic tissue and fibrinous exudate debrided back to healthy tissue. Excellent wound vac seal.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of managed anesthesia care, the right lower extremity were prepped and draped in the usual fashion. We started by sharply cutting out necrotic skin edges back to bleeding tissue. Next we used a curette to remove fibrinous exudate at the base and in the edges of the wound.
+
+Next we irrigated the wound with copious amounts of dilute hydrogen peroxide / saline mix and then fashioned the wound vac foam to fit into the wound cavity. We placed the wound vac dressing and achieved a good seal.
+
+The leg was wrapped with an ace bandage from the foot to the knee as well.
+
+The patient tolerated the procedure well and was brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+### Sample Report 2
+
+**PREOPERATIVE DIAGNOSIS:**
+Non-healing R BKA wound with infection
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+R Lower Extremity Above-Knee Amputation
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** General (LMA)
+
+**ESTIMATED BLOOD LOSS:** 15 ml
+**FLUIDS:** None
+**SPECIMENS:** R BKA stump → pathology
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Skin edges re-approximated well. Minimal tension.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of general anesthesia, the patient's right lower extremity was prepped and draped in the usual fashion. We marked out a standard classic fish-mouth above knee amputation. Then, Esmarch was used to extrude the venous blood from the right lower extremity. We turned up the tourniquet to 250 mmHg. Next, we used 10 blade to incise the skin around the marked area. We then utilized electrocautery to dissect down through the dermis up to the level of the fascia and through the fascia, exposing the underlying muscle medially, laterally, and posteriorly. Anteriorly we dissected down to the femur.
+
+The saphenous vein was identified and doubly ligated with 3-0 silk sutures. We then isolated the femoral artery and vein. This was doubly ligated with 2-0 silk sutures and transected. We were then able to circumferentially isolate the femur bone at this level. We raised the periosteum circumferentially around the femur and then used an oscillating handheld saw to transect through the femur.
+
+We then rounded the edges with a filing maneuver using our handheld oscillating saw. The distal BKA stump specimen was handed off. We let down the tourniquet after about 20 minutes. All small areas of bleeding were either treated with electrocautery or with interrupted 3-0 silk suture ties. We used bone wax on the femur and then re-approximated the fascial edges with interrupted 2-0 sutures. We placed as many sutures as were necessary such that we could not pass a finger through any of the gaps. Finally, we closed the skin with staples and dressed the wound.
+
+The patient was extubated and brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+### Sample Report 3
+
+**PREOPERATIVE DIAGNOSIS:**
+Non-healing L AKA wound with infection
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+Left Lower Extremity Above-Knee Amputation
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** General (LMA)
+
+**ESTIMATED BLOOD LOSS:** 15 ml
+**FLUIDS:** None
+**SPECIMENS:** L AKA stump → pathology
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Skin edges re-approximated well. Minimal tension.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of general anesthesia, the patient's left lower extremity was prepped and draped in the usual fashion. We marked out a standard classic fish-mouth above knee amputation. Next, we used 10 blade to incise the skin around the marked area. We then utilized electrocautery to dissect down through the dermis up to the level of the fascia and through the fascia, exposing the underlying muscle medially, laterally, and posteriorly. Anteriorly we dissected down to the femur.
+
+The saphenous vein was identified and doubly ligated with 3-0 silk sutures. We then isolated the femoral artery and vein. This was doubly ligated with 2-0 silk sutures and transected. We were then able to circumferentially isolate the femur bone at this level. We raised the periosteum circumferentially around the femur and then used an oscillating handheld saw to transect through the femur.
+
+We then rounded the edges with a filing maneuver using our handheld oscillating saw. The distal AKA stump specimen was handed off. All small areas of bleeding were either treated with electrocautery or with interrupted 3-0 silk suture ties. We used bone wax on the femur and then re-approximated the fascial edges with interrupted 2-0 sutures. We placed as many sutures as were necessary such that we could not pass a finger through any of the gaps. Finally, we closed the skin with staples and dressed the wound.
+
+The patient was extubated and brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## Port-A-Cath Placement
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+1. Metastatic high grade urethral cancer
+2. Need for chemotherapy
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided Right internal jugular vein access
+2. Placement of a right chest 8Fr Port-A-Cath
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local + sedation
+
+**ESTIMATED BLOOD LOSS:** 5 mL
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+The port withdrew blood easily.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of sedation, the patient's right neck was prepped and draped in the usual fashion. We used ultrasound to evaluate the right internal jugular vein, which was fully compressible with no intrinsic echoes. We then accessed the internal jugular vein using ultrasound guidance after infiltrating with 1% lidocaine. This was done with a micropuncture needle. We advanced our micropuncture wire followed by the micropuncture sheath, all under fluoroscopic guidance.
+
+Next, we marked the tract for the port-a-cath, which was an 8 French Bard device. Two finger breadths below the right midclavicular line, we made a transverse incision after infiltrating with 1% lidocaine. We created a pocket inferior to our incision using electrocautery. We then tunneled our trimmed and measured port catheter from the chest incision to the neck puncture site with the tunneling device that was included. We placed the port in the pocket and then exchanged the micropuncture sheath for the included dilator with a peel-away sheath. We then advanced the tip of our port catheter through the peel-away sheath to ensure that it was sitting in the right atrium. We confirmed good length as well as no kinking in the catheter. We then closed our port incision with interrupted 3-0 Vicryl sutures, and the neck incision was closed with a single subcuticular Monocryl suture. We were able to withdraw blood easily from the port and flushed the port with 3 ml of 1,000 units/ml of Heparin. The sites were dressed with glue and gauze.
+
+He was returned to the recovery room with stable vital signs. The port-a-cath is ok to use.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+## Temporal Artery Biopsy
+
+### Sample Report 1
+
+**PREOPERATIVE DIAGNOSIS:**
+Temporal arteritis
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+Left temporal artery biopsy
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** General (LMA)
+
+**ESTIMATED BLOOD LOSS:** 5 ml
+**FLUIDS:** None
+**SPECIMENS:** L temporal artery segment
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Temporal artery positively identified with doppler. 2 cm segment sent to pathology in saline. Artery appeared soft.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of LMA anesthesia, the patient's left temporal region was prepped and draped in the usual fashion. We used a doppler to identify the temporal artery in the pre-auricular space and injected the planned site of incision with 1% lidocaine plain.
+
+Next we made a longitudinal incision in the pre-auricular space with a 15 blade and dissected down through the subcutaneous space with a needle tipped cautery and tenotomy scissors to expose a segment of the temporal artery and its branches. We obtained control of a 2 cm segment by ligating the proximal and distal segments with 3-0 silk sutures and transected the segment out and sent it to pathology in normal saline.
+
+We obtained hemostasis with electrocautery and then closed the skin with a 5-0 Monocryl suture and used Dermabond on the skin.
+
+The patient was extubated and brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition
+
+---
+
+### Sample Report 2
+
+**PREOPERATIVE DIAGNOSIS:**
+Temporal arteritis
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+Right temporal artery biopsy
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** General (LMA)
+
+**ESTIMATED BLOOD LOSS:** 5 ml
+**FLUIDS:** None
+**SPECIMENS:** R temporal artery segment
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** None
+
+**FINDINGS:**
+Temporal artery positively identified with doppler. 2 cm segment sent to pathology in saline. Artery appeared soft.
+
+**DESCRIPTION OF PROCEDURE:**
+After the administration of LMA anesthesia, the patient's right temporal region was prepped and draped in the usual fashion. We used a doppler to identify the temporal artery in the pre-auricular space and injected the planned site of incision with 1% lidocaine plain.
+
+Next we made a longitudinal incision in the pre-auricular space with a 15 blade and dissected down through the subcutaneous space with a needle tipped cautery and tenotomy scissors to expose a segment of the temporal artery and its branches. We obtained control of a 2 cm segment by ligating the proximal and distal segments with 3-0 silk sutures and transected the segment out and sent it to pathology in normal saline.
+
+We obtained hemostasis with electrocautery and then closed the skin with a 5-0 Monocryl suture and used Dermabond on the skin.
+
+The patient was extubated and brought to the recovery room with stable vital signs.
+
+**DISPOSITION:**
+Patient transferred to recovery in stable condition

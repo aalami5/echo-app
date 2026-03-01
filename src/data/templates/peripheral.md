@@ -583,3 +583,87 @@ The patient tolerated the procedure well, was extubated, and brought to the reco
 
 **DISPOSITION:**
 Patient transferred to recovery in stable condition
+---
+
+### Sample Report 2 - LLE Angiography (Template with Placeholders)
+
+**PREOPERATIVE DIAGNOSIS:**
+1. LLE tissue loss
+2. Peripheral artery disease
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided access of the right common femoral artery
+2. Right fem-check angiogram
+3. Selection for the left tibioperoneal trunk
+4. LLE angiogram
+5. [PROCEDURE TO BE COMPLETED]
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** Local with sedation
+
+**ESTIMATED BLOOD LOSS:** 50 mL
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** No foley
+
+**FINDINGS:**
+[FINDINGS TO BE COMPLETED]
+
+**DESCRIPTION OF PROCEDURE:**
+After the right groin was prepped and draped in the usual fashion ultrasound was used to evaluate the right common femoral artery. [PROCEDURE DESCRIPTION TO BE COMPLETED]
+
+**DISPOSITION:**
+[DISPOSITION TO BE COMPLETED]
+
+---
+
+### Sample Report 3 - Thrombolysis Take-Back Procedure
+
+**PREOPERATIVE DIAGNOSIS:**
+1. RLE Acute Limb Ischemia with rest pain
+2. Peripheral artery disease
+
+**POSTOPERATIVE DIAGNOSIS:**
+Same
+
+**PROCEDURE PERFORMED:**
+1. Ultrasound guided access of the left common femoral artery
+2. Left fem-check angiogram
+3. Selection for the right tibioperoneal trunk
+4. RLE angiogram
+5. Placement of thrombolysis catheter (50cm Unifuse)
+6. Initiation of thrombolysis infusion
+
+**SURGEON:** Oliver Aalami, MD
+**ASSISTANT:** None
+**ANESTHESIA:** GETA, rapid sequence
+
+**ESTIMATED BLOOD LOSS:** 50 mL
+**FLUIDS:** None
+**SPECIMENS:** None
+**DRAINS:** None
+**COMPLICATIONS:** None
+**URINE OUTPUT:** No foley
+
+**FINDINGS:**
+Right distal SFA and popliteal artery occlusion with reconstitution of the right anterior tibial artery.
+
+**DESCRIPTION OF PROCEDURE:**
+After the left groin was prepped and draped in the usual fashion ultrasound was used to evaluate the left common femoral artery. The left common femoral artery was accessed using ultrasound guidance with a micropuncture needle. A micropuncture wire was advanced and a micropuncture sheath was placed. A fem-check angiogram showed our puncture to be in the mid common femoral artery.
+
+Next we selected for the right superficial femoral artery using an omni flush catheter. We performed a RLE angiogram which showed a patent right CFA, profunda and proximal and mid SFA with an occluded distal SFA, popliteal artery and tibioperoneal trunk with reconstitution of the tibial arteries.
+
+We then placed our Storq wire into the right SFA and exchanged for a 45cm Destination sheath. Next we used a quick cross catheter and an angled glide wire to cross the occlusion. An EKOS catheter was placed through the thrombus up to the end of the tibioperoneal trunk into the anterior tibial artery.
+
+Next we bolused with 2mg of TPA and started TPA infusion at 1mg/hr and 500 units/hr of heparin through the 6Fr sheath side port.
+
+The patient was extubated and brought to the recovery room and then ICU with vital signs stable.
+
+**DISPOSITION:**
+Patient transferred to recovery and then ICU in stable condition
