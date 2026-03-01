@@ -24,7 +24,7 @@ import {
   Platform,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
@@ -51,6 +51,7 @@ const ALL_CATEGORIES: ProcedureCategory[] = ['aortic', 'carotid', 'peripheral_ar
 type ScreenState = 'input' | 'generating' | 'review' | 'editing';
 
 export default function DictationScreen() {
+  const insets = useSafeAreaInsets();
   const [screenState, setScreenState] = useState<ScreenState>('input');
   const [showTextInput, setShowTextInput] = useState(false);
   const [textDraft, setTextDraft] = useState('');
@@ -111,16 +112,30 @@ export default function DictationScreen() {
         Alert.alert('Permission needed', 'Microphone access is required for dictation.');
         return;
       }
-      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      // Unload any existing recording first
+      if (recordingRef.current) {
+        try {
+          await recordingRef.current.stopAndUnloadAsync();
+        } catch {}
+        recordingRef.current = null;
+      }
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      });
+      // Small delay for iOS audio session setup
+      await new Promise((resolve) => setTimeout(resolve, 100));
       const { recording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
       recordingRef.current = recording;
       setIsRecording(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    } catch (e) {
+    } catch (e: any) {
       console.error('[Dictation] Failed to start recording', e);
-      Alert.alert('Error', 'Failed to start recording.');
+      Alert.alert('Error', `Failed to start recording: ${e.message}`);
     }
   };
 
@@ -656,7 +671,7 @@ export default function DictationScreen() {
 
         {/* ─── Bottom Input Bar ─── */}
         {screenState === 'input' && (
-          <View style={styles.bottomBar}>
+          <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.md) + 60 }]}>
             <TouchableOpacity
               style={styles.bottomButton}
               onPress={() => setShowTextInput(!showTextInput)}
