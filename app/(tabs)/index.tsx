@@ -488,7 +488,7 @@ export default function ChatScreen() {
   );
 
   const renderEmptyState = () => (
-    <View style={styles.emptyState}>
+    <View style={[styles.emptyState, { transform: [{ scaleY: -1 }] }]}>
       <Text style={styles.emptySubtitle}>
         Tap the avatar to start talking
       </Text>

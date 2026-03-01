@@ -45,17 +45,63 @@ interface SettingsState {
 }
 
 // Custom storage adapter using SecureStore for persistence
+// Uses a backup key to protect against crash-during-write corruption
+const BACKUP_SUFFIX = '-backup';
+
 const secureStorage = {
   getItem: async (name: string): Promise<string | null> => {
     try {
-      return await SecureStore.getItemAsync(name);
+      const value = await SecureStore.getItemAsync(name);
+      if (value) {
+        // Validate JSON is parseable before returning
+        try {
+          JSON.parse(value);
+          return value;
+        } catch {
+          console.warn('[Settings] Primary store corrupted, trying backup...');
+        }
+      }
+      // Primary missing or corrupted — try backup
+      const backup = await SecureStore.getItemAsync(name + BACKUP_SUFFIX);
+      if (backup) {
+        console.log('[Settings] Restored from backup');
+        // Repair primary from backup
+        await SecureStore.setItemAsync(name, backup).catch(() => {});
+        return backup;
+      }
+      return null;
     } catch (e) {
       console.log('[Settings] SecureStore get error:', e);
-      return null;
+      // Last resort: try backup
+      try {
+        return await SecureStore.getItemAsync(name + BACKUP_SUFFIX);
+      } catch {
+        return null;
+      }
     }
   },
   setItem: async (name: string, value: string): Promise<void> => {
     try {
+      // Validate we're not writing all-null state over real data
+      try {
+        const parsed = JSON.parse(value);
+        const state = parsed?.state;
+        if (state && !state.openaiApiKey && !state.elevenlabsApiKey && !state.gatewayToken) {
+          // All keys null — check if we have existing data we'd be wiping
+          const existing = await SecureStore.getItemAsync(name);
+          if (existing) {
+            const existingState = JSON.parse(existing)?.state;
+            if (existingState?.openaiApiKey || existingState?.elevenlabsApiKey || existingState?.gatewayToken) {
+              console.warn('[Settings] Blocked write that would wipe existing keys (likely hydration race)');
+              return; // Don't overwrite good data with empty state
+            }
+          }
+        }
+      } catch {
+        // parse failed, proceed with write anyway
+      }
+      // Write backup first (so if main write crashes, backup survives)
+      await SecureStore.setItemAsync(name + BACKUP_SUFFIX, value);
       await SecureStore.setItemAsync(name, value);
     } catch (e) {
       console.log('[Settings] SecureStore set error:', e);
@@ -64,6 +110,7 @@ const secureStorage = {
   removeItem: async (name: string): Promise<void> => {
     try {
       await SecureStore.deleteItemAsync(name);
+      await SecureStore.deleteItemAsync(name + BACKUP_SUFFIX);
     } catch (e) {
       console.log('[Settings] SecureStore remove error:', e);
     }
