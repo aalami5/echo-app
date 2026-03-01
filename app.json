@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.oppersmedical.echo",
-      "buildNumber": "40",
+      "buildNumber": "41",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "Echo needs microphone access for voice conversations",
