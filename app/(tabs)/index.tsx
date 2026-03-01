@@ -102,6 +102,16 @@ export default function ChatScreen() {
   const lastMessageId = useRef<string | null>(null);
   const userScrolledUp = useRef(false);
   const scrollTimeout = useRef<NodeJS.Timeout | null>(null);
+  
+  // Suppress TTS on app launch — only play for genuinely new messages
+  const appJustOpened = useRef(true);
+  useEffect(() => {
+    // Mark app as "warmed up" after a short delay, so initial message hydration doesn't trigger TTS
+    const timer = setTimeout(() => {
+      appJustOpened.current = false;
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Scroll to bottom helper
   const scrollToBottom = useCallback((animated = true) => {
@@ -131,7 +141,9 @@ export default function ChatScreen() {
       
       // Auto-play TTS for new assistant messages from notifications/sync
       // (Live chat responses already call speak() directly in sendMessageToGateway)
+      // Skip TTS entirely when app just opened — don't read old messages on launch
       if (
+        !appJustOpened.current &&
         latestMessage.role === 'assistant' &&
         voiceEnabled &&
         autoPlayResponses &&
