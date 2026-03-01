@@ -143,15 +143,21 @@ export default function ChatScreen() {
       ) {
         // Check if this message came from notification sync (not live chat)
         // Live chat messages have status transitions; notification messages don't
+        // Also skip if the message is older than 2 minutes (stale from background)
         if (!latestMessage.status) {
-          console.log('[Chat] Auto-playing TTS for notification message:', latestMessage.id);
-          speak(latestMessage.content).catch(() => {
-            addToast({
-              message: '🔇 Voice failed — check ElevenLabs API key in Settings',
-              type: 'warning',
-              duration: 4000,
+          const messageAge = Date.now() - new Date(latestMessage.timestamp).getTime();
+          if (messageAge > 2 * 60 * 1000) {
+            console.log('[Chat] Skipping TTS for stale message (age:', Math.round(messageAge / 1000), 's):', latestMessage.id);
+          } else {
+            console.log('[Chat] Auto-playing TTS for notification message:', latestMessage.id);
+            speak(latestMessage.content).catch(() => {
+              addToast({
+                message: '🔇 Voice failed — check ElevenLabs API key in Settings',
+                type: 'warning',
+                duration: 4000,
+              });
             });
-          });
+          }
         }
       }
     }
