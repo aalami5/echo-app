@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** February 18, 2026
+**Last Updated:** February 28, 2026
 
 ---
 
@@ -314,6 +314,25 @@ Main conversation interface with:
 - Text input toggle
 - Photo attachment button
 - Next meeting card
+
+---
+
+### Dictation Screen
+
+**File:** `app/(tabs)/dictation.tsx`
+
+OR dictation for generating structured operative reports:
+- Tag-based procedure picker (pill/chip UI) with categories: Aortic, Carotid, Peripheral Arterial, Venous, Dialysis Access, Other
+- Custom procedure tags (add, edit via long-press, delete, persisted via AsyncStorage)
+- Multi-modal transcript input: voice recording, text, photo
+- Report generation via OpenClaw Gateway with CPT/ICD-10 web search
+- Report actions: email, copy, TTS read-back, edit & regenerate
+- Save reports as examples for future context learning
+
+**Supporting Files:**
+- `src/services/dictationService.ts` — Report generation service
+- `src/stores/dictationStore.ts` — Session + persisted state
+- `src/data/vascularProcedures.ts` — Categorized procedure library
 
 ---
 

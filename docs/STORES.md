@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** February 25, 2026
+**Last Updated:** February 28, 2026
 
 ---
 
@@ -333,6 +333,36 @@ Caches calendar events fetched from Google Calendar.
 | `lastFetch` | `number \| null` | ❌ | Last refresh timestamp |
 
 **Note:** Events are fetched on-demand and not persisted. On rehydration, if the cache is from a different day, events are cleared and a fresh fetch is triggered to prevent stale/ghost events.
+
+---
+
+### dictationStore
+
+Manages OR dictation sessions and persisted learning data.
+
+**File:** `src/stores/dictationStore.ts`
+
+**Persistence:** AsyncStorage (not SecureStore — non-sensitive data)
+
+**Persisted State:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `corrections` | `CorrectionEntry[]` | Learned corrections for report generation |
+| `stylePreferences` | `StylePreference[]` | Section-level style preferences |
+| `savedExamples` | `SavedExample[]` | Saved reports as future learning context |
+| `customProcedures` | `CustomProcedure[]` | User-added procedure tags |
+
+**Session State (not persisted):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `transcriptParts` | `TranscriptPart[]` | Current session transcript (voice/text/image) |
+| `generatedReport` | `string \| null` | Generated operative report |
+| `isGenerating` | `boolean` | Report generation in progress |
+| `selectedProcedures` | `string[]` | Selected procedure tags for current session |
+
+**Key Actions:** `addTranscriptPart`, `toggleProcedure`, `setGeneratedReport`, `saveAsExample`, `addCustomProcedure`, `addCorrection`, `clearSession`
 
 ---
 

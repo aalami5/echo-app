@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** February 25, 2026
+**Last Updated:** February 28, 2026
 
 ---
 
@@ -16,14 +16,14 @@ Echo App is a React Native (Expo) application that provides Oliver with a privat
 │  ┌──────────────────────────────────────────────────────────┐  │
 │  │  React Native + Expo SDK 52                               │  │
 │  │                                                           │  │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │  │
-│  │  │ Chat UI     │ │ Patients    │ │ Settings            │ │  │
-│  │  │ (voice+text)│ │ (call list) │ │ (gateway, voice)    │ │  │
-│  │  └──────┬──────┘ └──────┬──────┘ └──────────┬──────────┘ │  │
-│  │         │               │                    │            │  │
-│  │  ┌──────▼───────────────▼────────────────────▼──────────┐│  │
+│  │  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌──────────┐ │  │
+│  │  │ Chat UI   │ │ Dictation │ │ Patients  │ │ Settings │ │  │
+│  │  │(voice+txt)│ │(OR reports│ │(call list)│ │(gw,voice)│ │  │
+│  │  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └────┬─────┘ │  │
+│  │        │              │             │             │        │  │
+│  │  ┌─────▼──────────────▼─────────────▼─────────────▼─────┐│  │
 │  │  │              Zustand Stores (Persistent)              ││  │
-│  │  │  chatStore │ patientsStore │ settingsStore │ networkStore ││
+│  │  │  chatStore │ dictationStore │ patientsStore │ settingsStore ││
 │  │  └──────────────────────┬────────────────────────────────┘│  │
 │  │                         │                                 │  │
 │  │  ┌──────────────────────▼────────────────────────────────┐│  │

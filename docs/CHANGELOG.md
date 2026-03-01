@@ -6,6 +6,30 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 39] - 2026-02-28
+
+### Added
+- **OR Dictation Tab** (Builds #36-39) — New dedicated tab for generating structured operative reports from voice, text, and photo input
+  - Tag-based procedure picker (pill/chip UI) organized by category: Aortic, Carotid, Peripheral Arterial, Venous, Dialysis Access, Other
+  - Custom procedure tags: add via '+ Add Procedure', long-press to edit/delete, persisted via AsyncStorage
+  - Web search (Perplexity) as PRIMARY source for CPT/ICD-10 codes; local procedure library as hints only
+  - Full report workflow: generate → review → email/copy/read back/edit+regenerate
+  - Save reports as examples for future learning context
+  - New `dictationStore` (Zustand + AsyncStorage) for custom procedures, corrections, style preferences, saved examples
+  - New `dictationService` for report generation via OpenClaw Gateway
+  - New `vascularProcedures` data module with categorized procedure library
+- **Toast Notification on TTS Failure** (Build #35) — Shows warning toast when ElevenLabs speak() errors out, covering all 4 speak call sites
+
+### Fixed
+- **Dictation Recording Startup Errors** (Build #39) — Unload existing recording before starting new, proper iOS audio mode setup with delay
+- **Dictation Bottom Bar Clipping** (Builds #38-39) — Increased paddingBottom for tab bar clearance
+- **Dictation UI Polish** (Build #38) — Email sent confirmation state, tappable teal mic icon in empty state, removed auto-scroll after transcription
+- **Dictation Layout & UX** (Build #37) — ScrollView auto-scroll, Generate Report button repositioned, email sent indicator, verified ElevenLabs voice config
+- **Missing expo-clipboard Dependency** — Added to package.json
+- **EAS Build Fix** — Upgraded expo-task-manager to 14.0.9
+
+---
+
 ## [Build 34] - 2026-02-25
 
 ### Fixed
