@@ -12,7 +12,22 @@ import { GatewayService } from './gateway';
 import { useDictationStore, TranscriptPart, CorrectionEntry, StylePreference, SavedExample } from '../stores/dictationStore';
 import { getProcedureById, PROCEDURE_TEMPLATES, buildProcedureReference, ProcedureTemplate } from '../data/vascularProcedures';
 
-const OR_SYSTEM_PROMPT = `You are a specialized assistant that converts surgical audio transcripts into complete, structured operative reports following a strict, standardized template. You extract key details from transcripts, format them exactly according to the structure below, and include ICD-10 diagnostic codes in the diagnosis sections and CPT procedure codes in the procedure sections. You also calculate and list total work RVUs in a separate section at the end. If information is missing or uncertain, follow the instructions in the appropriate section.
+import { getTemplateCategoriesForProcedures, buildStyleReferencePrompt } from '../data/templateLoader';
+import { findBestTemplates, TemplateCategory } from '../data/templateContent';
+
+const OR_SYSTEM_PROMPT = `You are a specialized assistant that converts surgical audio transcripts into complete, structured operative reports following a strict, standardized template. You extract key details from transcripts, format them exactly according to the structure below, and include ICD-10 diagnostic codes in the diagnosis sections and CPT procedure codes in the procedure sections. You also calculate and list total work RVUs in a separate section at the end. If information is missing or uncertain, follow the smart defaults below.
+
+IMPORTANT — SMART DEFAULTS:
+When the surgeon does NOT explicitly mention the following in their dictation, use these defaults automatically. Do NOT list these as "Open Items" — they are assumed unless stated otherwise:
+- **Surgeon:** Oliver Aalami, MD (always default to this unless another surgeon is named)
+- **Assistant:** None (assume no assistant unless one is explicitly mentioned)
+- **Urine output:** No Foley (assume no Foley placed unless mentioned)
+- **Specimens:** None (assume no specimens unless explicitly mentioned)
+- **Drains:** None (assume no drains unless explicitly mentioned)
+- **Complications:** None (assume no complications unless explicitly mentioned)
+- **EBL:** TBD (only list as open item if truly relevant to the procedure)
+
+These defaults reflect Dr. Aalami's standard practice. Only override them if the transcript explicitly states otherwise.
 
 IMPORTANT — CPT/ICD-10 CODE LOOKUP:
 You MUST use web search to look up and verify ALL CPT and ICD-10 codes before including them in the report. Search for the current, correct codes for each procedure and diagnosis mentioned. The local procedure reference codes (if provided below) are hints only — web search results take priority. Always use the most current codes from your search.
@@ -30,19 +45,19 @@ STRICT TEMPLATE (use this exact structure for every operative report). Each head
 2. (pulled from the transcript) (CPT XXXXX)
 
 **Surgeon:** Oliver Aalami, MD
-**Assistant:** (if an assistant is mentioned in the transcript, list them here; if NO assistant is mentioned, put "none")
+**Assistant:** (from transcript, or "None" if not mentioned)
 
 **Anesthesia:** (pulled from the transcript)
 
-**Specimens:** ("none" if not mentioned)
+**Specimens:** (from transcript, or "None" if not mentioned)
 
-**Drains:** ("none" if not mentioned)
+**Drains:** (from transcript, or "None" if not mentioned)
 
-**Complications:** ("none" if not mentioned)
+**Complications:** (from transcript, or "None" if not mentioned)
 
-**Urine output:** ("no foley" if not mentioned)
+**Urine output:** (from transcript, or "No Foley" if not mentioned)
 
-**EBL:** (put in "TBD" if not mentioned)
+**EBL:** (from transcript, or "TBD" if not mentioned)
 
 **Findings:** (this is obtained from the transcript)
 
@@ -59,7 +74,7 @@ _____________
 _____________
 
 **Open Items:**
-(list all the missing or open items needed to be filled out)
+(list ONLY genuinely missing clinical details that affect the report — do NOT list items covered by smart defaults above)
 
 ---
 
@@ -71,7 +86,9 @@ Rules:
 - Never include RVU values in the main body of the report; they must only appear in the "CPT Codes & Work RVUs" section
 - Use professional, concise, and standardized medical language
 - Follow the above structure exactly. Do not add or remove sections
-- Include an "Open Items" section at the end for missing data`;
+- Apply smart defaults for any fields not mentioned in the transcript
+- When a STYLE REFERENCE report is provided below, match its writing style, tone, level of detail, and phrasing patterns closely — this is how Dr. Aalami writes his reports
+- Include an "Open Items" section at the end ONLY for genuinely missing clinical information`;
 
 function buildLearningContext(
   corrections: CorrectionEntry[],
@@ -178,6 +195,23 @@ export async function generateReport(
     userMessage += `\n\nUse web search to verify and find the correct CPT codes, ICD-10 codes, and work RVUs for the above procedures. The reference codes above are hints only.`;
   }
 
+  // Add style reference from sample operative reports
+  const categories = getTemplateCategoriesForProcedures(selectedProcedures);
+  if (categories.length > 0) {
+    const stylePrompt = buildStyleReferencePrompt(categories);
+    userMessage += `\n\n${stylePrompt}`;
+    
+    // Find best matching sample reports for each selected procedure
+    for (const procName of selectedProcedures) {
+      for (const cat of categories) {
+        const bestTemplates = findBestTemplates(procName, cat as TemplateCategory);
+        for (const tmpl of bestTemplates) {
+          userMessage += `\n\n--- SAMPLE REPORT: ${tmpl.title} ---\n${tmpl.content}`;
+        }
+      }
+    }
+  }
+
   if (learningContext) {
     userMessage += `\n\n${learningContext}`;
   }
@@ -211,6 +245,22 @@ export async function regenerateWithCorrections(
     const template = findProcedureTemplate(procName);
     if (template) {
       userMessage += `\n\n${buildProcedureReference(template)}`;
+    }
+  }
+
+  // Add style reference from sample operative reports
+  const categories = getTemplateCategoriesForProcedures(selectedProcedures);
+  if (categories.length > 0) {
+    const stylePrompt = buildStyleReferencePrompt(categories);
+    userMessage += `\n\n${stylePrompt}`;
+    
+    for (const procName of selectedProcedures) {
+      for (const cat of categories) {
+        const bestTemplates = findBestTemplates(procName, cat as TemplateCategory);
+        for (const tmpl of bestTemplates) {
+          userMessage += `\n\n--- SAMPLE REPORT: ${tmpl.title} ---\n${tmpl.content}`;
+        }
+      }
     }
   }
 
