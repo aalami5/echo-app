@@ -64,8 +64,12 @@ export default function DictationScreen() {
   const [newProcCategory, setNewProcCategory] = useState<ProcedureCategory>('other');
   const [editingCustomProc, setEditingCustomProc] = useState<CustomProcedure | null>(null);
   const [emailSent, setEmailSent] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [isReadingBack, setIsReadingBack] = useState(false);
+  const [isTranscribing, setIsTranscribing] = useState(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  const ttsServiceRef = useRef<ElevenLabsService | null>(null);
 
   const {
     transcriptParts,
@@ -88,10 +92,16 @@ export default function DictationScreen() {
 
   const { gatewayUrl, gatewayToken, openaiApiKey, elevenlabsApiKey } = useSettingsStore();
 
+  const reviewScrollRef = useRef<ScrollView>(null);
+
   // Sync screen state with store
   useEffect(() => {
     if (isGenerating) setScreenState('generating');
-    else if (generatedReport) setScreenState('review');
+    else if (generatedReport) {
+      setScreenState('review');
+      // Scroll to top when report loads
+      setTimeout(() => reviewScrollRef.current?.scrollTo({ y: 0, animated: true }), 100);
+    }
   }, [isGenerating, generatedReport]);
 
   // Auto-scroll removed — user prefers staying at top after recording
@@ -152,7 +162,9 @@ export default function DictationScreen() {
         Alert.alert('Setup Required', 'Please configure OpenAI API key in Settings.');
         return;
       }
+      setIsTranscribing(true);
       const result = await transcribeAudio(uri, { apiKey: openaiApiKey });
+      setIsTranscribing(false);
       if (result?.text?.trim()) {
         addTranscriptPart({
           id: Date.now().toString(),
@@ -161,8 +173,11 @@ export default function DictationScreen() {
           timestamp: new Date().toISOString(),
         });
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        // Scroll to top so user sees the new transcript
+        setTimeout(() => scrollViewRef.current?.scrollTo({ y: 0, animated: true }), 100);
       }
     } catch (e) {
+      setIsTranscribing(false);
       console.error('[Dictation] Failed to stop/transcribe recording', e);
       Alert.alert('Error', 'Failed to transcribe audio.');
     }
@@ -219,7 +234,8 @@ export default function DictationScreen() {
   // ─── Report Actions ───
   const handleEmail = async () => {
     const gw = getGateway();
-    if (!gw || !generatedReport || emailSent) return;
+    if (!gw || !generatedReport || emailSent || isSendingEmail) return;
+    setIsSendingEmail(true);
     try {
       const msg = buildEmailMessage(generatedReport, selectedProcedures);
       await gw.sendMessage(msg);
@@ -227,6 +243,8 @@ export default function DictationScreen() {
       setEmailSent(true);
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to send email.');
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -235,11 +253,22 @@ export default function DictationScreen() {
       Alert.alert('Setup Required', 'Please configure ElevenLabs API key in Settings.');
       return;
     }
+    // If already reading back, stop it instead of starting another
+    if (isReadingBack && ttsServiceRef.current) {
+      await ttsServiceRef.current.stop();
+      setIsReadingBack(false);
+      return;
+    }
+    setIsReadingBack(true);
     try {
       const ttsService = new ElevenLabsService({ apiKey: elevenlabsApiKey, voiceId: OLIVER_VOICE_ID });
+      ttsServiceRef.current = ttsService;
       await ttsService.speak({ text: generatedReport, voiceId: OLIVER_VOICE_ID });
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to read back report.');
+    } finally {
+      setIsReadingBack(false);
+      ttsServiceRef.current = null;
     }
   };
 
@@ -493,7 +522,7 @@ export default function DictationScreen() {
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={90}
+        keyboardVerticalOffset={100}
       >
         {/* Header */}
         <View style={styles.header}>
@@ -508,7 +537,14 @@ export default function DictationScreen() {
         {/* ─── INPUT STATE ─── */}
         {screenState === 'input' && (
           <ScrollView ref={scrollViewRef} style={styles.flex} contentContainerStyle={styles.scrollContent}>
-            {transcriptParts.length === 0 && (
+            {/* Transcribing indicator */}
+            {isTranscribing && (
+              <View style={styles.transcribingBanner}>
+                <ActivityIndicator size="small" color={colors.primary} />
+                <Text style={styles.transcribingText}>Transcribing audio...</Text>
+              </View>
+            )}
+            {transcriptParts.length === 0 && !isTranscribing && (
               <TouchableOpacity style={styles.emptyState} onPress={startRecording} activeOpacity={0.7}>
                 <Ionicons name="mic-outline" size={48} color="#14b8a6" />
                 <Text style={styles.emptyText}>Tap the mic to start dictating</Text>
@@ -569,6 +605,10 @@ export default function DictationScreen() {
                   onChangeText={setTextDraft}
                   multiline
                   autoFocus
+                  onFocus={() => {
+                    // Scroll to bottom so text input is visible above keyboard
+                    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 300);
+                  }}
                 />
                 <TouchableOpacity
                   style={[styles.sendButton, !textDraft.trim() && styles.sendButtonDisabled]}
@@ -587,14 +627,14 @@ export default function DictationScreen() {
           <View style={styles.generatingContainer}>
             <Avatar state="thinking" size={80} />
             <Text style={styles.generatingText}>Generating operative report...</Text>
-            <Text style={styles.generatingSubtext}>Searching for current CPT/ICD-10 codes...</Text>
+            <Text style={styles.generatingSubtext}>Matching CPT/ICD-10 codes and formatting report...</Text>
             <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
           </View>
         )}
 
         {/* ─── REVIEW STATE ─── */}
         {screenState === 'review' && generatedReport && (
-          <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
+          <ScrollView ref={reviewScrollRef} style={styles.flex} contentContainerStyle={styles.scrollContent}>
             <View style={styles.reportCard}>
               <Text style={styles.reportText}>{generatedReport}</Text>
             </View>
@@ -603,20 +643,33 @@ export default function DictationScreen() {
               <TouchableOpacity
                 style={[styles.actionButton, emailSent && styles.actionButtonSent]}
                 onPress={handleEmail}
-                disabled={emailSent}
+                disabled={emailSent || isSendingEmail}
               >
-                <Ionicons
-                  name={emailSent ? 'checkmark-circle' : 'mail'}
-                  size={22}
-                  color={emailSent ? '#22c55e' : colors.primary}
-                />
+                {isSendingEmail ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons
+                    name={emailSent ? 'checkmark-circle' : 'mail'}
+                    size={22}
+                    color={emailSent ? '#22c55e' : colors.primary}
+                  />
+                )}
                 <Text style={[styles.actionLabel, emailSent && styles.actionLabelSent]}>
-                  {emailSent ? 'Email Sent' : 'Email'}
+                  {isSendingEmail ? 'Sending...' : emailSent ? 'Email Sent' : 'Email'}
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionButton} onPress={handleReadBack}>
-                <Ionicons name="volume-high" size={22} color={colors.primary} />
-                <Text style={styles.actionLabel}>Read Back</Text>
+              <TouchableOpacity
+                style={[styles.actionButton, isReadingBack && styles.actionButtonActive]}
+                onPress={handleReadBack}
+              >
+                {isReadingBack ? (
+                  <ActivityIndicator size="small" color={colors.primary} />
+                ) : (
+                  <Ionicons name="volume-high" size={22} color={colors.primary} />
+                )}
+                <Text style={styles.actionLabel}>
+                  {isReadingBack ? 'Playing...' : 'Read Back'}
+                </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
                 <Ionicons name="copy" size={22} color={colors.primary} />
@@ -749,6 +802,19 @@ const styles = StyleSheet.create({
   scrollContent: {
     padding: spacing.lg,
     paddingBottom: 220,
+  },
+  transcribingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  transcribingText: {
+    fontSize: typography.base,
+    color: colors.primary,
+    fontWeight: typography.medium as any,
   },
   emptyState: {
     alignItems: 'center',
@@ -967,6 +1033,10 @@ const styles = StyleSheet.create({
   },
   actionButtonSent: {
     opacity: 0.6,
+  },
+  actionButtonActive: {
+    borderWidth: 1,
+    borderColor: colors.primary,
   },
   actionLabelSent: {
     color: '#22c55e',
