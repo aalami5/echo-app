@@ -737,7 +737,7 @@ export default function DictationScreen() {
               onPress={() => setShowTextInput(!showTextInput)}
             >
               <Ionicons
-                name={showTextInput ? 'mic' : 'text'}
+                name={showTextInput ? 'mic' : 'keypad-outline'}
                 size={24}
                 color={colors.textSecondary}
               />
@@ -761,7 +761,7 @@ export default function DictationScreen() {
               style={styles.bottomButton}
               onPress={() => setShowImagePicker(true)}
             >
-              <Ionicons name="camera" size={24} color={colors.textSecondary} />
+              <Ionicons name="image-outline" size={24} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
         )}
