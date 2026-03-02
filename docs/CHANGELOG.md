@@ -6,13 +6,37 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 43] - 2026-03-01
+
+### Added
+- **Operative Report Templates** (Build 40) — Full template system for OR dictation
+  - 50+ operative report templates imported from Oliver's prior reports, organized by category (aortic, carotid, peripheral, venous, dialysis access, other)
+  - Template loader with smart defaults: auto-selects relevant template based on selected procedures
+  - Build-time template compiler (`scripts/build-templates.js`) for optimized loading
+  - `src/data/templateContent.ts` and `src/data/templateLoader.ts` for runtime template access
+- **Two Edit Modes for Reports** (Build 43) — Dictation review now offers direct text editing AND AI-powered regeneration as separate actions
+- **New Dictation Button in Review** (Build 42) — After generating a report, users can start a new dictation without going back
+
+### Changed
+- **CPT/ICD-10 Codes: Local Only** (Build 40) — Removed Perplexity web search for CPT/ICD-10 codes; now uses local procedure library exclusively for faster, more reliable code lookup
+- **Dictation Bottom Bar Icons** (Build 43) — Updated to match chat tab icons (keypad-outline + image-outline) for visual consistency
+
+### Fixed
+- **TTS Auto-Play on App Open** (Build 40) — Fixed stale messages triggering TTS when app opens; now skips auto-play for messages older than the current session
+- **API Key Loss on Crash** (Build 40) — settingsStore now guards against losing API keys during crash/rehydration race conditions
+- **Upside-Down Empty State** (Build 40) — Fixed inverted empty state display on chat screen
+- **Dictation Loading States** (Build 42) — Added proper loading indicators for email sending, TTS readback, and transcription; fixed keyboard scroll behavior; prevented double readback triggers
+- **Redundant Empty State Mic** (Build 42) — Removed duplicate microphone icon from dictation empty state
+
+---
+
 ## [Build 39] - 2026-02-28
 
 ### Added
 - **OR Dictation Tab** (Builds #36-39) — New dedicated tab for generating structured operative reports from voice, text, and photo input
   - Tag-based procedure picker (pill/chip UI) organized by category: Aortic, Carotid, Peripheral Arterial, Venous, Dialysis Access, Other
   - Custom procedure tags: add via '+ Add Procedure', long-press to edit/delete, persisted via AsyncStorage
-  - Web search (Perplexity) as PRIMARY source for CPT/ICD-10 codes; local procedure library as hints only
+  - CPT/ICD-10 code lookup from local procedure library (web search removed in Build 40)
   - Full report workflow: generate → review → email/copy/read back/edit+regenerate
   - Save reports as examples for future learning context
   - New `dictationStore` (Zustand + AsyncStorage) for custom procedures, corrections, style preferences, saved examples

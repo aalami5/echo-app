@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** February 28, 2026
+**Last Updated:** March 1, 2026
 
 ---
 
@@ -194,6 +194,7 @@ clearAllKeys(): void
 **Persistence Details:**
 - Key: `echo-settings`
 - All fields persisted
+- **Crash Guard (Build 40):** Rehydration logic validates that API keys aren't overwritten with `null` from a stale/corrupt state snapshot
 
 ---
 

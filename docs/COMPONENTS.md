@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** February 28, 2026
+**Last Updated:** March 1, 2026
 
 ---
 
@@ -326,7 +326,9 @@ OR dictation for generating structured operative reports:
 - Custom procedure tags (add, edit via long-press, delete, persisted via AsyncStorage)
 - Multi-modal transcript input: voice recording, text, photo
 - Report generation via OpenClaw Gateway with CPT/ICD-10 web search
-- Report actions: email, copy, TTS read-back, edit & regenerate
+- Report actions: email, copy, TTS read-back, save as example
+- **Two edit modes** (Build 43): direct text editing for quick fixes, AI-powered regeneration for structural changes
+- "New Dictation" button in review state to start fresh without navigating away
 - Save reports as examples for future context learning
 
 **Supporting Files:**

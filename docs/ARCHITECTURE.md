@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** February 28, 2026
+**Last Updated:** March 1, 2026
 
 ---
 
@@ -111,11 +111,25 @@ echo-app/
 │   │   ├── usePatientScan.ts     # Image scanning for patients
 │   │   └── useNotifications.ts   # Push notification setup
 │   │
+│   ├── data/                     # Static data & templates
+│   │   ├── templates/            # Operative report templates (markdown)
+│   │   │   ├── README.md         # Template format docs
+│   │   │   ├── aortic.md         # Aortic procedures
+│   │   │   ├── carotid.md        # Carotid procedures
+│   │   │   ├── peripheral.md     # Peripheral arterial
+│   │   │   ├── venous.md         # Venous procedures
+│   │   │   ├── dialysis-access.md# Dialysis access
+│   │   │   └── other.md          # Amputations, central lines, etc.
+│   │   ├── templateContent.ts    # Compiled template data
+│   │   ├── templateLoader.ts     # Runtime template selection & loading
+│   │   └── vascularProcedures.ts # Categorized procedure library + CPT/ICD-10
+│   │
 │   ├── services/                 # External service clients
 │   │   ├── gateway.ts            # OpenClaw Gateway API
 │   │   ├── elevenlabs.ts         # Text-to-speech
 │   │   ├── whisper.ts            # Speech-to-text
 │   │   ├── calendar.ts           # Google Calendar
+│   │   ├── dictationService.ts   # OR report generation via Gateway
 │   │   ├── notifications/        # Push notification service
 │   │   │   └── index.ts          # Expo push registration & handling
 │   │   └── supabase.ts           # Supabase client for push tokens
