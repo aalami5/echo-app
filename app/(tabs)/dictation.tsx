@@ -48,7 +48,7 @@ import {
 const OLIVER_VOICE_ID = 'grLAj0YuamNRv9WBJxB4';
 const ALL_CATEGORIES: ProcedureCategory[] = ['aortic', 'carotid', 'peripheral_arterial', 'venous', 'dialysis_access', 'other'];
 
-type ScreenState = 'input' | 'generating' | 'review' | 'editing';
+type ScreenState = 'input' | 'generating' | 'review' | 'editing' | 'direct-editing';
 
 export default function DictationScreen() {
   const insets = useSafeAreaInsets();
@@ -280,8 +280,31 @@ export default function DictationScreen() {
   };
 
   const handleEditRegenerate = () => {
-    setEditText('');
-    setScreenState('editing');
+    Alert.alert('Edit Report', 'How would you like to edit?', [
+      {
+        text: 'Edit Text Directly',
+        onPress: () => {
+          setEditText(generatedReport || '');
+          setScreenState('direct-editing');
+        },
+      },
+      {
+        text: 'Regenerate with AI',
+        onPress: () => {
+          setEditText('');
+          setScreenState('editing');
+        },
+      },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
+  const handleSaveDirectEdit = () => {
+    if (editText.trim()) {
+      setGeneratedReport(editText.trim());
+    }
+    setScreenState('review');
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleRegenerate = async () => {
@@ -729,6 +752,37 @@ export default function DictationScreen() {
           </View>
         )}
 
+        {/* ─── DIRECT EDITING STATE ─── */}
+        {screenState === 'direct-editing' && (
+          <View style={styles.flex}>
+            <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
+              <Text style={styles.editLabel}>Edit Report</Text>
+              <TextInput
+                style={styles.directEditInput}
+                value={editText}
+                onChangeText={setEditText}
+                multiline
+                autoFocus
+              />
+            </ScrollView>
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                style={styles.editCancelButton}
+                onPress={() => setScreenState('review')}
+              >
+                <Text style={styles.editCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.generateButton, styles.editRegenButton]}
+                onPress={handleSaveDirectEdit}
+              >
+                <Ionicons name="checkmark" size={18} color={colors.textInverse} />
+                <Text style={styles.generateButtonText}>Save</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
         {/* ─── Bottom Input Bar ─── */}
         {screenState === 'input' && (
           <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.md) + 60 }]}>
@@ -1091,6 +1145,16 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     minHeight: 120,
     textAlignVertical: 'top',
+  },
+  directEditInput: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    color: colors.textPrimary,
+    fontSize: typography.base,
+    minHeight: 300,
+    textAlignVertical: 'top',
+    lineHeight: 24,
   },
   editActions: {
     flexDirection: 'row',
