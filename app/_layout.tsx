@@ -3,9 +3,10 @@ import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import 'react-native-reanimated';
 import { useAuthStore } from '../src/stores/authStore';
+import { useSettingsStore } from '../src/stores/settingsStore';
 import { useNotifications } from '../src/hooks/useNotifications';
 import { colors } from '../src/constants/theme';
 
@@ -58,6 +59,21 @@ function RootLayoutNav() {
   const segments = useSegments();
   const { isAuthenticated, isLoading, loadStoredAuth } = useAuthStore();
   
+  // Track settings store hydration to avoid premature auth redirects.
+  // Before hydration, gatewayToken is null (Zustand default) — not a real sign-out.
+  const [settingsHydrated, setSettingsHydrated] = useState(false);
+  useEffect(() => {
+    if (useSettingsStore.persist.hasHydrated()) {
+      setSettingsHydrated(true);
+    } else {
+      const unsub = useSettingsStore.persist.onFinishHydration(() => {
+        setSettingsHydrated(true);
+        unsub();
+      });
+      return () => unsub();
+    }
+  }, []);
+  
   // Register for push notifications
   const { pushToken, isRegistered } = useNotifications();
 
@@ -73,9 +89,9 @@ function RootLayoutNav() {
     }
   }, [isRegistered, pushToken]);
 
-  // Handle auth state changes
+  // Handle auth state changes — wait for BOTH auth loading AND settings hydration
   useEffect(() => {
-    if (isLoading) return;
+    if (isLoading || !settingsHydrated) return;
 
     const inAuthGroup = segments[0] === 'login';
 
@@ -86,7 +102,7 @@ function RootLayoutNav() {
       // Redirect to main app if authenticated
       router.replace('/(tabs)');
     }
-  }, [isAuthenticated, isLoading, segments]);
+  }, [isAuthenticated, isLoading, settingsHydrated, segments]);
 
   return (
     <ThemeProvider value={EchoDarkTheme}>

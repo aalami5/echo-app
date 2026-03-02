@@ -48,6 +48,10 @@ interface SettingsState {
 // Uses a backup key to protect against crash-during-write corruption
 const BACKUP_SUFFIX = '-backup';
 
+// Hydration flag — blocks ALL SecureStore writes until hydration completes.
+// This prevents Zustand's initial null state from overwriting real credentials.
+let _hydrated = false;
+
 const secureStorage = {
   getItem: async (name: string): Promise<string | null> => {
     try {
@@ -82,6 +86,13 @@ const secureStorage = {
   },
   setItem: async (name: string, value: string): Promise<void> => {
     try {
+      // Block ALL writes until hydration is complete.
+      // Before hydration, Zustand has default (null) state — writing it would wipe real data.
+      if (!_hydrated) {
+        console.warn('[Settings] Blocked SecureStore write before hydration complete');
+        return;
+      }
+
       // Validate we're not writing all-null state over real data
       try {
         const parsed = JSON.parse(value);
@@ -92,7 +103,7 @@ const secureStorage = {
           if (existing) {
             const existingState = JSON.parse(existing)?.state;
             if (existingState?.openaiApiKey || existingState?.elevenlabsApiKey || existingState?.gatewayToken) {
-              console.warn('[Settings] Blocked write that would wipe existing keys (likely hydration race)');
+              console.warn('[Settings] Blocked write that would wipe existing keys');
               return; // Don't overwrite good data with empty state
             }
           }
@@ -168,6 +179,9 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       // Restore defaults if stored values are null but defaults exist
       onRehydrateStorage: () => (state) => {
+        // Mark hydration complete — SecureStore writes are now safe
+        _hydrated = true;
+        console.log('[Settings] Hydration complete, writes unlocked');
         if (state) {
           if (!state.gatewayUrl && DEFAULT_GATEWAY_URL) {
             state.gatewayUrl = DEFAULT_GATEWAY_URL;

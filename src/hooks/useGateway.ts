@@ -164,27 +164,46 @@ export function useGateway(): UseGatewayReturn {
       return false;
     }
 
-    try {
-      const startTime = Date.now();
-      const healthy = await serviceRef.current.healthCheck();
-      const latencyMs = Date.now() - startTime;
-      
-      // Only update connection state based on health check results
-      setIsConnected(healthy);
-      setNetworkConnected(healthy);
-      setError(healthy ? null : 'Gateway unreachable');
-      
-      if (healthy) {
-        setLatency(latencyMs);
+    // Retry with exponential backoff: 3 attempts at 1s, 2s, 4s delays
+    const MAX_RETRIES = 3;
+    const BASE_DELAY_MS = 1000;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const startTime = Date.now();
+        const healthy = await serviceRef.current.healthCheck();
+        const latencyMs = Date.now() - startTime;
+
+        if (healthy) {
+          setIsConnected(true);
+          setNetworkConnected(true);
+          setError(null);
+          setLatency(latencyMs);
+          return true;
+        }
+
+        // Not healthy — retry if attempts remain
+        if (attempt < MAX_RETRIES) {
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+          console.log(`[useGateway] Health check failed, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      } catch (err) {
+        if (attempt < MAX_RETRIES) {
+          const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+          console.log(`[useGateway] Health check error, retrying in ${delay}ms (attempt ${attempt + 1}/${MAX_RETRIES})`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
       }
-      
-      return healthy;
-    } catch (err) {
-      setIsConnected(false);
-      setNetworkConnected(false);
-      setError('Connection failed');
-      return false;
     }
+
+    // All retries exhausted
+    setIsConnected(false);
+    setNetworkConnected(false);
+    setError('Gateway unreachable');
+    return false;
   }, [setLatency, setNetworkConnected]);
 
   // Helper to check if a specific message is pending

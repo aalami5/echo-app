@@ -234,30 +234,36 @@ export function ConnectionSplash({ onReady, onRetry }: ConnectionSplashProps) {
     };
   }, []);
   
-  // Handle transition when connected
+  // Auto-dismiss: fade out when connected OR after 3 seconds max (whichever comes first)
   useEffect(() => {
-    const checkAndDismiss = () => {
-      if (canDismissSplash() && !readyToDismiss.current) {
-        readyToDismiss.current = true;
-        
-        // Fade out animation
-        Animated.timing(fadeOut, {
-          toValue: 0,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }).start(() => {
-          onReady?.();
-        });
-      }
+    const dismiss = () => {
+      if (readyToDismiss.current) return;
+      readyToDismiss.current = true;
+      
+      Animated.timing(fadeOut, {
+        toValue: 0,
+        duration: 400,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start(() => {
+        onReady?.();
+      });
     };
-    
-    // Check immediately
+
+    // Hard cap: always dismiss after 3 seconds regardless of connection state
+    const maxTimer = setTimeout(dismiss, 3000);
+
+    // Also dismiss early if connected + minimum splash time met
+    const checkAndDismiss = () => {
+      if (canDismissSplash()) dismiss();
+    };
     checkAndDismiss();
-    
-    // Also check periodically (for minimum time)
     const interval = setInterval(checkAndDismiss, 100);
-    return () => clearInterval(interval);
+
+    return () => {
+      clearTimeout(maxTimer);
+      clearInterval(interval);
+    };
   }, [state, canDismissSplash, onReady]);
   
   // Status text based on state
@@ -292,7 +298,7 @@ export function ConnectionSplash({ onReady, onRetry }: ConnectionSplashProps) {
   const orbColor = state === 'failed' ? colors.error : colors.primaryMuted;
   
   return (
-    <Animated.View style={[styles.container, { opacity: fadeOut }]}>
+    <Animated.View style={[styles.container, { opacity: fadeOut }]} pointerEvents="none">
       <LinearGradient
         colors={['#0B1120', '#0D1526', '#0B1120']}
         style={StyleSheet.absoluteFill}
