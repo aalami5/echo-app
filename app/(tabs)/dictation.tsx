@@ -545,13 +545,10 @@ export default function DictationScreen() {
               </View>
             )}
             {transcriptParts.length === 0 && !isTranscribing && (
-              <TouchableOpacity style={styles.emptyState} onPress={startRecording} activeOpacity={0.7}>
-                <Ionicons name="mic-outline" size={48} color="#14b8a6" />
-                <Text style={styles.emptyText}>Tap the mic to start dictating</Text>
-                <Text style={styles.emptySubtext}>
-                  Mix voice, text, and photos to build your transcript
-                </Text>
-              </TouchableOpacity>
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyText}>Start by selecting procedures below,</Text>
+                <Text style={styles.emptyText}>then tap the avatar to dictate</Text>
+              </View>
             )}
 
             {transcriptParts.map((part) => (
@@ -684,6 +681,16 @@ export default function DictationScreen() {
             <TouchableOpacity style={styles.saveExampleButton} onPress={handleSaveExample}>
               <Ionicons name="bookmark" size={18} color={colors.primaryMuted} />
               <Text style={styles.saveExampleText}>Save as Example</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={styles.newDictationButton} onPress={() => {
+              clearSession();
+              setScreenState('input');
+              setShowTextInput(false);
+              setEmailSent(false);
+            }}>
+              <Ionicons name="add-circle-outline" size={20} color={colors.textInverse} />
+              <Text style={styles.newDictationButtonText}>New Dictation</Text>
             </TouchableOpacity>
           </ScrollView>
         )}
@@ -1051,6 +1058,22 @@ const styles = StyleSheet.create({
   saveExampleText: {
     fontSize: typography.sm,
     color: colors.primaryMuted,
+  },
+  newDictationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xl,
+  },
+  newDictationButtonText: {
+    fontSize: typography.base,
+    fontWeight: typography.semibold as any,
+    color: colors.textInverse,
   },
 
   // Edit
