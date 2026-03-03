@@ -6,6 +6,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 45] - 2026-03-02
+
+### Fixed
+- **Cold-Start Hydration Race** (Build 45) — Added a `_hydrated` gate to `settingsStore` that blocks ALL SecureStore writes until Zustand hydration completes, preventing default null state from overwriting real gateway credentials on cold start. Also updated `ConnectionSplash`, `useGateway` hook, and `_layout.tsx` to coordinate around hydration timing.
+
+---
+
 ## [Build 43] - 2026-03-01
 
 ### Added

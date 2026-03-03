@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** March 1, 2026
+**Last Updated:** March 2, 2026
 
 ---
 
@@ -383,6 +383,12 @@ Patient data is stored **locally only** by design:
 - Failed connections handled gracefully with retry
 
 **History:** Builds 17-22 experimented with a "breathing crystal ball" splash screen during connection, but user testing showed it felt slower than necessary.
+
+### 7. Hydration-Gated Writes (Build 45)
+
+**Problem:** On cold start, Zustand initializes stores with default (null) state before hydration from SecureStore completes. Any store listener or side-effect that triggers a write during this window overwrites real credentials with nulls.
+
+**Solution:** A module-level `_hydrated` flag in `settingsStore` blocks all `secureStorage.setItem` calls until `onRehydrateStorage` fires. `_layout.tsx`, `ConnectionSplash`, and `useGateway` all coordinate around this flag to avoid acting on pre-hydration state.
 
 ---
 

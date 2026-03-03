@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** March 1, 2026
+**Last Updated:** March 2, 2026
 
 ---
 
@@ -195,6 +195,7 @@ clearAllKeys(): void
 - Key: `echo-settings`
 - All fields persisted
 - **Crash Guard (Build 40):** Rehydration logic validates that API keys aren't overwritten with `null` from a stale/corrupt state snapshot
+- **Hydration Gate (Build 45):** Module-level `_hydrated` flag blocks ALL SecureStore writes until `onRehydrateStorage` fires, preventing Zustand's default null state from overwriting real credentials during cold start
 
 ---
 
