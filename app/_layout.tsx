@@ -9,6 +9,8 @@ import { useAuthStore } from '../src/stores/authStore';
 import { useSettingsStore } from '../src/stores/settingsStore';
 import { useNotifications } from '../src/hooks/useNotifications';
 import { colors } from '../src/constants/theme';
+import { logCrash } from '../src/services/crashLog';
+import { supabase } from '../src/lib/supabase';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -47,6 +49,31 @@ export default function RootLayout() {
     }
   }, [loaded]);
 
+  useEffect(() => {
+    const errorUtils = (global as any)?.ErrorUtils;
+    if (!errorUtils?.getGlobalHandler || !errorUtils?.setGlobalHandler) return;
+
+    const defaultHandler = errorUtils.getGlobalHandler();
+    const handler = (err: unknown, isFatal?: boolean) => {
+      if (err instanceof Error) {
+        logCrash(err, isFatal ? 'fatal' : 'unhandled');
+      } else {
+        logCrash(new Error(String(err)), isFatal ? 'fatal' : 'unhandled');
+      }
+
+      if (typeof defaultHandler === 'function') {
+        defaultHandler(err, isFatal);
+      }
+    };
+
+    errorUtils.setGlobalHandler(handler);
+    return () => {
+      if (typeof defaultHandler === 'function') {
+        errorUtils.setGlobalHandler(defaultHandler);
+      }
+    };
+  }, []);
+
   if (!loaded) {
     return null;
   }
@@ -57,7 +84,7 @@ export default function RootLayout() {
 function RootLayoutNav() {
   const router = useRouter();
   const segments = useSegments();
-  const { isAuthenticated, isLoading, loadStoredAuth } = useAuthStore();
+  const { isAuthenticated, isLoading, loadStoredAuth, setUser, setTokens, logout } = useAuthStore();
   
   // Track settings store hydration to avoid premature auth redirects.
   // Before hydration, gatewayToken is null (Zustand default) — not a real sign-out.
@@ -81,6 +108,30 @@ function RootLayoutNav() {
   useEffect(() => {
     loadStoredAuth();
   }, []);
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_OUT') {
+        await logout();
+        return;
+      }
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          setUser({
+            id: session.user.id,
+            email: session.user.email || '',
+            createdAt: session.user.created_at || new Date().toISOString(),
+          });
+          await setTokens(session.access_token, session.refresh_token || null);
+        }
+      }
+    });
+
+    return () => {
+      authListener?.subscription?.unsubscribe();
+    };
+  }, [logout, setTokens, setUser]);
   
   // Log push notification registration status
   useEffect(() => {

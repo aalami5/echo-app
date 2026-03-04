@@ -25,6 +25,7 @@ import { usePatientSync } from '../../src/hooks/usePatientSync';
 import { useScaledTypography, TEXT_SCALE_LABELS } from '../../src/hooks/useScaledTypography';
 import { VOICES, VoiceName } from '../../src/services/elevenlabs';
 import { colors, spacing, borderRadius, typography } from '../../src/constants/theme';
+import { clearCrashLogs, getCrashLogs } from '../../src/services/crashLog';
 
 type ConnectionStatus = 'connected' | 'connecting' | 'disconnected' | 'error';
 
@@ -58,8 +59,19 @@ export default function SettingsScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showOpenAIKey, setShowOpenAIKey] = useState(false);
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
+  const [crashLogCount, setCrashLogCount] = useState(0);
 
   const connectionStatus: ConnectionStatus = isConnected ? 'connected' : 'disconnected';
+
+  const refreshCrashLogs = async () => {
+    const logs = await getCrashLogs();
+    setCrashLogCount(logs.length);
+    return logs;
+  };
+
+  useEffect(() => {
+    refreshCrashLogs();
+  }, []);
 
   const handleLogout = async () => {
     await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
@@ -106,6 +118,38 @@ export default function SettingsScreen() {
         },
       ]
     );
+  };
+
+  const handleViewCrashLogs = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const logs = await refreshCrashLogs();
+    if (logs.length === 0) {
+      Alert.alert('Crash Logs', 'No crash logs found.');
+      return;
+    }
+
+    const recent = logs.slice(-5).reverse();
+    const message = recent
+      .map((entry) => `${new Date(entry.timestamp).toLocaleString()}\n${entry.message}`)
+      .join('\n\n');
+
+    Alert.alert('Crash Logs (Last 5)', message);
+  };
+
+  const handleClearCrashLogs = async () => {
+    await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+    Alert.alert('Clear Crash Logs', 'This will remove all stored crash logs.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: async () => {
+          await clearCrashLogs();
+          await refreshCrashLogs();
+          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        },
+      },
+    ]);
   };
 
   const formatLastSync = (date: Date | number | null) => {
@@ -536,6 +580,44 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Crash Logs Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>CRASH LOGS</Text>
+          <View style={styles.card}>
+            <SettingsRow 
+              icon="bug-outline"
+              label="Stored Logs"
+              value={`${crashLogCount} stored`}
+              valueColor={crashLogCount > 0 ? colors.warning : colors.textTertiary}
+            />
+            <Divider />
+            <SettingsRow 
+              icon="options-outline"
+              label="Actions"
+              trailing={
+                <View style={styles.crashActions}>
+                  <TouchableOpacity
+                    style={styles.crashButton}
+                    onPress={handleViewCrashLogs}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.crashButtonText}>View Logs</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.crashButton, styles.crashButtonDestructive]}
+                    onPress={handleClearCrashLogs}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.crashButtonText, styles.crashButtonTextDestructive]}>
+                      Clear Logs
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              }
+            />
+          </View>
+        </View>
+
         {/* Logout */}
         <TouchableOpacity 
           style={styles.logoutButton} 
@@ -762,6 +844,30 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     color: colors.error,
     fontWeight: '500',
+  },
+  crashActions: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  crashButton: {
+    backgroundColor: colors.primarySubtle,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.primaryMuted,
+  },
+  crashButtonText: {
+    fontSize: typography.sm,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  crashButtonDestructive: {
+    backgroundColor: colors.surfaceElevated,
+    borderColor: colors.error,
+  },
+  crashButtonTextDestructive: {
+    color: colors.error,
   },
   version: {
     textAlign: 'center',
