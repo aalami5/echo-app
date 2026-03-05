@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 46] - 2026-03-04
+
+### Added
+- **Crash Logging Service** — New `src/services/crashLog.ts` with AsyncStorage-backed crash log (max 20 entries, FIFO eviction)
+- **Global Error Handler** — `ErrorUtils` global handler in `_layout.tsx` catches unhandled JS errors and persists them via crashLog service
+- **Auth State Persistence Fix** — Supabase `onAuthStateChange` listener in root layout for reliable session restore after crash
+- **Crash Log Viewer** — New "Crash Logs" section in Settings (`explore.tsx`) with View and Clear buttons
+
+---
+
 ## [Build 45] - 2026-03-02
 
 ### Fixed

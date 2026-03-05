@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** March 1, 2026
+**Last Updated:** March 4, 2026
 
 ---
 
@@ -362,6 +362,7 @@ App configuration:
 - Voice settings (on/off, voice selection)
 - API key management
 - Haptic feedback toggle
+- Crash Logs — View and clear stored crash logs (max 20 entries)
 
 ---
 

@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** March 2, 2026
+**Last Updated:** March 4, 2026
 
 ---
 
@@ -125,6 +125,7 @@ echo-app/
 │   │   └── vascularProcedures.ts # Categorized procedure library + CPT/ICD-10
 │   │
 │   ├── services/                 # External service clients
+│   │   ├── crashLog.ts           # Crash logging (AsyncStorage, FIFO, max 20)
 │   │   ├── gateway.ts            # OpenClaw Gateway API
 │   │   ├── elevenlabs.ts         # Text-to-speech
 │   │   ├── whisper.ts            # Speech-to-text
