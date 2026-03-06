@@ -28,6 +28,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { useRouter } from 'expo-router';
 import { colors, spacing, borderRadius, typography, shadows } from '../../src/constants/theme';
 import { 
   usePatientsStore, 
@@ -36,6 +37,8 @@ import {
   Patient,
   CallDay 
 } from '../../src/stores/patientsStore';
+import { usePatientDictationsStore } from '../../src/stores/patientDictationsStore';
+import { PROCEDURE_TEMPLATES } from '../../src/data/vascularProcedures';
 import { usePatientVoiceInput } from '../../src/hooks/usePatientVoiceInput';
 import { usePatientScan, ScannedPatientData } from '../../src/hooks/usePatientScan';
 
@@ -43,6 +46,7 @@ import { usePatientScan, ScannedPatientData } from '../../src/hooks/usePatientSc
 const HOSPITAL_ORDER: Hospital[] = ['SEQ', 'ECH', 'SMCMC', 'Mills', 'OTHER'];
 
 export default function PatientsScreen() {
+  const router = useRouter();
   const {
     patients,
     callDays,
@@ -64,6 +68,13 @@ export default function PatientsScreen() {
     getCommonComplaints,
     reorganizePatientsByTimeSeen,
   } = usePatientsStore();
+
+  const {
+    dictations,
+    getDictationsForPatient,
+    createDictation,
+    updateDictation,
+  } = usePatientDictationsStore();
   
   // Voice input for chief complaint
   const {
@@ -387,39 +398,129 @@ export default function PatientsScreen() {
     const newId = createCallDay();
     setExpandedCallDays(prev => new Set([...prev, newId]));
   }, [createCallDay]);
+
+  const getSuggestedProcedures = useCallback((chiefComplaint: string) => {
+    const text = chiefComplaint.toLowerCase();
+    const categories = new Set<string>();
+    if (/\b(aaa|aneurysm|aortic)\b/.test(text)) categories.add('aortic');
+    if (/\bcarotid\b/.test(text)) categories.add('carotid');
+    if (/\b(pad|claudication|ischemia)\b/.test(text)) categories.add('peripheral_arterial');
+    if (/\b(dialysis|fistula|graft)\b/.test(text)) categories.add('dialysis_access');
+    if (/\b(dvt|varicose)\b/.test(text)) categories.add('venous');
+    if (categories.size === 0) return [];
+    return PROCEDURE_TEMPLATES
+      .filter((proc) => categories.has(proc.category))
+      .map((proc) => proc.name);
+  }, []);
+
+  const handleStartNewDictation = useCallback((patient: Patient) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const dictationId = createDictation(patient.id);
+    const suggested = patient.chiefComplaint ? getSuggestedProcedures(patient.chiefComplaint) : [];
+    if (suggested.length > 0) {
+      updateDictation(dictationId, { selectedProcedures: suggested });
+    }
+    router.push({
+      pathname: '/patient-dictation',
+      params: { patientId: patient.id, dictationId, mode: 'new' },
+    });
+  }, [createDictation, getSuggestedProcedures, router, updateDictation]);
+
+  const handleContinueDictation = useCallback((patientId: string, dictationId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({
+      pathname: '/patient-dictation',
+      params: { patientId, dictationId, mode: 'continue' },
+    });
+  }, [router]);
+
+  const handleViewReport = useCallback((patientId: string, dictationId?: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push({
+      pathname: '/patient-dictation',
+      params: { patientId, dictationId: dictationId || undefined, mode: 'view' },
+    });
+  }, [router]);
   
   // Render patient row - tap to edit, long press to delete
-  const renderPatient = useCallback((patient: Patient, showHospital = false) => (
-    <TouchableOpacity
-      key={patient.id}
-      style={styles.patientRow}
-      onPress={() => handleEditPatient(patient)}
-      onLongPress={() => handleDeletePatient(patient)}
-      delayLongPress={500}
-    >
-      <View style={styles.patientInfo}>
-        <View style={styles.patientNameRow}>
-          <Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text>
-          {patient.room && (
-            <Text style={styles.patientRoom}>{patient.room}</Text>
+  const renderPatient = useCallback((patient: Patient, showHospital = false) => {
+    const patientDictations = getDictationsForPatient(patient.id);
+    const drafts = patientDictations.filter((d) => d.status === 'draft');
+    const finals = patientDictations.filter((d) => d.status === 'final');
+    const latestDraft = drafts[0];
+    const latestFinal = finals[0];
+    const hasDraft = drafts.length > 0;
+    const finalCount = finals.length;
+
+    let actionLabel = 'Op Report';
+    let actionIcon: React.ComponentProps<typeof Ionicons>['name'] = 'mic';
+    let actionStyle = styles.opReportButton;
+    let actionTextStyle = styles.opReportButtonText;
+    let actionIconColor = colors.textInverse;
+    let onAction = () => handleStartNewDictation(patient);
+
+    if (hasDraft && latestDraft) {
+      actionLabel = 'Continue Report';
+      actionIcon = 'time-outline';
+      actionStyle = styles.opReportButtonDraft;
+      actionTextStyle = styles.opReportButtonTextDraft;
+      onAction = () => handleContinueDictation(patient.id, latestDraft.id);
+    } else if (finalCount > 0 && latestFinal) {
+      actionLabel = 'View Report';
+      actionIcon = 'document-text-outline';
+      actionStyle = styles.opReportButtonView;
+      actionTextStyle = styles.opReportButtonTextView;
+      actionIconColor = colors.primary;
+      onAction = () => {
+        if (finalCount === 1) handleViewReport(patient.id, latestFinal.id);
+        else handleViewReport(patient.id);
+      };
+    }
+
+    return (
+      <TouchableOpacity
+        key={patient.id}
+        style={styles.patientRow}
+        onPress={() => handleEditPatient(patient)}
+        onLongPress={() => handleDeletePatient(patient)}
+        delayLongPress={500}
+      >
+        <View style={styles.patientInfo}>
+          <View style={styles.patientNameRow}>
+            <Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text>
+            {patient.room && (
+              <Text style={styles.patientRoom}>{patient.room}</Text>
+            )}
+          </View>
+          <View style={styles.patientDetails}>
+            <Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>
+            {patient.dob && <Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}
+          </View>
+          {patient.chiefComplaint && (
+            <Text style={styles.patientComplaint} numberOfLines={2}>{patient.chiefComplaint}</Text>
+          )}
+          {showHospital && (
+            <Text style={styles.patientHospital}>{HOSPITAL_NAMES[patient.hospital]}</Text>
           )}
         </View>
-        <View style={styles.patientDetails}>
-          <Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>
-          {patient.dob && <Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}
+        <View style={styles.patientActions}>
+          <TouchableOpacity style={actionStyle} onPress={onAction}>
+            {hasDraft && <View style={styles.draftDot} />}
+            <Ionicons name={actionIcon} size={14} color={actionIconColor} />
+            <Text style={actionTextStyle}>{actionLabel}</Text>
+            {finalCount > 1 && !hasDraft && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{finalCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <View style={styles.patientEditIcon}>
+            <Ionicons name="pencil" size={16} color={colors.textTertiary} />
+          </View>
         </View>
-        {patient.chiefComplaint && (
-          <Text style={styles.patientComplaint} numberOfLines={2}>{patient.chiefComplaint}</Text>
-        )}
-        {showHospital && (
-          <Text style={styles.patientHospital}>{HOSPITAL_NAMES[patient.hospital]}</Text>
-        )}
-      </View>
-      <View style={styles.patientEditIcon}>
-        <Ionicons name="pencil" size={16} color={colors.textTertiary} />
-      </View>
-    </TouchableOpacity>
-  ), [handleEditPatient, handleDeletePatient]);
+      </TouchableOpacity>
+    );
+  }, [getDictationsForPatient, handleContinueDictation, handleDeletePatient, handleEditPatient, handleStartNewDictation, handleViewReport]);
   
   // Render hospital section
   const renderHospitalSection = useCallback((callDayId: string, hospital: Hospital) => {
@@ -1479,9 +1580,75 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: spacing.sm,
   },
+  patientActions: {
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+  },
   patientEditIcon: {
     paddingTop: 2,
     paddingLeft: spacing.xs,
+  },
+  opReportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+  },
+  opReportButtonText: {
+    fontSize: typography.xs,
+    fontWeight: typography.semibold,
+    color: colors.textInverse,
+  },
+  opReportButtonDraft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.warning,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+  },
+  opReportButtonTextDraft: {
+    fontSize: typography.xs,
+    fontWeight: typography.semibold,
+    color: colors.textInverse,
+  },
+  opReportButtonView: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primaryMuted,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+  },
+  opReportButtonTextView: {
+    fontSize: typography.xs,
+    fontWeight: typography.semibold,
+    color: colors.primary,
+  },
+  draftDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.warning,
+  },
+  countBadge: {
+    backgroundColor: colors.primarySubtle,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 2,
+  },
+  countBadgeText: {
+    fontSize: typography.xs,
+    color: colors.primary,
+    fontWeight: typography.semibold,
   },
   patientName: {
     fontSize: typography.base,
