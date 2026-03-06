@@ -6,6 +6,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 47] - 2026-03-05
+
+### Improved
+- **WebSocket Auto-Reconnect** — Robust reconnection system replacing the fragile 3-attempt retry:
+  - AppState listener for instant reconnect when app returns to foreground
+  - Exponential backoff: 2s → 4s → 8s → 16s → 30s cap, retries indefinitely
+  - Ping/pong heartbeat: 25s interval with 10s pong timeout to detect zombie connections
+  - Any incoming message clears pong timeout (proves connection alive)
+  - Fixes the issue where the app would go "offline" and require a force-restart to recover
+
+### Fixed
+- **TypeScript errors** — Fixed `NodeJS.Timeout` type references to `ReturnType<typeof setTimeout>` for React Native compatibility
+
+---
+
 ## [Build 46] - 2026-03-04
 
 ### Added

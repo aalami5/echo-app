@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** March 4, 2026
+**Last Updated:** March 5, 2026
 
 ---
 
@@ -142,7 +142,7 @@ echo-app/
 │   │   ├── settingsStore.ts      # App settings (persisted)
 │   │   ├── calendarStore.ts      # Calendar events
 │   │   ├── networkStore.ts       # Connection state + toasts
-│   │   └── websocketStore.ts     # Legacy connection state
+│   │   └── websocketStore.ts     # WebSocket connection state
 │   │
 │   └── types/
 │       └── index.ts              # TypeScript type definitions
@@ -324,15 +324,21 @@ Patient data is stored **locally only** by design:
 
 ## Key Design Decisions
 
-### 1. HTTP API vs WebSocket
+### 1. HTTP API + WebSocket (Dual Transport)
 
-**Chose:** HTTP API (OpenAI-compatible `/v1/chat/completions`)
+**Chose:** Both — HTTP API for chat completions, WebSocket for real-time push
 
-**Why:**
-- Simpler to implement and debug
+**HTTP (`/v1/chat/completions`):**
+- OpenAI-compatible endpoint for sending messages
 - Works through Cloudflare Tunnel without issues
-- Streaming not critical for our use case
-- Gateway already exposes this endpoint
+- Simple request/response model
+
+**WebSocket (`src/lib/websocket.ts`):**
+- Real-time push for incoming messages, calendar events, patient data
+- Robust auto-reconnect with exponential backoff (2s → 30s cap, retries forever)
+- Ping/pong heartbeat every 25s with 10s pong timeout for zombie connection detection
+- AppState-aware: instant reconnect when app returns to foreground
+- Any incoming message resets pong timeout (proves connection alive)
 
 ### 2. SecureStore vs AsyncStorage
 
