@@ -16,8 +16,8 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
   const [duration, setDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
   const recording = useRef<Audio.Recording | null>(null);
-  const durationInterval = useRef<NodeJS.Timeout | null>(null);
-  const meteringInterval = useRef<NodeJS.Timeout | null>(null);
+  const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const meteringInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startRecording = useCallback(async () => {
     // Prevent double-starts

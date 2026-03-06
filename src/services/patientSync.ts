@@ -20,7 +20,7 @@ const RETRY_DELAY_MS = 5000;
 let pendingSyncData: { patients: any; callDays: any; callDayOrder: string[] } | null = null;
 let syncInProgress = false;
 let retryCount = 0;
-let retryTimer: NodeJS.Timeout | null = null;
+let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
 /**
  * Sync patient data to server

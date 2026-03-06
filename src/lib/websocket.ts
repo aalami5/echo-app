@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
+import { AppState } from 'react-native';
 import { useChatStore } from '../stores/chatStore';
 import { useCalendarStore } from '../stores/calendarStore';
 import { useWebSocketStore } from '../stores/websocketStore';
@@ -8,14 +9,18 @@ import type { Message, AvatarState } from '../types';
 // Gateway WebSocket URL - will be configurable later
 const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:8765';
 
-// Max reconnect attempts before giving up
-const MAX_RECONNECT_ATTEMPTS = 3;
-const RECONNECT_DELAY = 5000;
+const INITIAL_RECONNECT_DELAY = 2000;
+const MAX_RECONNECT_DELAY = 30000;
+const RECONNECT_BACKOFF_FACTOR = 2;
+const PING_INTERVAL = 25000; // Send ping every 25 seconds
+const PONG_TIMEOUT = 10000;  // Expect pong within 10 seconds
 
 export function useWebSocket(token: string | null) {
   const ws = useRef<WebSocket | null>(null);
   const reconnectAttempts = useRef(0);
-  const reconnectTimeout = useRef<NodeJS.Timeout | null>(null);
+  const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pongTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { addMessage, setAvatarState, setConnected } = useChatStore();
   const { setEvents } = useCalendarStore();
   const { setConnected: setWsConnected, setConnecting, setLastMessageTime, setError } = useWebSocketStore();
@@ -32,13 +37,6 @@ export function useWebSocket(token: string | null) {
       return;
     }
 
-    // Don't retry forever
-    if (reconnectAttempts.current >= MAX_RECONNECT_ATTEMPTS) {
-      console.log('[WS] Max reconnect attempts reached, staying offline');
-      setConnected(false);
-      return;
-    }
-
     const url = `${WS_URL}?token=${token}`;
     console.log('[WS] Connecting...');
 
@@ -50,6 +48,33 @@ export function useWebSocket(token: string | null) {
         setConnected(true);
         setWsConnected(true);
         reconnectAttempts.current = 0; // Reset on successful connection
+
+        // Start heartbeat pings
+        if (pingInterval.current) {
+          clearInterval(pingInterval.current);
+        }
+        pingInterval.current = setInterval(() => {
+          if (ws.current?.readyState === WebSocket.OPEN) {
+            try {
+              ws.current.send(JSON.stringify({ type: 'ping', ts: Date.now() }));
+              // Set pong timeout — if no response, connection is dead
+              if (pongTimeout.current) {
+                clearTimeout(pongTimeout.current);
+              }
+              pongTimeout.current = setTimeout(() => {
+                console.log('[WS] Pong timeout — connection appears dead, reconnecting...');
+                if (ws.current) {
+                  ws.current.close();
+                  ws.current = null;
+                }
+                reconnectAttempts.current = 0;
+                connect();
+              }, PONG_TIMEOUT);
+            } catch (e) {
+              console.log('[WS] Failed to send ping');
+            }
+          }
+        }, PING_INTERVAL);
       };
 
       ws.current.onclose = (event) => {
@@ -58,12 +83,24 @@ export function useWebSocket(token: string | null) {
         setWsConnected(false);
         ws.current = null;
 
-        // Only auto-reconnect a few times
-        if (reconnectAttempts.current < MAX_RECONNECT_ATTEMPTS) {
-          reconnectAttempts.current++;
-          console.log(`[WS] Will retry (${reconnectAttempts.current}/${MAX_RECONNECT_ATTEMPTS}) in ${RECONNECT_DELAY/1000}s...`);
-          reconnectTimeout.current = setTimeout(connect, RECONNECT_DELAY);
+        // Stop heartbeat
+        if (pingInterval.current) {
+          clearInterval(pingInterval.current);
+          pingInterval.current = null;
         }
+        if (pongTimeout.current) {
+          clearTimeout(pongTimeout.current);
+          pongTimeout.current = null;
+        }
+
+        // Always retry with exponential backoff (no max attempts)
+        reconnectAttempts.current++;
+        const delay = Math.min(
+          INITIAL_RECONNECT_DELAY * Math.pow(RECONNECT_BACKOFF_FACTOR, reconnectAttempts.current - 1),
+          MAX_RECONNECT_DELAY
+        );
+        console.log(`[WS] Will retry (#${reconnectAttempts.current}) in ${(delay / 1000).toFixed(1)}s...`);
+        reconnectTimeout.current = setTimeout(connect, delay);
       };
 
       ws.current.onerror = () => {
@@ -78,6 +115,12 @@ export function useWebSocket(token: string | null) {
           const data = JSON.parse(event.data);
           console.log('[WS] Message:', data.type);
           setLastMessageTime(new Date());
+
+          // Any incoming message proves connection is alive
+          if (pongTimeout.current) {
+            clearTimeout(pongTimeout.current);
+            pongTimeout.current = null;
+          }
 
           switch (data.type) {
             case 'message':
@@ -135,6 +178,17 @@ export function useWebSocket(token: string | null) {
                 });
               }
               break;
+            case 'pong':
+              // Clear pong timeout — connection is alive
+              if (pongTimeout.current) {
+                clearTimeout(pongTimeout.current);
+                pongTimeout.current = null;
+              }
+              if (data.ts) {
+                const latency = Date.now() - data.ts;
+                console.log('[WS] Pong received, latency:', latency, 'ms');
+              }
+              break;
           }
         } catch (e) {
           console.log('[WS] Failed to parse message');
@@ -144,12 +198,20 @@ export function useWebSocket(token: string | null) {
       console.log('[WS] Failed to create WebSocket');
       setConnected(false);
     }
-  }, [token, addMessage, setAvatarState, setConnected]);
+  }, [token, addMessage, setAvatarState, setConnected, setEvents, setLastMessageTime, setPendingPatient, setWsConnected]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeout.current) {
       clearTimeout(reconnectTimeout.current);
       reconnectTimeout.current = null;
+    }
+    if (pingInterval.current) {
+      clearInterval(pingInterval.current);
+      pingInterval.current = null;
+    }
+    if (pongTimeout.current) {
+      clearTimeout(pongTimeout.current);
+      pongTimeout.current = null;
     }
     if (ws.current) {
       ws.current.close();
@@ -203,6 +265,22 @@ export function useWebSocket(token: string | null) {
     connect();
     return () => disconnect();
   }, [connect, disconnect]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active') {
+        console.log('[WS] App foregrounded — checking connection');
+        // Reset retry counter so we get fresh attempts
+        reconnectAttempts.current = 0;
+        // Only reconnect if not already connected
+        if (!ws.current || ws.current.readyState !== WebSocket.OPEN) {
+          console.log('[WS] Reconnecting after foreground...');
+          connect();
+        }
+      }
+    });
+    return () => subscription.remove();
+  }, [connect]);
 
   return { 
     sendMessage, 
