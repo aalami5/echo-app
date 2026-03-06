@@ -485,35 +485,39 @@ export default function PatientsScreen() {
         onLongPress={() => handleDeletePatient(patient)}
         delayLongPress={500}
       >
-        <View style={styles.patientInfo}>
-          <View style={styles.patientNameRow}>
-            <Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text>
+        {/* Full-width name row on top */}
+        <View style={styles.patientTopRow}>
+          <Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text>
+          <View style={styles.patientBadgeRow}>
             {patient.room && (
               <Text style={styles.patientRoom}>{patient.room}</Text>
             )}
+            <TouchableOpacity style={actionStyle} onPress={onAction}>
+              {hasDraft && <View style={styles.draftDot} />}
+              <Ionicons name={actionIcon} size={14} color={actionIconColor} />
+              <Text style={actionTextStyle}>{actionLabel}</Text>
+              {finalCount > 1 && !hasDraft && (
+                <View style={styles.countBadge}>
+                  <Text style={styles.countBadgeText}>{finalCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
           </View>
-          <View style={styles.patientDetails}>
-            <Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>
-            {patient.dob && <Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}
-          </View>
-          {patient.chiefComplaint && (
-            <Text style={styles.patientComplaint} numberOfLines={2}>{patient.chiefComplaint}</Text>
-          )}
-          {showHospital && (
-            <Text style={styles.patientHospital}>{HOSPITAL_NAMES[patient.hospital]}</Text>
-          )}
         </View>
-        <View style={styles.patientActions}>
-          <TouchableOpacity style={actionStyle} onPress={onAction}>
-            {hasDraft && <View style={styles.draftDot} />}
-            <Ionicons name={actionIcon} size={14} color={actionIconColor} />
-            <Text style={actionTextStyle}>{actionLabel}</Text>
-            {finalCount > 1 && !hasDraft && (
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{finalCount}</Text>
-              </View>
+        {/* Details row below name */}
+        <View style={styles.patientDetailsRow}>
+          <View style={styles.patientInfo}>
+            <View style={styles.patientDetails}>
+              <Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>
+              {patient.dob && <Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}
+            </View>
+            {patient.chiefComplaint && (
+              <Text style={styles.patientComplaint} numberOfLines={2}>{patient.chiefComplaint}</Text>
             )}
-          </TouchableOpacity>
+            {showHospital && (
+              <Text style={styles.patientHospital}>{HOSPITAL_NAMES[patient.hospital]}</Text>
+            )}
+          </View>
           <View style={styles.patientEditIcon}>
             <Ionicons name="pencil" size={16} color={colors.textTertiary} />
           </View>
@@ -1569,20 +1573,32 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
   },
   patientRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: 'column',
     backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
+  patientTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginBottom: 6,
+  },
+  patientBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    flexShrink: 0,
+  },
+  patientDetailsRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
   patientInfo: {
     flex: 1,
     marginRight: spacing.sm,
-  },
-  patientActions: {
-    alignItems: 'flex-end',
-    gap: spacing.sm,
   },
   patientEditIcon: {
     paddingTop: 2,
@@ -1651,8 +1667,8 @@ const styles = StyleSheet.create({
     fontWeight: typography.semibold,
   },
   patientName: {
-    fontSize: typography.base,
-    fontWeight: typography.semibold,
+    fontSize: typography.lg,
+    fontWeight: typography.bold,
     color: colors.textPrimary,
     flex: 1,
     flexShrink: 1,
@@ -1909,11 +1925,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   // Patient row with room
-  patientNameRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
+  // patientNameRow removed — name now gets full top row
   patientRoom: {
     fontSize: typography.sm,
     fontWeight: typography.medium,
