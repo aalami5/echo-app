@@ -485,43 +485,39 @@ export default function PatientsScreen() {
         onLongPress={() => handleDeletePatient(patient)}
         delayLongPress={500}
       >
-        {/* Full-width name row on top */}
-        <View style={styles.patientTopRow}>
-          <Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text>
-          <View style={styles.patientBadgeRow}>
-            {patient.room && (
-              <Text style={styles.patientRoom}>{patient.room}</Text>
+        {/* Name on its own full-width line */}
+        <Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text>
+        {/* Badges + action row below name */}
+        <View style={styles.patientBadgeRow}>
+          {patient.room && (
+            <Text style={styles.patientRoom}>{patient.room}</Text>
+          )}
+          <TouchableOpacity style={actionStyle} onPress={onAction}>
+            {hasDraft && <View style={styles.draftDot} />}
+            <Ionicons name={actionIcon} size={14} color={actionIconColor} />
+            <Text style={actionTextStyle}>{actionLabel}</Text>
+            {finalCount > 1 && !hasDraft && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{finalCount}</Text>
+              </View>
             )}
-            <TouchableOpacity style={actionStyle} onPress={onAction}>
-              {hasDraft && <View style={styles.draftDot} />}
-              <Ionicons name={actionIcon} size={14} color={actionIconColor} />
-              <Text style={actionTextStyle}>{actionLabel}</Text>
-              {finalCount > 1 && !hasDraft && (
-                <View style={styles.countBadge}>
-                  <Text style={styles.countBadgeText}>{finalCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-        {/* Details row below name */}
-        <View style={styles.patientDetailsRow}>
-          <View style={styles.patientInfo}>
-            <View style={styles.patientDetails}>
-              <Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>
-              {patient.dob && <Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}
-            </View>
-            {patient.chiefComplaint && (
-              <Text style={styles.patientComplaint} numberOfLines={2}>{patient.chiefComplaint}</Text>
-            )}
-            {showHospital && (
-              <Text style={styles.patientHospital}>{HOSPITAL_NAMES[patient.hospital]}</Text>
-            )}
-          </View>
+          </TouchableOpacity>
+          <View style={{ flex: 1 }} />
           <View style={styles.patientEditIcon}>
             <Ionicons name="pencil" size={16} color={colors.textTertiary} />
           </View>
         </View>
+        {/* Details below badges */}
+        <View style={styles.patientDetails}>
+          <Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>
+          {patient.dob && <Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}
+        </View>
+        {patient.chiefComplaint && (
+          <Text style={styles.patientComplaint} numberOfLines={2}>{patient.chiefComplaint}</Text>
+        )}
+        {showHospital && (
+          <Text style={styles.patientHospital}>{HOSPITAL_NAMES[patient.hospital]}</Text>
+        )}
       </TouchableOpacity>
     );
   }, [getDictationsForPatient, handleContinueDictation, handleDeletePatient, handleEditPatient, handleStartNewDictation, handleViewReport]);
@@ -1579,26 +1575,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
-  patientTopRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    marginBottom: 6,
-  },
   patientBadgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: spacing.sm,
-    flexShrink: 0,
-  },
-  patientDetailsRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  patientInfo: {
-    flex: 1,
-    marginRight: spacing.sm,
+    marginTop: 6,
+    marginBottom: 4,
   },
   patientEditIcon: {
     paddingTop: 2,
@@ -1670,8 +1653,6 @@ const styles = StyleSheet.create({
     fontSize: typography.lg,
     fontWeight: typography.bold,
     color: colors.textPrimary,
-    flex: 1,
-    flexShrink: 1,
   },
   patientDetails: {
     flexDirection: 'row',
