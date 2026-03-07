@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** March 5, 2026
+**Last Updated:** March 6, 2026
 
 ---
 
@@ -87,6 +87,7 @@ echo-app/
 │   │   ├── patients.tsx          # Patient tracking
 │   │   ├── today.tsx             # Calendar view
 │   │   └── explore.tsx           # Settings
+│   ├── patient-dictation.tsx      # Patient-linked OR dictation (modal)
 │   ├── login.tsx                 # Authentication
 │   ├── modal.tsx                 # Modal template
 │   └── _layout.tsx               # Root layout
@@ -139,6 +140,7 @@ echo-app/
 │   │   ├── authStore.ts          # Authentication state
 │   │   ├── chatStore.ts          # Chat messages (persisted)
 │   │   ├── patientsStore.ts      # Patient list (persisted)
+│   │   ├── patientDictationsStore.ts # Per-patient OR dictations (AsyncStorage)
 │   │   ├── settingsStore.ts      # App settings (persisted)
 │   │   ├── calendarStore.ts      # Calendar events
 │   │   ├── networkStore.ts       # Connection state + toasts

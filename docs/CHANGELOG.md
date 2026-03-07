@@ -6,6 +6,27 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 48] - 2026-03-06
+
+### Added
+- **Patient-Linked Operative Report Dictation** — Full dictation workflow tied to individual patients:
+  - New `patient-dictation.tsx` modal screen (1900+ lines) with complete OR dictation flow
+  - New `patientDictationsStore` — per-patient dictation persistence via AsyncStorage (draft/final status, report history)
+  - Auto-populated report header: Dr. Aalami + patient name + MRN + date of operation
+  - Date of operation picker
+  - Smart procedure pre-selection from patient's chief complaint
+  - Per-patient report history timeline
+  - Draft auto-save with 10-second debounce
+  - Quick duplicate: start new report from previous
+  - Export encounter bundle (patient + report + CPT codes)
+  - Read-back (TTS), email, and copy support
+- **Op Report Button on Patient Cards** — Quick access from patients list with draft indicator badge and "View Report" action
+
+### Fixed
+- **Patient Name Layout** — Patient name now renders on its own full-width row on cards (two layout fixes)
+
+---
+
 ## [Build 47] - 2026-03-05
 
 ### Improved

@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** March 2, 2026
+**Last Updated:** March 6, 2026
 
 ---
 
@@ -365,6 +365,39 @@ Manages OR dictation sessions and persisted learning data.
 | `selectedProcedures` | `string[]` | Selected procedure tags for current session |
 
 **Key Actions:** `addTranscriptPart`, `toggleProcedure`, `setGeneratedReport`, `saveAsExample`, `addCustomProcedure`, `addCorrection`, `clearSession`
+
+---
+
+### patientDictationsStore
+
+Manages per-patient operative report dictations with draft/final lifecycle.
+
+**File:** `src/stores/patientDictationsStore.ts`
+
+**Persistence:** AsyncStorage (key: `patient-dictations`)
+
+**State:**
+
+| Field | Type | Persisted | Description |
+|-------|------|-----------|-------------|
+| `dictations` | `Record<string, PatientDictation>` | ✅ | All dictations keyed by ID |
+
+**PatientDictation Shape:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | UUID |
+| `patientId` | `string` | Links to `Patient.id` |
+| `status` | `'draft' \| 'final'` | Draft = in-progress, Final = completed |
+| `dateOfOperation` | `string` | ISO date string |
+| `transcriptParts` | `TranscriptPart[]` | Voice/text/image inputs (reuses dictationStore types) |
+| `selectedProcedures` | `string[]` | Selected procedure tags |
+| `generatedReport` | `string \| null` | AI-generated operative report |
+| `createdAt` / `updatedAt` | `string` | ISO timestamps |
+
+**Actions:** `createDictation(patientId)` → returns new ID, `updateDictation(id, updates)`, `deleteDictation(id)`, `finalizeDictation(id)`
+
+**Helpers:** `getDictationsForPatient(patientId)` — returns all dictations for a patient, sorted by date. `buildPatientDictationHeader(name, mrn, date)` — generates report header. `formatPatientDictationDate(iso)` — display-friendly date.
 
 ---
 

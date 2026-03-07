@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** March 4, 2026
+**Last Updated:** March 6, 2026
 
 ---
 
@@ -350,6 +350,29 @@ On-call patient tracking with:
 - Image scanning for patient info
 - Search functionality
 - CSV export
+- **Op Report button** on each patient card — shows draft indicator badge, opens patient-linked dictation
+
+---
+
+### Patient Dictation Screen
+
+**File:** `app/patient-dictation.tsx` (modal)
+
+Patient-linked operative report dictation with full workflow:
+- Auto-populated header (Dr. Aalami + patient name + MRN + date)
+- Date of operation picker
+- Smart procedure pre-selection from chief complaint
+- Voice/text/photo input (reuses dictation infrastructure)
+- AI report generation with read-back (TTS)
+- Direct text editing and AI-powered regeneration
+- Per-patient report history timeline
+- Draft auto-save (10s debounce)
+- Quick duplicate from previous report
+- Export encounter bundle (patient + report + CPT codes)
+- Email, copy, read-back actions
+
+**Screen States:** `input` → `generating` → `review` → `editing` / `direct-editing`
+**Screen Modes:** `new` | `continue` (resume draft) | `view` (read-only final)
 
 ---
 
