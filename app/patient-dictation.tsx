@@ -247,15 +247,8 @@ export default function PatientDictationScreen() {
       .map((proc) => proc.name);
   }, []);
 
-  useEffect(() => {
-    if (!activeDictation || !patient || mode !== 'new') return;
-    if (activeDictation.selectedProcedures.length > 0) return;
-    if (!patient.chiefComplaint) return;
-    const suggested = getSuggestedProcedures(patient.chiefComplaint);
-    if (suggested.length > 0) {
-      updateDictation(activeDictation.id, { selectedProcedures: suggested });
-    }
-  }, [activeDictation, getSuggestedProcedures, mode, patient, updateDictation]);
+  // Bug fix: Do NOT auto-select procedures on new dictation.
+  // Always start with zero procedures selected so the surgeon picks explicitly.
 
   const markAutosave = useCallback(() => {
     if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
@@ -1236,7 +1229,11 @@ export default function PatientDictationScreen() {
         {/* ─── DIRECT EDITING STATE ─── */}
         {screenState === 'direct-editing' && (
           <View style={styles.flex}>
-            <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
+            <ScrollView
+              style={styles.flex}
+              contentContainerStyle={styles.directEditScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
               <Text style={styles.editLabel}>Edit Report</Text>
               <TextInput
                 style={styles.directEditInput}
@@ -1244,6 +1241,7 @@ export default function PatientDictationScreen() {
                 onChangeText={setEditText}
                 multiline
                 autoFocus
+                scrollEnabled={false}
               />
             </ScrollView>
             <View style={styles.editActions}>
@@ -1720,9 +1718,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     color: colors.textPrimary,
     fontSize: typography.base,
-    minHeight: 300,
+    minHeight: 400,
     textAlignVertical: 'top',
     lineHeight: 24,
+  },
+  directEditScrollContent: {
+    padding: spacing.lg,
+    paddingBottom: 300,
   },
   editActions: {
     flexDirection: 'row',

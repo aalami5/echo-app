@@ -30,7 +30,7 @@ When the surgeon does NOT explicitly mention the following in their dictation, u
 These defaults reflect Dr. Aalami's standard practice. Only override them if the transcript explicitly states otherwise.
 
 IMPORTANT — CPT/ICD-10 CODES:
-Use ONLY the procedure reference codes provided below (from the local code library). Do NOT use web search for codes — it is too slow. If a CPT or ICD-10 code is not available in the provided reference, substitute "TBD" instead. Speed is critical — generate the report quickly without any external lookups.
+Use ONLY the procedure reference codes provided below (from the local code library). Do NOT use web search for codes — it is too slow. If a CPT or ICD-10 code is not available in the provided reference, simply OMIT it — do NOT write "TBD" or any placeholder. Speed is critical — generate the report quickly without any external lookups.
 
 STRICT TEMPLATE (use this exact structure for every operative report). Each heading should be BOLD.
 
@@ -81,15 +81,18 @@ _____________
 Rules:
 - Do NOT use web search for CPT/ICD-10 codes — use only the provided reference codes below
 - If a code is not in the provided reference, use "TBD" as placeholder
-- Always include a CPT code for EVERY procedure listed (from reference or TBD)
-- Always include ICD-10 codes for each diagnosis (from reference or TBD)
+- Include CPT codes for procedures when available from the provided reference; omit code if not available
+- Include ICD-10 codes for diagnoses when available from the provided reference; omit code if not available
 - Never include RVU values in the main body of the report; they must only appear in the "CPT Codes & Work RVUs" section
 - Use professional, concise, and standardized medical language
 - Follow the above structure exactly. Do not add or remove sections
 - Apply smart defaults for any fields not mentioned in the transcript
 - When a STYLE REFERENCE report is provided below, match its writing style, tone, level of detail, and phrasing patterns closely — this is how Dr. Aalami writes his reports
 - Include an "Open Items" section at the end ONLY for genuinely missing clinical information
-- SPEED IS CRITICAL — generate the report as fast as possible without external lookups`;
+- SPEED IS CRITICAL — generate the report as fast as possible without external lookups
+- The transcript will begin with an intro line like "This is Dr. Aalami dictating an operative report for [Patient], MRN [number], date of operation [date]." — ALWAYS include this line verbatim as the very first line of the generated report, before "Pre-operative Diagnosis"
+- If a CPT or ICD-10 code is NOT available in the provided reference, simply OMIT the code entirely — do NOT write "TBD", "N/A", or any placeholder. Just list the procedure/diagnosis name without a code.
+- In the "Open Items" section, do NOT list missing CPT/ICD-10 codes as open items. Only list genuinely missing CLINICAL information (e.g., missing operative details, unclear anatomy, etc.).`;
 
 function buildLearningContext(
   corrections: CorrectionEntry[],
@@ -193,7 +196,7 @@ export async function generateReport(
 
   if (selectedProcedures.length > 0) {
     userMessage += `\n\nSelected procedures: ${selectedProcedures.join(', ')}`;
-    userMessage += `\n\nUse the CPT codes, ICD-10 codes, and work RVUs from the procedure references above. If a code is not available, use TBD. Do NOT search the web for codes.`;
+    userMessage += `\n\nUse the CPT codes, ICD-10 codes, and work RVUs from the procedure references above. If a code is not available, simply omit it — do NOT write TBD. Do NOT search the web for codes.`;
   }
 
   // Add style reference from sample operative reports
