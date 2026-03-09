@@ -1,16 +1,20 @@
 import { create } from 'zustand';
 
+export type TransportMode = 'websocket' | 'polling' | 'disconnected';
+
 interface WebSocketState {
   isConnected: boolean;
   isConnecting: boolean;
   lastMessageTime: Date | null;
   error: string | null;
-  
+  transportMode: TransportMode;
+
   // Actions
   setConnected: (connected: boolean) => void;
   setConnecting: (connecting: boolean) => void;
   setLastMessageTime: (time: Date) => void;
   setError: (error: string | null) => void;
+  setTransportMode: (mode: TransportMode) => void;
   reset: () => void;
 }
 
@@ -19,6 +23,7 @@ const initialState = {
   isConnecting: false,
   lastMessageTime: null,
   error: null,
+  transportMode: 'disconnected' as TransportMode,
 };
 
 export const useWebSocketStore = create<WebSocketState>((set) => ({
@@ -38,11 +43,13 @@ export const useWebSocketStore = create<WebSocketState>((set) => ({
     lastMessageTime: time,
   }),
   
-  setError: (error) => set({ 
+  setError: (error) => set({
     error,
     isConnected: false,
     isConnecting: false,
   }),
-  
+
+  setTransportMode: (transportMode) => set({ transportMode }),
+
   reset: () => set(initialState),
 }));

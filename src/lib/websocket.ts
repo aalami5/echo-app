@@ -1,3 +1,13 @@
+/**
+ * Legacy WebSocket-only hook.
+ *
+ * DEPRECATED: Use `useTransport` from './transport' instead.
+ * `useTransport` wraps this same WS logic with automatic long-polling
+ * fallback for networks that block WebSocket (e.g., Sequoia Hospital Wi-Fi).
+ *
+ * Kept for backward compatibility — no behaviour changes.
+ */
+
 import { useEffect, useRef, useCallback } from 'react';
 import { AppState } from 'react-native';
 import { useChatStore } from '../stores/chatStore';

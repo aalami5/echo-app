@@ -10,6 +10,7 @@ import { StyleSheet, View, TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import { useNetworkStore } from '../stores/networkStore';
+import { useWebSocketStore } from '../stores/websocketStore';
 import type { ConnectionQuality } from '../types';
 
 interface NetworkIndicatorProps {
@@ -31,19 +32,33 @@ const qualityConfig: Record<ConnectionQuality, {
 
 export function NetworkIndicator({ compact = true, onPress }: NetworkIndicatorProps) {
   const { connectionQuality, latencyMs, isConnected } = useNetworkStore();
-  
+  const { transportMode } = useWebSocketStore();
+
+  const isPolling = transportMode === 'polling';
   const config = qualityConfig[connectionQuality];
+
+  // When polling, override color to warning yellow (connected but degraded)
+  const displayColor = isPolling && isConnected ? colors.warning : config.color;
+  const displayIcon: keyof typeof Ionicons.glyphMap = isPolling && isConnected
+    ? 'swap-horizontal'
+    : config.icon;
 
   if (compact) {
     // Simple icon indicator
     return (
       <TouchableOpacity onPress={onPress} style={styles.compactContainer}>
-        <Ionicons name={config.icon} size={14} color={config.color} />
+        <Ionicons name={displayIcon} size={14} color={displayColor} />
       </TouchableOpacity>
     );
   }
 
   // Expanded signal bars with latency
+  const labelText = isPolling && isConnected
+    ? 'Limited'
+    : isConnected && latencyMs !== null
+      ? `${latencyMs}ms`
+      : config.label;
+
   return (
     <TouchableOpacity onPress={onPress} style={styles.container}>
       <View style={styles.barsContainer}>
@@ -53,13 +68,13 @@ export function NetworkIndicator({ compact = true, onPress }: NetworkIndicatorPr
             style={[
               styles.bar,
               { height: 4 + bar * 3 },
-              bar <= config.bars ? { backgroundColor: config.color } : styles.barInactive,
+              bar <= config.bars ? { backgroundColor: displayColor } : styles.barInactive,
             ]}
           />
         ))}
       </View>
-      <Text style={[styles.label, { color: config.color }]}>
-        {isConnected && latencyMs !== null ? `${latencyMs}ms` : config.label}
+      <Text style={[styles.label, { color: displayColor }]}>
+        {labelText}
       </Text>
     </TouchableOpacity>
   );
