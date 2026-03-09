@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 51] - 2026-03-08
+
+### Fixed
+- **Dictation: No Auto-Select Procedures** — New dictations now start with a clean procedure list instead of auto-selecting from the patient's chief complaint
+- **Dictation: Report Header Included** — AI is now instructed to include the intro header line verbatim in the generated operative report
+- **Dictation: Edit Scroll Fix** — Fixed scroll behavior in direct-edit mode by disabling inner TextInput scroll and letting the parent ScrollView handle it
+- **Dictation: Remove TBD Codes** — CPT/ICD codes not found in the reference library are now omitted entirely instead of showing "TBD" placeholders; missing codes are no longer listed as Open Items
+
+---
+
 ## [Build 48] - 2026-03-06
 
 ### Added
