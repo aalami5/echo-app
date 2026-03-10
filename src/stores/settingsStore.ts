@@ -112,8 +112,9 @@ const secureStorage = {
         // parse failed, proceed with write anyway
       }
       // Write backup first (so if main write crashes, backup survives)
-      await SecureStore.setItemAsync(name + BACKUP_SUFFIX, value);
-      await SecureStore.setItemAsync(name, value);
+      const opts = { keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK };
+      await SecureStore.setItemAsync(name + BACKUP_SUFFIX, value, opts);
+      await SecureStore.setItemAsync(name, value, opts);
     } catch (e) {
       console.log('[Settings] SecureStore set error:', e);
     }
@@ -131,6 +132,20 @@ const secureStorage = {
 // Default gateway config (baked into build)
 const DEFAULT_GATEWAY_URL = process.env.EXPO_PUBLIC_GATEWAY_URL || 'https://echo.oppersmedical.com';
 const DEFAULT_GATEWAY_TOKEN = process.env.EXPO_PUBLIC_GATEWAY_TOKEN || null;
+
+// Hardcoded gateway URL fallback
+const _HARDCODED_GATEWAY_URL = 'https://echo.oppersmedical.com';
+
+// Obfuscated gateway token — XOR'd with key, assembled at runtime to avoid `strings` extraction
+const _getHardcodedToken = (): string => {
+  const k = 0x42;
+  const d = [
+    32,123,116,122,113,38,115,38,112,112,117,33,118,117,32,114,
+    118,35,114,116,115,32,119,33,33,112,122,36,33,33,39,114,
+    117,116,33,114,116,35,114,36,117,39,116,116,32,114,38,35,
+  ];
+  return d.map(c => String.fromCharCode(c ^ k)).join('');
+};
 
 export const useSettingsStore = create<SettingsState>()(
   persist(
@@ -183,11 +198,15 @@ export const useSettingsStore = create<SettingsState>()(
         _hydrated = true;
         console.log('[Settings] Hydration complete, writes unlocked');
         if (state) {
-          if (!state.gatewayUrl && DEFAULT_GATEWAY_URL) {
-            state.gatewayUrl = DEFAULT_GATEWAY_URL;
+          // Post-hydration validation: restore critical keys from hardcoded fallbacks
+          if (!state.gatewayUrl) {
+            console.warn('[Settings] gatewayUrl lost — restoring hardcoded fallback');
+            state.gatewayUrl = _HARDCODED_GATEWAY_URL;
           }
-          if (!state.gatewayToken && DEFAULT_GATEWAY_TOKEN) {
-            state.gatewayToken = DEFAULT_GATEWAY_TOKEN;
+          if (!state.gatewayToken) {
+            const fallbackToken = DEFAULT_GATEWAY_TOKEN || _getHardcodedToken();
+            console.warn('[Settings] gatewayToken lost — restoring from fallback');
+            state.gatewayToken = fallbackToken;
           }
         }
       },
