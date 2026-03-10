@@ -256,30 +256,18 @@ export function useGateway(): UseGatewayReturn {
       const raceResult = await Promise.race([requestPromise, timeoutPromise]);
 
       if (timedOut) {
-        // Timeout won - return marker, but let request continue in background
+        // Timeout won - return marker, but let ORIGINAL request continue in background
         console.log('[useGateway] Quick response timeout - continuing in background');
-        
+
         // Remove from pending immediately (stop loading indicator)
         setPendingMessageIds(prev => {
           const next = new Set(prev);
           next.delete(messageId);
           return next;
         });
-        
-        // Re-send the request WITHOUT the abort timeout so it can run indefinitely
-        const noAbortPromise = serviceRef.current!.sendMessage(
-          content,
-          [],
-          image?.base64,
-          image?.mimeType,
-          true // noTimeout
-        );
-        
-        // Also ignore the original requestPromise (it may abort, that's fine)
-        requestPromise.catch(() => { /* original may abort — ignored */ });
-        
-        // Continue waiting for the no-abort request in background
-        noAbortPromise.then(async (response) => {
+
+        // Continue waiting for the ORIGINAL request (no second request)
+        requestPromise.then(async (response) => {
           console.log('[useGateway] Delayed response arrived:', response?.length || 0, 'chars');
           
           if (response) {
@@ -305,8 +293,26 @@ export function useGateway(): UseGatewayReturn {
             inFlightRequest.current = null;
           }
         }).catch(async (err) => {
-          console.error('[useGateway] Delayed request failed, polling for response:', err);
-          
+          console.error('[useGateway] Delayed request failed:', err);
+
+          // Check if an assistant response already arrived before polling/failing
+          const { messages: catchMessages } = useChatStore.getState();
+          const catchUserMsg = catchMessages.find((m: any) => m.id === messageId);
+          if (catchUserMsg) {
+            const catchUserTs = new Date(catchUserMsg.timestamp).getTime();
+            const catchHasResponse = catchMessages.some(
+              (m: any) => m.role === 'assistant' && new Date(m.timestamp).getTime() >= catchUserTs && m.status !== 'thinking'
+            );
+            if (catchHasResponse) {
+              console.log('[useGateway] Assistant response already exists, suppressing delayed failure');
+              if (requestId) {
+                await removePendingGatewayRequest(requestId);
+                inFlightRequest.current = null;
+              }
+              return;
+            }
+          }
+
           // Fallback: poll for ~2 minutes before giving up
           const pollIntervalMs = 30000;
           const maxPolls = 4; // 4 × 30s = 2 minutes
@@ -373,13 +379,32 @@ export function useGateway(): UseGatewayReturn {
       const message = err instanceof Error ? err.message : 'Failed to send message';
       console.error('[useGateway] Message send error:', message);
       console.error('[useGateway] Full error:', err);
+
+      // Check if an assistant response already arrived for this conversation turn
+      const { messages: currentMessages } = useChatStore.getState();
+      const userMsg = currentMessages.find((m: any) => m.id === messageId);
+      if (userMsg) {
+        const userTs = new Date(userMsg.timestamp).getTime();
+        const hasResponse = currentMessages.some(
+          (m: any) => m.role === 'assistant' && new Date(m.timestamp).getTime() >= userTs && m.status !== 'thinking'
+        );
+        if (hasResponse) {
+          console.log('[useGateway] Assistant response already exists, suppressing failure');
+          if (requestId) {
+            await removePendingGatewayRequest(requestId);
+            inFlightRequest.current = null;
+          }
+          return null;
+        }
+      }
+
       setError(message);
-      
+
       // DON'T flip isConnected on message send failure
       // Instead, trigger a health check to determine actual connection state
       console.log('[useGateway] Message send failed, triggering health check');
       checkConnection();
-      
+
       if (requestId) {
         if (AppState.currentState === 'active') {
           await removePendingGatewayRequest(requestId);

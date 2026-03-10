@@ -329,18 +329,31 @@ export default function ChatScreen() {
       }
     } else {
       console.log('[Chat] No response received from Gateway');
-      // Mark user message as failed
-      updateMessage(userMessageId, { status: 'failed' });
-      // Update placeholder with failure message
-      updateMessage(assistantMessageId, { 
-        content: 'Failed to get response. Please try again.',
-        status: undefined,
-      });
-      addToast({
-        message: 'Failed to send message. Tap to retry.',
-        type: 'error',
-        duration: 5000,
-      });
+      // Check if an assistant response already arrived (e.g. from background request)
+      const currentMsgs = useChatStore.getState().messages;
+      const sentUserMsg = currentMsgs.find((m: Message) => m.id === userMessageId);
+      const userTs = sentUserMsg ? new Date(sentUserMsg.timestamp).getTime() : 0;
+      const alreadyAnswered = currentMsgs.some(
+        (m: Message) => m.role === 'assistant' && new Date(m.timestamp).getTime() >= userTs && m.status !== 'thinking' && m.id !== assistantMessageId
+      );
+      if (alreadyAnswered) {
+        console.log('[Chat] Assistant response already exists, suppressing failure');
+        // Clean up the placeholder
+        updateMessage(assistantMessageId, { content: '', status: undefined });
+      } else {
+        // Mark user message as failed
+        updateMessage(userMessageId, { status: 'failed' });
+        // Update placeholder with failure message
+        updateMessage(assistantMessageId, {
+          content: 'Failed to get response. Please try again.',
+          status: undefined,
+        });
+        addToast({
+          message: 'Failed to send message. Tap to retry.',
+          type: 'error',
+          duration: 5000,
+        });
+      }
     }
     
     setAvatarState('idle');
