@@ -6,6 +6,21 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 52] - 2026-03-09
+
+### Added
+- **HTTP Long-Polling Fallback Transport** — Automatic fallback when WebSocket is blocked (e.g., hospital Wi-Fi firewalls):
+  - New `transport.ts` — transport manager that orchestrates WS + polling
+  - New `longpoll.ts` — tries `/poll` endpoint (25s long-hang), degrades to short-polling `/ping` every 10s on 404
+  - New `messageHandler.ts` — shared message handling logic extracted from WS `onmessage`
+  - Auto-switch: 3 WS failures within 60s triggers polling fallback
+  - Auto-recovery: retries WS every 5 minutes while in polling mode
+  - `websocket.ts` marked deprecated in favor of `useTransport`
+- **Network Indicator Polling Badge** — Shows yellow 'Limited' badge with swap icon when in polling mode
+- **Transport Mode in websocketStore** — New `transportMode` field (`websocket` | `polling` | `disconnected`)
+
+---
+
 ## [Build 51] - 2026-03-08
 
 ### Fixed

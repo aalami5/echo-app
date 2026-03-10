@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** March 6, 2026
+**Last Updated:** March 9, 2026
 
 ---
 
@@ -317,6 +317,39 @@ interface PendingNotification {
 ```
 
 **Note:** As of Build 23, the splash screen is removed, but this store still tracks connection state for notification queueing.
+
+---
+
+### websocketStore
+
+Tracks WebSocket/transport connection state and current transport mode.
+
+**File:** `src/stores/websocketStore.ts`
+
+**State:**
+
+| Field | Type | Persisted | Description |
+|-------|------|-----------|-------------|
+| `isConnected` | `boolean` | ❌ | Whether any transport is connected |
+| `isConnecting` | `boolean` | ❌ | Whether a connection attempt is in progress |
+| `lastMessageTime` | `Date \| null` | ❌ | Timestamp of last received message |
+| `error` | `string \| null` | ❌ | Last connection error |
+| `transportMode` | `TransportMode` | ❌ | Current transport: `'websocket'` \| `'polling'` \| `'disconnected'` |
+
+**Actions:**
+
+```typescript
+setConnected(connected: boolean): void
+setConnecting(connecting: boolean): void
+setLastMessageTime(time: Date): void
+setError(error: string | null): void
+setTransportMode(mode: TransportMode): void
+reset(): void
+```
+
+**Transport Mode (Build 52):** The `transportMode` field is set by the transport manager (`src/lib/transport.ts`). It starts as `'disconnected'`, moves to `'websocket'` on successful WS connection, and falls back to `'polling'` after 3 WS failures in 60s. The `NetworkIndicator` component uses this to show a yellow "Limited" badge in polling mode.
+
+**Note:** Not persisted — transport state is re-established on app launch.
 
 ---
 

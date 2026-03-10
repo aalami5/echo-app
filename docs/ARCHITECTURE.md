@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** March 6, 2026
+**Last Updated:** March 9, 2026
 
 ---
 
@@ -125,6 +125,12 @@ echo-app/
 │   │   ├── templateLoader.ts     # Runtime template selection & loading
 │   │   └── vascularProcedures.ts # Categorized procedure library + CPT/ICD-10
 │   │
+│   ├── lib/                      # Core transport & utility modules
+│   │   ├── transport.ts          # Transport manager (WS + polling orchestration)
+│   │   ├── longpoll.ts           # HTTP long-polling fallback transport
+│   │   ├── messageHandler.ts     # Shared gateway event handler
+│   │   └── websocket.ts          # WebSocket client (deprecated → transport.ts)
+│   │
 │   ├── services/                 # External service clients
 │   │   ├── crashLog.ts           # Crash logging (AsyncStorage, FIFO, max 20)
 │   │   ├── gateway.ts            # OpenClaw Gateway API
@@ -144,7 +150,7 @@ echo-app/
 │   │   ├── settingsStore.ts      # App settings (persisted)
 │   │   ├── calendarStore.ts      # Calendar events
 │   │   ├── networkStore.ts       # Connection state + toasts
-│   │   └── websocketStore.ts     # WebSocket connection state
+│   │   └── websocketStore.ts     # WebSocket/transport connection state
 │   │
 │   └── types/
 │       └── index.ts              # TypeScript type definitions
@@ -326,21 +332,33 @@ Patient data is stored **locally only** by design:
 
 ## Key Design Decisions
 
-### 1. HTTP API + WebSocket (Dual Transport)
+### 1. HTTP API + Multi-Transport Push (WS → Polling Fallback)
 
-**Chose:** Both — HTTP API for chat completions, WebSocket for real-time push
+**Chose:** HTTP API for chat completions, with adaptive push transport (WebSocket primary, long-polling fallback)
 
 **HTTP (`/v1/chat/completions`):**
 - OpenAI-compatible endpoint for sending messages
 - Works through Cloudflare Tunnel without issues
 - Simple request/response model
 
-**WebSocket (`src/lib/websocket.ts`):**
+**Transport Manager (`src/lib/transport.ts`) — Build 52:**
+- Orchestrates WebSocket (primary) and long-polling (fallback) transports
+- Auto-switch: 3 consecutive WS failures within 60s triggers polling mode
+- Auto-recovery: retries WS every 5 minutes while polling, upgrades seamlessly
+- Shared `messageHandler.ts` for consistent event processing across both transports
+- Exposes `transportMode` via `websocketStore` for UI feedback
+
+**WebSocket (`src/lib/websocket.ts`) — deprecated in favor of transport.ts:**
 - Real-time push for incoming messages, calendar events, patient data
 - Robust auto-reconnect with exponential backoff (2s → 30s cap, retries forever)
 - Ping/pong heartbeat every 25s with 10s pong timeout for zombie connection detection
 - AppState-aware: instant reconnect when app returns to foreground
 - Any incoming message resets pong timeout (proves connection alive)
+
+**Long-Polling (`src/lib/longpoll.ts`) — Build 52:**
+- Fallback for restrictive networks (hospital Wi-Fi that blocks WebSocket)
+- Tries `/poll` endpoint with 25s long-hang; degrades to `/ping` short-polling every 10s on 404
+- Same message handling pipeline as WebSocket via shared `messageHandler.ts`
 
 ### 2. SecureStore vs AsyncStorage
 

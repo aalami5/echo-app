@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** March 6, 2026
+**Last Updated:** March 9, 2026
 
 ---
 
@@ -229,14 +229,16 @@ Displays the next upcoming calendar event.
 
 ### NetworkIndicator
 
-Displays connection quality with signal strength bars.
+Displays connection quality with signal strength bars and transport mode.
 
 **File:** `src/components/NetworkIndicator.tsx`
 
 **Features:**
-- 3-tier visual indicator (good/fair/poor)
-- Auto-updates from networkStore
+- 4-tier visual indicator (excellent/good/poor/offline)
+- Auto-updates from networkStore and websocketStore
 - Compact signal bar design
+- **Polling mode badge (Build 52):** Shows yellow swap icon and "Limited" label when transport falls back to HTTP long-polling
+- Tappable for latency details
 
 **Usage:**
 
