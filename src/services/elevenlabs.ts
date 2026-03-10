@@ -167,6 +167,137 @@ export class ElevenLabsService {
   }
 
   /**
+   * Generate speech audio and return file URI without playing.
+   * Use with play() for deferred playback.
+   */
+  async generateAudio(options: { text: string; voiceId?: string }): Promise<string> {
+    const { text, voiceId } = options;
+
+    if (!text?.trim()) {
+      throw new Error('No text to generate');
+    }
+
+    const targetVoiceId = voiceId || this.voiceId;
+    const url = `${ELEVENLABS_API_URL}/${targetVoiceId}`;
+
+    console.log('[ElevenLabs] Generating speech audio...');
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Accept': 'audio/mpeg',
+        'Content-Type': 'application/json',
+        'xi-api-key': this.apiKey,
+      },
+      body: JSON.stringify({
+        text,
+        model_id: this.modelId,
+        voice_settings: {
+          stability: this.stability,
+          similarity_boost: this.similarityBoost,
+        },
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('[ElevenLabs] API error:', error);
+      throw new Error(`ElevenLabs API error: ${response.status}`);
+    }
+
+    const audioBlob = await response.blob();
+    const reader = new FileReader();
+    const base64Promise = new Promise<string>((resolve, reject) => {
+      reader.onloadend = () => {
+        const base64 = reader.result as string;
+        const base64Data = base64.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.onerror = reject;
+    });
+    reader.readAsDataURL(audioBlob);
+    const base64Data = await base64Promise;
+
+    const fileUri = `${FileSystem.cacheDirectory}echo_response_${Date.now()}.mp3`;
+    await FileSystem.writeAsStringAsync(fileUri, base64Data, {
+      encoding: FileSystem.EncodingType.Base64,
+    });
+
+    console.log('[ElevenLabs] Audio generated:', fileUri);
+    return fileUri;
+  }
+
+  /**
+   * Play a previously generated audio file.
+   * Returns the Sound object for pause/resume control.
+   */
+  async playAudioFile(
+    fileUri: string,
+    callbacks?: { onStart?: () => void; onEnd?: () => void; onError?: (error: Error) => void }
+  ): Promise<Audio.Sound> {
+    await this.stop();
+
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      playsInSilentModeIOS: true,
+      staysActiveInBackground: false,
+      shouldDuckAndroid: true,
+    });
+
+    let hasStarted = false;
+
+    const { sound } = await Audio.Sound.createAsync(
+      { uri: fileUri },
+      { shouldPlay: true },
+      (status) => {
+        if (status.isLoaded) {
+          if (status.isPlaying && !hasStarted) {
+            hasStarted = true;
+            console.log('[ElevenLabs] Playback started');
+            callbacks?.onStart?.();
+          }
+          if (status.didJustFinish) {
+            console.log('[ElevenLabs] Playback finished');
+            callbacks?.onEnd?.();
+            this.cleanup(fileUri);
+          }
+        }
+      }
+    );
+
+    this.currentSound = sound;
+    return sound;
+  }
+
+  /**
+   * Pause currently playing audio
+   */
+  async pause(): Promise<void> {
+    if (this.currentSound) {
+      try {
+        await this.currentSound.pauseAsync();
+        console.log('[ElevenLabs] Paused');
+      } catch (e) {
+        console.error('[ElevenLabs] Pause error:', e);
+      }
+    }
+  }
+
+  /**
+   * Resume paused audio
+   */
+  async resume(): Promise<void> {
+    if (this.currentSound) {
+      try {
+        await this.currentSound.playAsync();
+        console.log('[ElevenLabs] Resumed');
+      } catch (e) {
+        console.error('[ElevenLabs] Resume error:', e);
+      }
+    }
+  }
+
+  /**
    * Stop currently playing audio
    */
   async stop(): Promise<void> {

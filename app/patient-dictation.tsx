@@ -113,6 +113,8 @@ export default function PatientDictationScreen() {
   const [emailSent, setEmailSent] = useState(false);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isReadingBack, setIsReadingBack] = useState(false);
+  const [readBackState, setReadBackState] = useState<'idle' | 'processing' | 'ready' | 'playing' | 'paused'>('idle');
+  const [readBackAudioUri, setReadBackAudioUri] = useState<string | null>(null);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -136,6 +138,8 @@ export default function PatientDictationScreen() {
     setEmailSent(false);
     setIsSendingEmail(false);
     setIsReadingBack(false);
+    setReadBackState('idle');
+    setReadBackAudioUri(null);
   }, [activeDictation?.id]);
 
   useEffect(() => {
@@ -413,21 +417,79 @@ export default function PatientDictationScreen() {
       Alert.alert('Setup Required', 'Please configure ElevenLabs API key in Settings.');
       return;
     }
-    if (isReadingBack && ttsServiceRef.current) {
-      await ttsServiceRef.current.stop();
-      setIsReadingBack(false);
-      return;
-    }
-    setIsReadingBack(true);
-    try {
-      const ttsService = new ElevenLabsService({ apiKey: elevenlabsApiKey, voiceId: OLIVER_VOICE_ID });
-      ttsServiceRef.current = ttsService;
-      await ttsService.speak({ text: activeDictation.generatedReport, voiceId: OLIVER_VOICE_ID });
-    } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to read back report.');
-    } finally {
-      setIsReadingBack(false);
-      ttsServiceRef.current = null;
+
+    // State machine: idle → processing → ready → playing ↔ paused → idle
+    switch (readBackState) {
+      case 'idle': {
+        // Start generating audio
+        setReadBackState('processing');
+        setIsReadingBack(true);
+        try {
+          const ttsService = new ElevenLabsService({ apiKey: elevenlabsApiKey, voiceId: OLIVER_VOICE_ID });
+          ttsServiceRef.current = ttsService;
+          const audioUri = await ttsService.generateAudio({
+            text: activeDictation.generatedReport,
+            voiceId: OLIVER_VOICE_ID,
+          });
+          setReadBackAudioUri(audioUri);
+          setReadBackState('ready');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch (e: any) {
+          Alert.alert('Error', e.message || 'Failed to generate audio.');
+          setReadBackState('idle');
+          setIsReadingBack(false);
+          ttsServiceRef.current = null;
+        }
+        break;
+      }
+      case 'ready': {
+        // Play the generated audio
+        if (!readBackAudioUri || !ttsServiceRef.current) return;
+        setReadBackState('playing');
+        try {
+          await ttsServiceRef.current.playAudioFile(readBackAudioUri, {
+            onEnd: () => {
+              setReadBackState('idle');
+              setIsReadingBack(false);
+              setReadBackAudioUri(null);
+              ttsServiceRef.current = null;
+            },
+          });
+        } catch (e: any) {
+          Alert.alert('Error', e.message || 'Failed to play audio.');
+          setReadBackState('idle');
+          setIsReadingBack(false);
+          ttsServiceRef.current = null;
+        }
+        break;
+      }
+      case 'playing': {
+        // Pause playback
+        if (ttsServiceRef.current) {
+          await ttsServiceRef.current.pause();
+          setReadBackState('paused');
+        }
+        break;
+      }
+      case 'paused': {
+        // Resume playback
+        if (ttsServiceRef.current) {
+          await ttsServiceRef.current.resume();
+          setReadBackState('playing');
+        }
+        break;
+      }
+      case 'processing': {
+        // Cancel if still processing
+        if (ttsServiceRef.current) {
+          await ttsServiceRef.current.stop();
+        }
+        setReadBackState('idle');
+        setIsReadingBack(false);
+        setReadBackAudioUri(null);
+        ttsServiceRef.current = null;
+        break;
+      }
     }
   };
 
@@ -1144,16 +1206,29 @@ export default function PatientDictationScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles.actionButton, isReadingBack && styles.actionButtonActive]}
+                style={[
+                  styles.actionButton,
+                  (readBackState === 'playing' || readBackState === 'paused' || readBackState === 'ready') && styles.actionButtonActive,
+                ]}
                 onPress={handleReadBack}
               >
-                {isReadingBack ? (
+                {readBackState === 'processing' ? (
                   <ActivityIndicator size="small" color={colors.primary} />
+                ) : readBackState === 'ready' ? (
+                  <Ionicons name="play" size={22} color={colors.primary} />
+                ) : readBackState === 'playing' ? (
+                  <Ionicons name="pause" size={22} color={colors.primary} />
+                ) : readBackState === 'paused' ? (
+                  <Ionicons name="play" size={22} color={colors.primary} />
                 ) : (
                   <Ionicons name="volume-high" size={22} color={colors.primary} />
                 )}
                 <Text style={styles.actionLabel}>
-                  {isReadingBack ? 'Playing...' : 'Read Back'}
+                  {readBackState === 'processing' ? 'Processing' :
+                   readBackState === 'ready' ? 'Play' :
+                   readBackState === 'playing' ? 'Pause' :
+                   readBackState === 'paused' ? 'Resume' :
+                   'Read Back'}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.actionButton} onPress={handleCopy}>
