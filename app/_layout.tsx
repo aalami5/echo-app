@@ -11,6 +11,7 @@ import { useNotifications } from '../src/hooks/useNotifications';
 import { colors } from '../src/constants/theme';
 import { logCrash } from '../src/services/crashLog';
 import { supabase } from '../src/lib/supabase';
+import { ensureGatewayConfig } from '../src/services/gatewayBootstrap';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -139,6 +140,14 @@ function RootLayoutNav() {
       console.log('Push notifications registered, token:', pushToken?.substring(0, 20) + '...');
     }
   }, [isRegistered, pushToken]);
+
+  // Bootstrap gateway config once authenticated and settings are hydrated
+  useEffect(() => {
+    if (!isAuthenticated || !settingsHydrated) return;
+    ensureGatewayConfig().then((ok) => {
+      if (!ok) console.warn('[Layout] Gateway bootstrap failed — will retry next launch');
+    });
+  }, [isAuthenticated, settingsHydrated]);
 
   // Handle auth state changes — wait for BOTH auth loading AND settings hydration
   useEffect(() => {
