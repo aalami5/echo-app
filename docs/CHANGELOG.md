@@ -6,6 +6,59 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 59] - 2026-03-10
+
+### Added
+- **Bootstrap OpenAI + ElevenLabs Keys from Supabase** — Gateway bootstrap RPC now returns `openai_api_key` and `elevenlabs_api_key`; restores these keys after credential loss (only if currently empty, never overwrites user-set keys)
+
+---
+
+## [Build 58] - 2026-03-10
+
+### Fixed
+- **Derive WebSocket URL from Gateway URL** — Removed hardcoded `ws://localhost:8765` (nothing listens there); WebSocket URL now derived from `settingsStore.gatewayUrl` (e.g., `https://echo.oppersmedical.com` → `wss://echo.oppersmedical.com`). TLS-encrypted WebSocket works on hospital Wi-Fi (port 443)
+
+---
+
+## [Build 57] - 2026-03-10
+
+### Fixed
+- **Stop Double-Sending Messages** — Removed `noAbortPromise` that fired a second request after 30s timeout; original request now continues in background without duplication
+- **Eliminate False 'Tap to Retry'** — Added "response already arrived" guard in 3 locations (useGateway main catch, delayed request catch, Chat screen failure handler); before showing "Tap to retry", checks if an assistant response already exists for the conversation turn and suppresses error silently if so
+
+---
+
+## [Build 55] - 2026-03-10
+
+### Added
+- **Level 2 Bootstrap Token Exchange** — No secrets in binary:
+  - New `gatewayBootstrap` service fetches gateway config from Supabase RPC after authentication
+  - Supabase RPC function `get_gateway_config()` returns config only to authenticated users
+  - `app_config` table with RLS (no direct access, SECURITY DEFINER function only)
+  - Removed hardcoded obfuscated token from settingsStore (Level 1 bridge removed)
+  - App layout calls `ensureGatewayConfig()` after auth + settings hydration
+  - Migration: `supabase/migrations/004_gateway_bootstrap.sql` (deployed)
+
+---
+
+## [Build 54] - 2026-03-10
+
+### Fixed
+- **Hardened Credential Persistence** — Obfuscated gateway token fallback (XOR'd, runtime assembly) so credentials survive SecureStore loss; changed keychain accessibility to `AFTER_FIRST_UNLOCK` (prevents null reads after device reboot); post-hydration validation restores critical keys from hardcoded fallbacks with logging; applied `AFTER_FIRST_UNLOCK` to Supabase auth storage adapter
+
+---
+
+## [Build 53] - 2026-03-10
+
+### Added
+- **Read Back Play/Pause Controls** — Deferred playback with Processing → Play → Pause states:
+  - `ElevenLabsService`: new `generateAudio()` for audio-only generation, `playAudioFile()` for deferred playback, `pause()` and `resume()` methods
+  - Patient dictation Read Back now shows Processing spinner → Play button when ready → Pause/Resume during playback
+  - Haptic feedback when audio is ready
+  - State resets on dictation change
+
+---
+
 ## [Build 52] - 2026-03-09
 
 ### Added

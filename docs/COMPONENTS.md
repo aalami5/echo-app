@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** March 9, 2026
+**Last Updated:** March 10, 2026
 
 ---
 
@@ -367,6 +367,7 @@ Patient-linked operative report dictation with full workflow:
 - Voice/text/photo input (reuses dictation infrastructure)
 - AI report generation with read-back (TTS)
 - Direct text editing and AI-powered regeneration
+- **Read Back play/pause controls (Build 53):** Processing spinner → Play button when audio ready → Pause/Resume during playback, with haptic feedback on audio ready
 - Per-patient report history timeline
 - Draft auto-save (10s debounce)
 - Quick duplicate from previous report

@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** March 9, 2026
+**Last Updated:** March 10, 2026
 
 ---
 
@@ -196,6 +196,9 @@ clearAllKeys(): void
 - All fields persisted
 - **Crash Guard (Build 40):** Rehydration logic validates that API keys aren't overwritten with `null` from a stale/corrupt state snapshot
 - **Hydration Gate (Build 45):** Module-level `_hydrated` flag blocks ALL SecureStore writes until `onRehydrateStorage` fires, preventing Zustand's default null state from overwriting real credentials during cold start
+- **Gateway Bootstrap (Build 55):** Hardcoded obfuscated token removed; gateway URL and token now fetched from Supabase RPC via `gatewayBootstrap` service after authentication. `ensureGatewayConfig()` called from app layout after auth + hydration.
+- **API Key Bootstrap (Build 59):** OpenAI and ElevenLabs keys restored from Supabase RPC if currently empty (never overwrites user-set keys)
+- **Credential Hardening (Build 54):** Keychain accessibility changed to `AFTER_FIRST_UNLOCK`; XOR-obfuscated fallback for gateway token survives SecureStore loss after reboot
 
 ---
 

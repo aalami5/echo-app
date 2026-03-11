@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** March 9, 2026
+**Last Updated:** March 10, 2026
 
 ---
 
@@ -134,7 +134,8 @@ echo-app/
 │   ├── services/                 # External service clients
 │   │   ├── crashLog.ts           # Crash logging (AsyncStorage, FIFO, max 20)
 │   │   ├── gateway.ts            # OpenClaw Gateway API
-│   │   ├── elevenlabs.ts         # Text-to-speech
+│   │   ├── gatewayBootstrap.ts   # Supabase RPC bootstrap (gateway config + API keys)
+│   │   ├── elevenlabs.ts         # Text-to-speech (+ generateAudio/playAudioFile/pause/resume)
 │   │   ├── whisper.ts            # Speech-to-text
 │   │   ├── calendar.ts           # Google Calendar
 │   │   ├── dictationService.ts   # OR report generation via Gateway
@@ -316,9 +317,12 @@ export const useStore = create(
 - All traffic over HTTPS via Cloudflare Tunnel
 - Gateway URL: `https://echo.oppersmedical.com`
 - Bearer token authentication for API calls
-- **Baked-in Credentials** (Build 22): Gateway URL and token embedded in build
-  - Eliminates need for manual configuration on fresh install
-  - Settings still allow override for development
+- **Gateway Bootstrap (Build 55):** No secrets in binary — gateway config and API keys fetched from Supabase RPC after authentication
+  - `get_gateway_config()` RPC with SECURITY DEFINER + RLS
+  - Replaces baked-in obfuscated credentials (Level 1 bridge removed)
+  - Also bootstraps OpenAI and ElevenLabs keys if missing (Build 59)
+- **Credential Hardening (Build 54):** Keychain accessibility set to `AFTER_FIRST_UNLOCK`; obfuscated XOR fallback survives SecureStore loss
+- **WebSocket URL Derivation (Build 58):** WS URL derived from gateway URL (no hardcoded endpoints); uses `wss://` for TLS on hospital Wi-Fi
 
 ### PHI Considerations
 
