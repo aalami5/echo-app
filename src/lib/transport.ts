@@ -20,7 +20,17 @@ import { handleGatewayEvent } from './messageHandler';
 import { createLongPollTransport, type LongPollTransport } from './longpoll';
 import type { Message, AvatarState } from '../types';
 
-const WS_URL = process.env.EXPO_PUBLIC_WS_URL || 'ws://localhost:8765';
+/**
+ * Derive the WebSocket URL from the gateway URL in settingsStore.
+ * e.g. https://echo.oppersmedical.com -> wss://echo.oppersmedical.com
+ *      http://localhost:18789          -> ws://localhost:18789
+ */
+function getWsUrl(): string {
+  const { useSettingsStore } = require('../stores/settingsStore');
+  const { gatewayUrl } = useSettingsStore.getState();
+  if (!gatewayUrl) return '';
+  return gatewayUrl.replace(/^https:/, 'wss:').replace(/^http:/, 'ws:');
+}
 
 const INITIAL_RECONNECT_DELAY = 2000;
 const MAX_RECONNECT_DELAY = 30000;
@@ -138,7 +148,8 @@ export function useTransport(token: string | null) {
   const attemptWsUpgrade = useCallback(() => {
     if (!token) return;
 
-    const testWs = new WebSocket(`${WS_URL}?token=${token}`);
+    // Token in query param is acceptable: wss:// encrypts the full URL in transit
+    const testWs = new WebSocket(`${getWsUrl()}?token=${token}`);
     const upgradeTimeout = setTimeout(() => {
       testWs.close();
     }, 10000);
@@ -178,7 +189,8 @@ export function useTransport(token: string | null) {
       return;
     }
 
-    const url = `${WS_URL}?token=${token}`;
+    // Token in query param is acceptable: wss:// encrypts the full URL in transit
+    const url = `${getWsUrl()}?token=${token}`;
     console.log('[WS] Connecting...');
 
     try {
