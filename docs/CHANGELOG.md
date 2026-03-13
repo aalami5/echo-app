@@ -6,6 +6,14 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 60] - 2026-03-12
+
+### Changed
+- **Operative Report Email — Added Recipient** — Added Rajka.Campbell@sutterhealth.org to operative report email recipients
+- **Simplified Email Subject** — Operative report email subject now uses just the date (removed procedure names) for cleaner subject lines
+
+---
+
 ## [Build 59] - 2026-03-10
 
 ### Added
