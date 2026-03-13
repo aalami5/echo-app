@@ -285,5 +285,5 @@ export function buildEmailMessage(report: string, selectedProcedures: string[]):
     day: 'numeric',
   });
   const procName = selectedProcedures.length > 0 ? selectedProcedures.join(', ') : 'Procedure';
-  return `Please email the following operative report to aalami@gmail.com and Oliver.Aalami@sutterhealth.org with subject 'Operative Report - ${procName} - ${date}':\n\n${report}`;
+  return `Please email the following operative report to aalami@gmail.com, Oliver.Aalami@sutterhealth.org, and Rajka.Campbell@sutterhealth.org with subject 'Operative Report - ${procName} - ${date}':\n\n${report}`;
 }
