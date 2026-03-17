@@ -15,7 +15,7 @@ import { getProcedureById, PROCEDURE_TEMPLATES, buildProcedureReference, Procedu
 import { getTemplateCategoriesForProcedures, buildStyleReferencePrompt } from '../data/templateLoader';
 import { findBestTemplates, TemplateCategory } from '../data/templateContent';
 
-const OR_SYSTEM_PROMPT = `You are a specialized assistant that converts surgical audio transcripts into complete, structured operative reports following a strict, standardized template. You extract key details from transcripts, format them exactly according to the structure below, and include ICD-10 diagnostic codes in the diagnosis sections and CPT procedure codes in the procedure sections. You also calculate and list total work RVUs in a separate section at the end. If information is missing or uncertain, follow the smart defaults below.
+const OR_SYSTEM_PROMPT = `You are a specialized assistant that converts surgical audio transcripts into complete, structured operative reports following a strict, standardized template. You extract key details from transcripts, format them exactly according to the structure below, and include ICD-10 diagnostic codes in the diagnosis sections and CPT procedure codes in the procedure sections. If information is missing or uncertain, follow the smart defaults below.
 
 IMPORTANT — SMART DEFAULTS:
 When the surgeon does NOT explicitly mention the following in their dictation, use these defaults automatically. Do NOT list these as "Open Items" — they are assumed unless stated otherwise:
@@ -67,12 +67,6 @@ STRICT TEMPLATE (use this exact structure for every operative report). Each head
 
 _____________
 
-**CPT Codes & Work RVUs:**
-(list procedure with associated CPT codes and associated work RVU)
-**Total work RVU:** (sum up total work RVUs)
-
-_____________
-
 **Open Items:**
 (list ONLY genuinely missing clinical details that affect the report — do NOT list items covered by smart defaults above)
 
@@ -83,7 +77,6 @@ Rules:
 - If a code is not in the provided reference, use "TBD" as placeholder
 - Include CPT codes for procedures when available from the provided reference; omit code if not available
 - Include ICD-10 codes for diagnoses when available from the provided reference; omit code if not available
-- Never include RVU values in the main body of the report; they must only appear in the "CPT Codes & Work RVUs" section
 - Use professional, concise, and standardized medical language
 - Follow the above structure exactly. Do not add or remove sections
 - Apply smart defaults for any fields not mentioned in the transcript
@@ -196,7 +189,7 @@ export async function generateReport(
 
   if (selectedProcedures.length > 0) {
     userMessage += `\n\nSelected procedures: ${selectedProcedures.join(', ')}`;
-    userMessage += `\n\nUse the CPT codes, ICD-10 codes, and work RVUs from the procedure references above. If a code is not available, simply omit it — do NOT write TBD. Do NOT search the web for codes.`;
+    userMessage += `\n\nUse the CPT codes and ICD-10 codes from the procedure references above. If a code is not available, simply omit it — do NOT write TBD. Do NOT search the web for codes.`;
   }
 
   // Add style reference from sample operative reports
