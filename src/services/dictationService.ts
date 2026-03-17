@@ -29,6 +29,9 @@ When the surgeon does NOT explicitly mention the following in their dictation, u
 
 These defaults reflect Dr. Aalami's standard practice. Only override them if the transcript explicitly states otherwise.
 
+IMPORTANT — IMAGE DATA:
+If the transcript includes sections labeled "[OCR from ...]", this is text extracted from photos uploaded during dictation (e.g., OR whiteboards, patient stickers, consent forms, anesthesia records). Use this data to fill in patient details, MRN, date of operation, diagnoses, medications, measurements, and any other relevant clinical information in the report. Prioritize OCR-extracted data over defaults when available.
+
 IMPORTANT — CPT/ICD-10 CODES:
 Use ONLY the procedure reference codes provided below (from the local code library). Do NOT use web search for codes — it is too slow. If a CPT or ICD-10 code is not available in the provided reference, simply OMIT it — do NOT write "TBD" or any placeholder. Speed is critical — generate the report quickly without any external lookups.
 
@@ -154,6 +157,39 @@ function findProcedureTemplate(procedureName: string): ProcedureTemplate | undef
   });
 }
 
+/**
+ * Extract text from images via the gateway's vision capability.
+ * Sends each image with an OCR prompt and returns extracted text.
+ */
+async function extractTextFromImages(
+  gateway: GatewayService,
+  imageParts: TranscriptPart[],
+): Promise<string[]> {
+  const results: string[] = [];
+  for (const part of imageParts) {
+    if (!part.imageBase64 || !part.imageMimeType) continue;
+    try {
+      const ocrPrompt = 'Extract ALL text visible in this image. Include every detail: patient names, MRNs, dates, procedure names, diagnoses, medications, vitals, measurements, and any other clinical information. Return the extracted text exactly as it appears, organized clearly. If there are labels or headers, preserve them.';
+      const extracted = await gateway.sendMessage(
+        ocrPrompt,
+        [],
+        part.imageBase64,
+        part.imageMimeType,
+        false,
+      );
+      if (extracted && extracted.trim()) {
+        const label = part.content && part.content !== 'Surgical image attached'
+          ? part.content
+          : 'Uploaded image';
+        results.push(`[OCR from ${label}]:\n${extracted.trim()}`);
+      }
+    } catch (err) {
+      console.warn('[Dictation] OCR extraction failed for image:', err);
+    }
+  }
+  return results;
+}
+
 export async function generateReport(
   gateway: GatewayService,
   transcriptParts: TranscriptPart[],
@@ -167,7 +203,18 @@ export async function generateReport(
     selectedProcedures,
   );
 
+  // Extract text from any uploaded images via OCR/vision
+  const imageParts = transcriptParts.filter(p => p.type === 'image' && p.imageBase64);
+  let ocrTexts: string[] = [];
+  if (imageParts.length > 0) {
+    ocrTexts = await extractTextFromImages(gateway, imageParts);
+  }
+
   const transcript = buildTranscriptText(transcriptParts);
+  // Append OCR-extracted text to the transcript
+  const fullTranscript = ocrTexts.length > 0
+    ? `${transcript}\n\n--- EXTRACTED DATA FROM UPLOADED IMAGES ---\n${ocrTexts.join('\n\n')}`
+    : transcript;
 
   let userMessage = `${OR_SYSTEM_PROMPT}`;
 
@@ -213,7 +260,7 @@ export async function generateReport(
     userMessage += `\n\n${learningContext}`;
   }
 
-  userMessage += `\n\n---\n\nPLEASE GENERATE AN OPERATIVE REPORT FROM THE FOLLOWING TRANSCRIPT:\n\n${transcript}`;
+  userMessage += `\n\n---\n\nPLEASE GENERATE AN OPERATIVE REPORT FROM THE FOLLOWING TRANSCRIPT:\n\n${fullTranscript}`;
 
   const response = await gateway.sendMessage(userMessage);
   return response;
