@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 63] - 2026-03-17
+
+### Added
+- **OCR Extraction from Uploaded Images in Dictation** — When images are uploaded during dictation (OR whiteboards, patient stickers, consent forms), their text is now extracted via the gateway's vision capability before report generation. Extracted data (patient names, MRNs, dates, diagnoses) is appended to the transcript for AI use
+
+### Changed
+- **Removed CPT Codes & Work RVUs Summary from Reports** — Removed the CPT/RVU summary table at the end of operative reports; inline CPT codes in procedure listings are kept
+
+---
+
 ## [Build 60] - 2026-03-12
 
 ### Changed
