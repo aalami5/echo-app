@@ -12,6 +12,8 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import { useCalendarStore, CalendarEvent } from '../stores/calendarStore';
+import { useTimezoneStore } from '../stores/timezoneStore';
+import { formatDualTime, formatLocalTime, getTimezoneAbbreviation } from '../services/timezone';
 import { MeetingDetail } from './MeetingDetail';
 
 interface NextMeetingProps {
@@ -22,6 +24,7 @@ type MeetingStatus = 'now' | 'imminent' | 'upcoming' | 'later' | 'tomorrow' | 'f
 
 export function NextMeeting({ onExpand }: NextMeetingProps) {
   const { events, isBackgroundRefreshing } = useCalendarStore();
+  const { isTraveling, deviceTimezone } = useTimezoneStore();
   const [expanded, setExpanded] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
@@ -136,11 +139,25 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
   }, [status]);
 
   const formatTime = (date: Date): string => {
+    if (isTraveling) {
+      return formatLocalTime(date, deviceTimezone);
+    }
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
       hour12: true,
     });
+  };
+
+  const formatTimeWithTz = (date: Date): string => {
+    if (!isTraveling) return formatTime(date);
+    const abbr = getTimezoneAbbreviation(deviceTimezone, date);
+    return `${formatLocalTime(date, deviceTimezone)} ${abbr}`;
+  };
+
+  const getHomeTimeLabel = (date: Date): string => {
+    const dual = formatDualTime(date, deviceTimezone);
+    return dual.home;
   };
 
   const formatTimeDisplay = (): string => {
@@ -161,9 +178,9 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
         const mins = minutesUntil % 60;
         return mins === 0 ? `In ${hours}h` : `In ${hours}h ${mins}m`;
       case 'later':
-        return formatTime(startTime);
+        return formatTimeWithTz(startTime);
       case 'tomorrow':
-        return `Tomorrow ${formatTime(startTime)}`;
+        return `Tomorrow ${formatTimeWithTz(startTime)}`;
       default:
         return '';
     }
@@ -246,6 +263,11 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
           <Text style={[styles.timeText, { color: getStatusColor() }]}>
             {formatTimeDisplay()}
           </Text>
+          {isTraveling && nextEvent && (status === 'later' || status === 'tomorrow') && (
+            <Text style={styles.homeTimeInline}>
+              ({getHomeTimeLabel(toDate(nextEvent.startTime))})
+            </Text>
+          )}
           <Text style={styles.separator}>·</Text>
           <TouchableOpacity 
             style={styles.titleTouchable} 
@@ -268,15 +290,22 @@ export function NextMeeting({ onExpand }: NextMeetingProps) {
         {expanded && todayEvents.length > 1 && (
           <View style={styles.expandedContainer}>
             {todayEvents.slice(1).map((event) => (
-              <TouchableOpacity 
-                key={event.id} 
+              <TouchableOpacity
+                key={event.id}
                 style={styles.expandedRow}
                 onPress={() => handleMeetingTap(event)}
                 activeOpacity={0.7}
               >
-                <Text style={styles.expandedTime}>
-                  {formatTime(toDate(event.startTime))}
-                </Text>
+                <View style={styles.expandedTimeContainer}>
+                  <Text style={styles.expandedTime}>
+                    {formatTimeWithTz(toDate(event.startTime))}
+                  </Text>
+                  {isTraveling && (
+                    <Text style={styles.expandedHomeTime}>
+                      {getHomeTimeLabel(toDate(event.startTime))}
+                    </Text>
+                  )}
+                </View>
                 <Text style={styles.expandedTitle} numberOfLines={1}>
                   {event.title}
                 </Text>
@@ -370,12 +399,26 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     width: '100%',
   },
+  homeTimeInline: {
+    fontSize: typography.xs,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+    marginLeft: spacing.xs,
+    flexShrink: 0,
+  },
+  expandedTimeContainer: {
+    flexShrink: 0,
+    marginRight: spacing.sm,
+  },
   expandedTime: {
     fontSize: typography.xs,
     color: colors.textTertiary,
-    width: 60,
     flexShrink: 0,
-    marginRight: spacing.sm,
+  },
+  expandedHomeTime: {
+    fontSize: typography.xs - 1,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
   },
   expandedTitle: {
     flex: 1,

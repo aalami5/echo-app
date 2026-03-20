@@ -14,6 +14,14 @@ import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, typography, borderRadius } from '../constants/theme';
 import { CalendarEvent } from '../stores/calendarStore';
+import { useTimezoneStore } from '../stores/timezoneStore';
+import {
+  formatLocalTime,
+  formatHomeTime,
+  getTimezoneAbbreviation,
+  formatDateInZone,
+  HOME_TIMEZONE,
+} from '../services/timezone';
 
 interface MeetingDetailProps {
   event: CalendarEvent;
@@ -22,7 +30,12 @@ interface MeetingDetailProps {
 }
 
 export function MeetingDetail({ event, visible, onClose }: MeetingDetailProps) {
+  const { isTraveling, deviceTimezone } = useTimezoneStore();
+
   const formatTime = (date: Date): string => {
+    if (isTraveling) {
+      return formatLocalTime(date, deviceTimezone);
+    }
     return date.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
@@ -31,6 +44,9 @@ export function MeetingDetail({ event, visible, onClose }: MeetingDetailProps) {
   };
 
   const formatDate = (date: Date): string => {
+    if (isTraveling) {
+      return formatDateInZone(date, deviceTimezone);
+    }
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
@@ -130,9 +146,24 @@ export function MeetingDetail({ event, visible, onClose }: MeetingDetailProps) {
                   <Text style={styles.timeRange}>
                     {formatTime(startTime)}
                     {endTime && ` – ${formatTime(endTime)}`}
+                    {isTraveling && ` ${getTimezoneAbbreviation(deviceTimezone, startTime)}`}
                   </Text>
+                  {isTraveling && (
+                    <Text style={styles.homeTimeRange}>
+                      ({formatHomeTime(startTime)}
+                      {endTime && ` – ${formatHomeTime(endTime)}`}
+                      {` ${getTimezoneAbbreviation(HOME_TIMEZONE, startTime)}`})
+                    </Text>
+                  )}
                 </View>
               </View>
+              {isTraveling && (
+                <View style={styles.travelBadge}>
+                  <Text style={styles.travelBadgeText}>
+                    🌍 Showing local time · Home: {getTimezoneAbbreviation(HOME_TIMEZONE, startTime)}
+                  </Text>
+                </View>
+              )}
 
               <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Location */}
@@ -286,6 +317,25 @@ const styles = StyleSheet.create({
     fontSize: typography.base,
     fontWeight: '500',
     color: colors.textPrimary,
+  },
+  homeTimeRange: {
+    fontSize: typography.sm,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+    marginTop: 2,
+  },
+  travelBadge: {
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.primarySubtle,
+    borderRadius: borderRadius.sm,
+  },
+  travelBadgeText: {
+    fontSize: typography.xs,
+    color: colors.textTertiary,
+    textAlign: 'center',
   },
   content: {
     paddingHorizontal: spacing.lg,
