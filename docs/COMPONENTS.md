@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** March 10, 2026
+**Last Updated:** March 20, 2026
 
 ---
 
@@ -490,6 +490,10 @@ const styles = StyleSheet.create({
 - `content` — Main scrollable area
 - `footer` / `bottomBar` — Bottom fixed section
 - `*Row` — Horizontal flex container
+- `*Input` — Text input field
+- `*Button` — Touchable element
+- `*Text` — Text element within component
+� Horizontal flex container
 - `*Input` — Text input field
 - `*Button` — Touchable element
 - `*Text` — Text element within component

@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** March 10, 2026
+**Last Updated:** March 20, 2026
 
 ---
 
@@ -484,6 +484,52 @@ On app startup:
 1. Zustand's persist middleware reads from SecureStore
 2. State is hydrated before first render
 3. `onRehydrateStorage` callback cleans up data if needed
+
+---
+
+## Best Practices
+
+### Accessing State
+
+```typescript
+// ✅ Inside components - use hook
+const { messages } = useChatStore();
+
+// ✅ Outside components - use getState()
+const messages = useChatStore.getState().messages;
+
+// ✅ Subscribe to changes outside React
+const unsub = useChatStore.subscribe(
+  (state) => state.isConnected,
+  (connected) => console.log('Connection:', connected)
+);
+```
+
+### Updating State
+
+```typescript
+// ✅ Use actions
+addMessage(newMessage);
+
+// ✅ For complex updates
+set((state) => ({
+  messages: [...state.messages, newMessage].slice(-100),
+}));
+
+// ❌ Don't mutate directly
+state.messages.push(newMessage); // BAD
+```
+
+### Performance
+
+```typescript
+// ✅ Select only what you need
+const avatarState = useChatStore((s) => s.avatarState);
+
+// ❌ Don't select entire state if you only need one field
+const { avatarState } = useChatStore(); // Re-renders on ANY state change
+```
+f needed
 
 ---
 

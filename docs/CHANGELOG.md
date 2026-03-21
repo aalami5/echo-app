@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 64] - 2026-03-20
+
+### Added
+- **Travel Time Intelligence** — Auto-detects when Oliver is in a different timezone and displays dual-time (local + home/Pacific) on meeting cards. New `timezone.ts` service handles timezone detection, offset calculation, and dual-time formatting. New `timezoneStore` persists timezone state and auto-updates on app foreground
+
+### Changed
+- **MeetingCountdown / MeetingDetail / NextMeeting** — Updated to show dual-timezone display when traveling (e.g., "2:00 PM HST / 5:00 PM PST")
+
+---
+
 ## [Build 63] - 2026-03-17
 
 ### Added

@@ -137,6 +137,7 @@ echo-app/
 │   │   ├── gatewayBootstrap.ts   # Supabase RPC bootstrap (gateway config + API keys)
 │   │   ├── elevenlabs.ts         # Text-to-speech (+ generateAudio/playAudioFile/pause/resume)
 │   │   ├── whisper.ts            # Speech-to-text
+│   │   ├── timezone.ts           # Timezone detection & dual-time formatting
 │   │   ├── calendar.ts           # Google Calendar
 │   │   ├── dictationService.ts   # OR report generation via Gateway
 │   │   ├── notifications/        # Push notification service
