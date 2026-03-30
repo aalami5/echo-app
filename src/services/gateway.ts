@@ -226,6 +226,7 @@ export class GatewayService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'x-openclaw-scopes': 'operator.write',
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
           'x-openclaw-agent-id': agentId,
           'X-App-State': appState || 'unknown',
@@ -323,6 +324,7 @@ export class GatewayService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'x-openclaw-scopes': 'operator.write',
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
           'X-App-State': appState || 'unknown',
           ...(devicePushToken ? { 'X-APNS-Token': devicePushToken } : {}),
