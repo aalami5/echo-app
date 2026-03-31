@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 65] - 2026-03-30
+
+### Fixed
+- **Gateway Auth Scopes Header** — Added `x-openclaw-scopes: operator.write` header to gateway HTTP requests. OpenClaw 2026.3.28 enforces operator scopes on `/v1/chat/completions`, and without this header requests returned 403, breaking dictation report generation
+
+### Changed
+- **Build bump to 65** for TestFlight submission
+
+---
+
 ## [Build 64] - 2026-03-20
 
 ### Added

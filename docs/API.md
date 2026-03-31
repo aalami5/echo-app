@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** February 7, 2026
+**Last Updated:** March 30, 2026
 
 ---
 
@@ -39,7 +39,10 @@ Send a message and receive Echo's response.
 POST /v1/chat/completions
 Content-Type: application/json
 Authorization: Bearer <token>
+x-openclaw-scopes: operator.write
 ```
+
+> **Note:** As of OpenClaw 2026.3.28, the `x-openclaw-scopes: operator.write` header is required. Without it, requests return 403 `missing scope: operator.write`.
 
 **Request Body:**
 
