@@ -112,12 +112,14 @@ function RootLayoutNav() {
 
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('[Auth] onAuthStateChange:', event, 'session:', !!session);
       if (event === 'SIGNED_OUT') {
         await logout();
+        useAuthStore.setState({ isLoading: false });
         return;
       }
 
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           setUser({
             id: session.user.id,
@@ -125,6 +127,15 @@ function RootLayoutNav() {
             createdAt: session.user.created_at || new Date().toISOString(),
           });
           await setTokens(session.access_token, session.refresh_token || null);
+          useAuthStore.setState({ isLoading: false, isAuthenticated: true });
+        } else if (event === 'INITIAL_SESSION') {
+          useAuthStore.setState({
+            user: null,
+            accessToken: null,
+            refreshToken: null,
+            isAuthenticated: false,
+            isLoading: false,
+          });
         }
       }
     });

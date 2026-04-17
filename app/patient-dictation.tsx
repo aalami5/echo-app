@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Audio } from 'expo-av';
@@ -190,10 +190,10 @@ export default function PatientDictationScreen() {
   useEffect(() => {
     if (!patientId || dictationId || mode !== 'new') return;
     const newId = createDictation(patientId);
-    router.replace({
+    router.replace(({
       pathname: '/patient-dictation',
       params: { patientId, dictationId: newId, mode: 'new' },
-    });
+    }) as unknown as Href);
   }, [createDictation, dictationId, mode, patientId, router]);
 
   // Sync screen state with store
@@ -646,7 +646,7 @@ export default function PatientDictationScreen() {
 
     pendingDuplicateSourceRef.current = null;
     setShowDuplicateModal(false);
-    router.push({ pathname: '/patient-dictation', params: { patientId: patient.id, dictationId: newId, mode: 'new' } });
+    router.push(({ pathname: '/patient-dictation', params: { patientId: patient.id, dictationId: newId, mode: 'new' } }) as unknown as Href);
   };
 
   const openDuplicateModal = () => {
@@ -937,10 +937,10 @@ export default function PatientDictationScreen() {
                 style={styles.timelineItem}
                 onPress={() => {
                   const nextMode = d.status === 'draft' ? 'continue' : 'view';
-                  router.push({
+                  router.push(({
                     pathname: '/patient-dictation',
                     params: { patientId: patient.id, dictationId: d.id, mode: nextMode },
-                  });
+                  }) as unknown as Href);
                 }}
               >
                 <View style={styles.timelineHeader}>

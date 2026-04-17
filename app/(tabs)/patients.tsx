@@ -28,7 +28,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { useRouter } from 'expo-router';
+import { useRouter, type Href } from 'expo-router';
 import { colors, spacing, borderRadius, typography, shadows } from '../../src/constants/theme';
 import { 
   usePatientsStore, 
@@ -420,26 +420,26 @@ export default function PatientsScreen() {
     if (suggested.length > 0) {
       updateDictation(dictationId, { selectedProcedures: suggested });
     }
-    router.push({
+    router.push(({
       pathname: '/patient-dictation',
       params: { patientId: patient.id, dictationId, mode: 'new' },
-    });
+    }) as unknown as Href);
   }, [createDictation, getSuggestedProcedures, router, updateDictation]);
 
   const handleContinueDictation = useCallback((patientId: string, dictationId: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    router.push({
+    router.push(({
       pathname: '/patient-dictation',
       params: { patientId, dictationId, mode: 'continue' },
-    });
+    }) as unknown as Href);
   }, [router]);
 
   const handleViewReport = useCallback((patientId: string, dictationId?: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    router.push({
+    router.push(({
       pathname: '/patient-dictation',
       params: { patientId, dictationId: dictationId || undefined, mode: 'view' },
-    });
+    }) as unknown as Href);
   }, [router]);
   
   // Render patient row - tap to edit, long press to delete

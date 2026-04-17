@@ -3,16 +3,20 @@ import * as SecureStore from 'expo-secure-store';
 import { supabase, signIn, signOut, getSession } from '../lib/supabase';
 import type { AuthState, User } from '../types';
 
+const SECURE_STORE_OPTS = {
+  keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+} as const;
+
 interface AuthStore extends AuthState {
   setUser: (user: User | null) => void;
-  setTokens: (access: string | null, refresh: string | null) => void;
+  setTokens: (access: string | null, refresh: string | null) => Promise<void>;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   loadStoredAuth: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
 }
 
-export const useAuthStore = create<AuthStore>((set, get) => ({
+export const useAuthStore = create<AuthStore>((set) => ({
   user: null,
   accessToken: null,
   refreshToken: null,
@@ -23,12 +27,12 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
 
   setTokens: async (access, refresh) => {
     if (access) {
-      await SecureStore.setItemAsync('accessToken', access);
+      await SecureStore.setItemAsync('accessToken', access, SECURE_STORE_OPTS);
     } else {
       await SecureStore.deleteItemAsync('accessToken');
     }
     if (refresh) {
-      await SecureStore.setItemAsync('refreshToken', refresh);
+      await SecureStore.setItemAsync('refreshToken', refresh, SECURE_STORE_OPTS);
     } else {
       await SecureStore.deleteItemAsync('refreshToken');
     }
@@ -51,10 +55,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           createdAt: data.user.created_at || new Date().toISOString(),
         };
 
-        // Store tokens
-        await SecureStore.setItemAsync('accessToken', data.session.access_token);
+        // Store tokens consistently with AFTER_FIRST_UNLOCK
+        await SecureStore.setItemAsync('accessToken', data.session.access_token, SECURE_STORE_OPTS);
         if (data.session.refresh_token) {
-          await SecureStore.setItemAsync('refreshToken', data.session.refresh_token);
+          await SecureStore.setItemAsync('refreshToken', data.session.refresh_token, SECURE_STORE_OPTS);
         }
 
         set({
@@ -62,6 +66,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
           accessToken: data.session.access_token,
           refreshToken: data.session.refresh_token || null,
           isAuthenticated: true,
+          isLoading: false,
         });
 
         return { success: true };
@@ -112,13 +117,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       accessToken: null,
       refreshToken: null,
       isAuthenticated: false,
+      isLoading: false,
     });
   },
 
   loadStoredAuth: async () => {
     try {
       // Check for existing Supabase session
-      const { data, error } = await getSession();
+      const { data } = await getSession();
+      console.log('[Auth] loadStoredAuth session present:', !!data?.session);
 
       if (data?.session) {
         const user: User = {
@@ -138,10 +145,22 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
       }
 
       // No session found
-      set({ isLoading: false });
+      set({
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
     } catch (error) {
       console.error('Error loading stored auth:', error);
-      set({ isLoading: false });
+      set({
+        user: null,
+        accessToken: null,
+        refreshToken: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
     }
   },
 }));
