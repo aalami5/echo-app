@@ -250,7 +250,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+- **Chat Persistence Moved to AsyncStorage** — `chatStore` now persists transcript history in AsyncStorage instead of SecureStore, with a one-time legacy migration path from the old `echo-chat` SecureStore key
+
 ### Fixed
+- **Chat Hydration Wipe on Launch** — Added a pre-hydration write lock and queued-message flush in `chatStore` so startup state cannot overwrite stored history with `messages: []`
+- **Auth Restore Hardening** — `authStore` and root layout now handle `INITIAL_SESSION`, `SIGNED_IN`, `TOKEN_REFRESHED`, and `SIGNED_OUT` consistently, and manual token writes use `SecureStore.AFTER_FIRST_UNLOCK` for more reliable cold-start session restore
+- **Typed Patient Dictation Route Cleanup** — Standardized `/patient-dictation` navigation through typed `Href` usage to avoid Expo Router pathname type failures
 - **Keyboard Covering Image Preview** (Build #31) — Image preview now scrolls up and shrinks when keyboard opens, preventing caption input from being hidden behind the keyboard
 - **Image Send API Format** (Build #29) — Fixed OpenResponses API format: `input_image` goes inside message content array instead of top-level
 - **Background Request Reliability** — Removed abort timeout for long-running background requests; re-sends without timeout so tasks can complete indefinitely. Added fallback polling (4×30s) if the no-timeout request also fails, checking for new assistant messages before showing an error.

@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** March 10, 2026
+**Last Updated:** April 17, 2026
 
 ---
 
@@ -262,7 +262,7 @@ echo-app/
 
 | Store | Storage | Encryption | Contents |
 |-------|---------|------------|----------|
-| `chatStore` | SecureStore | ✅ Keychain | Last 100 messages |
+| `chatStore` | AsyncStorage | ❌ | Last 100 messages |
 | `patientsStore` | SecureStore | ✅ Keychain | Patient list, call days |
 | `settingsStore` | SecureStore | ✅ Keychain | API keys, preferences |
 
@@ -275,29 +275,41 @@ echo-app/
 
 ### Persistence Implementation
 
-All persisted stores use the same pattern:
+Echo App now uses two persistence tiers:
+
+- **AsyncStorage** for chat transcripts (`chatStore`) where payload size grows over time and secret storage is not required
+- **SecureStore** for secrets and sensitive local data (`settingsStore`, patient-related stores, auth token writes)
+
+`chatStore` also includes a one-time migration path from the legacy SecureStore-backed `echo-chat` key into AsyncStorage, plus a pre-hydration write lock so startup state cannot overwrite stored history before hydration completes.
 
 ```typescript
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
-const secureStorage = {
-  getItem: async (name) => SecureStore.getItemAsync(name),
-  setItem: async (name, value) => SecureStore.setItemAsync(name, value),
-  removeItem: async (name) => SecureStore.deleteItemAsync(name),
-};
+const chatStorage = {
+  getItem: async (name) => {
+    const value = await AsyncStorage.getItem(name);
+    if (value) return value;
 
-export const useStore = create(
-  persist(
-    (set) => ({ /* state and actions */ }),
-    {
-      name: 'store-key',
-      storage: createJSONStorage(() => secureStorage),
-      partialize: (state) => ({ /* what to persist */ }),
+    const legacyValue = await SecureStore.getItemAsync(name);
+    if (legacyValue) {
+      await AsyncStorage.setItem(name, legacyValue);
+      await SecureStore.deleteItemAsync(name);
+      return legacyValue;
     }
-  )
-);
+
+    return null;
+  },
+  setItem: async (name, value) => {
+    await AsyncStorage.setItem(name, value);
+  },
+  removeItem: async (name) => {
+    await AsyncStorage.removeItem(name);
+    await SecureStore.deleteItemAsync(name);
+  },
+};
 ```
 
 ---
@@ -308,10 +320,11 @@ export const useStore = create(
 
 | Data Type | Protection |
 |-----------|------------|
-| Chat messages | SecureStore (Keychain encryption) |
+| Chat messages | AsyncStorage (local only, non-secret transcript storage) |
 | Patient PHI | SecureStore (Keychain encryption) |
 | API keys | SecureStore (Keychain encryption) |
 | Gateway token | SecureStore (Keychain encryption) |
+| Auth tokens | SecureStore with `AFTER_FIRST_UNLOCK` accessibility |
 
 ### Network Security
 
@@ -367,12 +380,17 @@ Patient data is stored **locally only** by design:
 
 ### 2. SecureStore vs AsyncStorage
 
-**Chose:** SecureStore (expo-secure-store)
+**Chose:** Split storage by data type
 
-**Why:**
+**AsyncStorage for chat transcripts:**
+- Better fit for growing conversation history
+- Avoids SecureStore size brittleness for large transcript payloads
+- Keeps chat local without treating transcripts like secrets
+
+**SecureStore for secrets + PHI:**
 - Hardware-backed encryption on iOS (Keychain)
-- Required for storing PHI (patient data)
-- Survives app reinstalls (Keychain backup)
+- Required for storing patient data and credentials
+- Auth token writes use `AFTER_FIRST_UNLOCK` for more reliable cold-start restore
 
 ### 3. Zustand vs Redux/Context
 

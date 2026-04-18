@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** March 20, 2026
+**Last Updated:** April 17, 2026
 
 ---
 
@@ -29,10 +29,9 @@ Manages conversation history with Echo.
 | `messages` | `Message[]` | ✅ | Chat history (max 100) |
 | `isConnected` | `boolean` | ❌ | Gateway connection status |
 | `avatarState` | `AvatarState` | ❌ | Current avatar animation state |
-| `_hydrated` | `boolean` | ❌ | Whether SecureStore rehydration is complete |
-| `_preHydrationQueue` | `Message[]` | ❌ | Messages queued before hydration finishes |
+| `hasHydrated` | `boolean` | ❌ | Whether local transcript hydration is complete |
 
-**Hydration Safety:** Messages added before rehydration completes are queued in `_preHydrationQueue` and replayed via `onRehydrateStorage`. This prevents cold-start notification messages from being overwritten by stale persisted state.
+**Hydration Safety:** `chatStore` now persists transcripts in AsyncStorage and uses a pre-hydration write lock plus queued-message replay during `onRehydrateStorage`. If legacy chat history exists in SecureStore under `echo-chat`, it is migrated forward once, then removed from SecureStore.
 
 **Actions:**
 
@@ -65,6 +64,8 @@ function ChatScreen() {
 
 **Persistence Details:**
 - Key: `echo-chat`
+- Storage backend: AsyncStorage
+- Legacy migration: reads old SecureStore value once and moves it to AsyncStorage automatically
 - Max messages: 100 (auto-trims oldest)
 - Only `messages` array is persisted
 
@@ -213,11 +214,15 @@ Manages authentication state (minimal, for future use).
 | Field | Type | Persisted | Description |
 |-------|------|-----------|-------------|
 | `user` | `User \| null` | ❌ | Current user |
-| `accessToken` | `string \| null` | ❌ | JWT token |
+| `accessToken` | `string \| null` | ❌ | JWT access token |
+| `refreshToken` | `string \| null` | ❌ | JWT refresh token |
 | `isAuthenticated` | `boolean` | ❌ | Auth status |
 | `isLoading` | `boolean` | ❌ | Loading state |
 
-**Note:** Auth is currently bypassed (app is single-user).
+**Auth Restore Notes (Apr 17):**
+- `loadStoredAuth()` now logs whether a Supabase session was found and always resolves to a fully signed-in or signed-out state
+- Manual token writes use `SecureStore.AFTER_FIRST_UNLOCK` for more reliable cold-start restoration
+- Root layout listens for `INITIAL_SESSION`, `SIGNED_IN`, `TOKEN_REFRESHED`, and `SIGNED_OUT` so auth state does not get stranded in a partial startup state
 
 ---
 
