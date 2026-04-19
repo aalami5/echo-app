@@ -2,15 +2,17 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** April 17, 2026
+**Last Updated:** April 18, 2026
 
 ---
 
 ## Overview
 
-Echo App uses [Zustand](https://github.com/pmndrs/zustand) for state management with the `persist` middleware for durable storage via `expo-secure-store`.
+Echo App uses [Zustand](https://github.com/pmndrs/zustand) for state management with the `persist` middleware.
 
-All persisted stores use iOS Keychain encryption.
+Persisted state is split across:
+- **AsyncStorage** for larger non-secret local data like chat transcripts and dictation state
+- **expo-secure-store** for secrets and sensitive patient/settings data that should live in iOS Keychain
 
 ---
 
@@ -417,6 +419,8 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 
 **Persistence:** AsyncStorage (key: `patient-dictations`)
 
+**Sync Behavior (Apr 18):** Any time a finalized dictation is created, updated, or deleted, the store calls `syncFinalizedDictations()` from `src/services/dictationSync.ts`. Only dictations with `status: 'final'` are sent to the Mac mini sync server. Sync is best-effort with an in-memory pending payload, single-flight protection, and up to 3 retries.
+
 **State:**
 
 | Field | Type | Persisted | Description |
@@ -437,6 +441,11 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 | `createdAt` / `updatedAt` | `string` | ISO timestamps |
 
 **Actions:** `createDictation(patientId)` → returns new ID, `updateDictation(id, updates)`, `deleteDictation(id)`, `finalizeDictation(id)`
+
+**Notes:**
+- `updateDictation()` triggers sync if the dictation was already final or is being transitioned to final
+- `deleteDictation()` re-syncs only when removing a finalized dictation, so the server copy stays in step
+- `finalizeDictation()` always syncs immediately after flipping status to `final`
 
 **Helpers:** `getDictationsForPatient(patientId)` — returns all dictations for a patient, sorted by date. `buildPatientDictationHeader(name, mrn, date)` — generates report header. `formatPatientDictationDate(iso)` — display-friendly date.
 
@@ -486,7 +495,7 @@ const secureStorage = {
 ### Rehydration
 
 On app startup:
-1. Zustand's persist middleware reads from SecureStore
+1. Zustand's persist middleware reads from AsyncStorage or SecureStore, depending on the store
 2. State is hydrated before first render
 3. `onRehydrateStorage` callback cleans up data if needed
 

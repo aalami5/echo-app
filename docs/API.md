@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** March 30, 2026
+**Last Updated:** April 18, 2026
 
 ---
 
@@ -92,6 +92,78 @@ GET /ping
 ```
 
 **Response:** `200 OK` with body `pong` or similar.
+
+### Finalized Dictation Sync
+
+Upload the current finalized operative-report set to the sync server.
+
+```http
+POST /patients/dictations/sync
+Content-Type: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:**
+
+```json
+{
+  "dictations": {
+    "uuid-1": {
+      "id": "uuid-1",
+      "patientId": "patient-123",
+      "status": "final",
+      "dateOfOperation": "2026-04-18T00:00:00.000Z",
+      "selectedProcedures": ["Right carotid endarterectomy"],
+      "generatedReport": "This is Dr. Aalami...",
+      "transcriptParts": [
+        {
+          "id": "part-1",
+          "type": "text",
+          "content": "Patient had symptomatic carotid stenosis",
+          "timestamp": "2026-04-18T18:10:00.000Z"
+        }
+      ],
+      "createdAt": "2026-04-18T18:00:00.000Z",
+      "updatedAt": "2026-04-18T18:12:00.000Z"
+    }
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "dictationCount": 1,
+  "lastSync": "2026-04-18T18:12:30.000Z"
+}
+```
+
+### Finalized Dictation Retrieval
+
+```http
+GET /patients/dictations/list
+Authorization: Bearer <gateway-token>
+```
+
+Returns:
+
+```json
+{
+  "dictations": {
+    "uuid-1": { "...": "dictation payload" }
+  },
+  "lastSync": "2026-04-18T18:12:30.000Z"
+}
+```
+
+```http
+GET /patients/dictations/:id
+Authorization: Bearer <gateway-token>
+```
+
+Returns one finalized dictation or `404` if not found.
 
 ---
 

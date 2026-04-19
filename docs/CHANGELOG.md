@@ -250,7 +250,11 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **Finalized Operative Report Sync** — `patientDictationsStore` now syncs the current set of finalized patient dictations to the Mac mini sync server via new `dictationSync` retry logic. The server persists finalized reports in `dictations.json` and exposes authenticated list/detail endpoints for retrieval
+
 ### Changed
+- **Build bump to 66** for the next iOS/TestFlight build
 - **Chat Persistence Moved to AsyncStorage** — `chatStore` now persists transcript history in AsyncStorage instead of SecureStore, with a one-time legacy migration path from the old `echo-chat` SecureStore key
 
 ### Fixed

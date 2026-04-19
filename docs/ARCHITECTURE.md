@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** April 17, 2026
+**Last Updated:** April 18, 2026
 
 ---
 
@@ -23,12 +23,13 @@ Echo App is a React Native (Expo) application that provides Oliver with a privat
 │  │        │              │             │             │        │  │
 │  │  ┌─────▼──────────────▼─────────────▼─────────────▼─────┐│  │
 │  │  │              Zustand Stores (Persistent)              ││  │
-│  │  │  chatStore │ dictationStore │ patientsStore │ settingsStore ││
+│  │  │ chatStore │ dictationStore │ patientDictationsStore   ││  │
+│  │  │ patientsStore │ settingsStore │ authStore             ││  │
 │  │  └──────────────────────┬────────────────────────────────┘│  │
 │  │                         │                                 │  │
 │  │  ┌──────────────────────▼────────────────────────────────┐│  │
-│  │  │              expo-secure-store (Keychain)              ││  │
-│  │  │              Encrypted local persistence               ││  │
+│  │  │        AsyncStorage + expo-secure-store (Keychain)     ││  │
+│  │  │     Split local persistence for transcripts / PHI      ││  │
 │  │  └────────────────────────────────────────────────────────┘│  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                  │
@@ -140,6 +141,7 @@ echo-app/
 │   │   ├── timezone.ts           # Timezone detection & dual-time formatting
 │   │   ├── calendar.ts           # Google Calendar
 │   │   ├── dictationService.ts   # OR report generation via Gateway
+│   │   ├── dictationSync.ts      # Finalized dictation sync + retry queue
 │   │   ├── notifications/        # Push notification service
 │   │   │   └── index.ts          # Expo push registration & handling
 │   │   └── supabase.ts           # Supabase client for push tokens
@@ -231,6 +233,29 @@ echo-app/
    Avatar state → "idle"
 ```
 
+### Finalized Dictation Sync Flow
+
+```
+1. User finalizes or edits a patient dictation
+                    │
+                    ▼
+2. patientDictationsStore updates local AsyncStorage state
+                    │
+                    ▼
+3. dictationSync.ts filters to finalized dictations only
+   and strips transcript parts to sync-safe fields
+                    │
+                    ▼
+4. POST /patients/dictations/sync
+   Authorization: Bearer <gateway-token>
+                    │
+                    ▼
+5. Mac mini sync server writes dictations.json
+                    │
+                    ▼
+6. On failure, in-memory retry queue retries up to 3 times
+```
+
 ---
 
 ### Image Analysis Flow (Build 26)
@@ -263,6 +288,8 @@ echo-app/
 | Store | Storage | Encryption | Contents |
 |-------|---------|------------|----------|
 | `chatStore` | AsyncStorage | ❌ | Last 100 messages |
+| `dictationStore` | AsyncStorage | ❌ | Learned templates, examples, custom procedures |
+| `patientDictationsStore` | AsyncStorage | ❌ local store, synced finals over HTTPS | Per-patient draft/final dictations |
 | `patientsStore` | SecureStore | ✅ Keychain | Patient list, call days |
 | `settingsStore` | SecureStore | ✅ Keychain | API keys, preferences |
 
@@ -340,11 +367,11 @@ const chatStorage = {
 
 ### PHI Considerations
 
-Patient data is stored **locally only** by design:
-- Never sent to OpenClaw Gateway
-- Never synced to cloud
+Patient data is minimized by design:
+- General patient list data remains local on device in SecureStore
+- Finalized operative report dictations are synced only to Oliver's Mac mini sync server over authenticated HTTPS for retrieval and backup
+- Patient data is not sent to the OpenClaw chat completion endpoint
 - Export feature produces local CSV only
-- Follows HIPAA data minimization principles
 
 ---
 
@@ -402,15 +429,15 @@ Patient data is stored **locally only** by design:
 - Works well with React Native
 - Simple async actions
 
-### 4. Local Patient Storage
+### 4. Local-First Patient Storage with Finalized Dictation Sync
 
-**Chose:** On-device only, no cloud sync
+**Chose:** Keep patient lists local, but sync finalized operative reports to Oliver's Mac mini
 
 **Why:**
-- PHI security requirements
-- Avoids HIPAA-compliant infrastructure complexity
-- Export to CSV for backup
-- Keychain backup provides some redundancy
+- PHI security requirements still favor local-first storage on device
+- Finalized reports benefit from server-side retrieval/backstop without sending patient context into chat completion flows
+- Sync is narrow in scope: finalized dictations only, over authenticated HTTPS, with retry logic on failure
+- Export to CSV remains available for local backup
 
 ### 5. Inverted FlatList for Chat
 
