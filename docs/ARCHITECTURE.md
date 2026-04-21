@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** April 19, 2026
+**Last Updated:** April 20, 2026
 
 ---
 
@@ -247,10 +247,12 @@ echo-app/
                     │
                     ▼
 4. POST /patients/dictations/sync
+   (server also mirrors root-level /dictations/* routes)
    Authorization: Bearer <gateway-token>
                     │
                     ▼
 5. Mac mini sync server writes dictations.json
+   for retrieval/backstop outside the device
                     │
                     ▼
 6. On failure, in-memory retry queue retries up to 3 times
@@ -369,7 +371,7 @@ const chatStorage = {
 
 Patient data is minimized by design:
 - General patient list data remains local on device in SecureStore
-- Finalized operative report dictations are synced only to Oliver's Mac mini sync server over authenticated HTTPS for retrieval and backup
+- Finalized operative report dictations are synced only to Oliver's Mac mini sync server over authenticated HTTPS for retrieval and backup, using dedicated `dictations.json` storage plus authenticated list/detail endpoints
 - Patient data is not sent to the OpenClaw chat completion endpoint
 - Export feature produces local CSV only
 

@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** April 19, 2026
+**Last Updated:** April 20, 2026
 
 ---
 
@@ -419,7 +419,7 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 
 **Persistence:** AsyncStorage (key: `patient-dictations`)
 
-**Sync Behavior (Apr 18):** Any time a finalized dictation is created, updated, or deleted, the store calls `syncFinalizedDictations()` from `src/services/dictationSync.ts`. Only dictations with `status: 'final'` are sent to the Mac mini sync server. Sync is best-effort with an in-memory pending payload, single-flight protection, and up to 3 retries.
+**Sync Behavior (Apr 20):** Any time a finalized dictation is created, updated, or deleted, the store calls `syncFinalizedDictations()` from `src/services/dictationSync.ts`. Only dictations with `status: 'final'` are sent to the Mac mini sync server. Sync is best-effort with an in-memory pending payload, single-flight protection, transcript-part sanitization, and up to 3 retries.
 
 **State:**
 
@@ -446,6 +446,7 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 - `updateDictation()` triggers sync if the dictation was already final or is being transitioned to final
 - `deleteDictation()` re-syncs only when removing a finalized dictation, so the server copy stays in step
 - `finalizeDictation()` always syncs immediately after flipping status to `final`
+- Sync payloads include only finalized dictations and only the transcript-part fields needed downstream (`id`, `type`, `content`, `timestamp`)
 
 **Helpers:** `getDictationsForPatient(patientId)` — returns all dictations for a patient, sorted by date. `buildPatientDictationHeader(name, mrn, date)` — generates report header. `formatPatientDictationDate(iso)` — display-friendly date.
 
