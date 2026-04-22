@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** April 20, 2026
+**Last Updated:** April 21, 2026
 
 ---
 
@@ -533,6 +533,9 @@ The sync server (`server/index.js`) includes endpoints:
 - `POST /notify/brief` — Send daily brief
 - `GET /messages/pending` — Get queued messages for sync (Build 25)
 - `POST /messages/ack` — Acknowledge synced messages (Build 25)
+- `POST /dictations/sync` and `POST /patients/dictations/sync` — Persist the current finalized operative-report set to `dictations.json`
+- `GET /dictations/list` / `GET /dictations/:id` — Root-level finalized dictation retrieval
+- `GET /patients/dictations/list` / `GET /patients/dictations/:id` — Cloudflare-tunneled finalized dictation retrieval
 
 Uses `expo-server-sdk` for push delivery.
 
