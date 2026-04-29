@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** April 26, 2026
+**Last Updated:** April 28, 2026
 
 ---
 
@@ -67,7 +67,7 @@ Echo App is a React Native (Expo) application that provides Oliver with a privat
 | **Framework** | React Native + Expo SDK 52 | Cross-platform mobile |
 | **Language** | TypeScript 5.x | Type safety |
 | **State** | Zustand + persist middleware | State management |
-| **Storage** | expo-secure-store | Encrypted Keychain storage |
+| **Storage** | AsyncStorage + expo-secure-store | Split local transcript storage and encrypted Keychain storage |
 | **Navigation** | Expo Router (file-based) | Tab navigation |
 | **Audio** | expo-av | Recording & playback |
 | **Haptics** | expo-haptics | Tactile feedback |
