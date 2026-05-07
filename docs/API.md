@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** May 5, 2026
+**Last Updated:** May 6, 2026
 
 ---
 
