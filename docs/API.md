@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** May 6, 2026
+**Last Updated:** May 11, 2026
 
 ---
 
@@ -164,6 +164,31 @@ Authorization: Bearer <gateway-token>
 ```
 
 Returns one finalized dictation or `404` if not found.
+
+---
+
+## Message Sync Queue
+
+Push-backed messages and briefs are queued server-side so the app can recover them after missed/delayed APNs delivery.
+
+```http
+GET /patients/messages/pending
+Authorization: Bearer <gateway-token>
+```
+
+Returns pending queued messages from `pending-messages.json`.
+
+```http
+POST /patients/messages/ack
+Content-Type: application/json
+Authorization: Bearer <gateway-token>
+```
+
+```json
+{ "messageIds": ["msg-123"] }
+```
+
+Acknowledges synced messages, removes them from the pending queue, and records an `acked` receipt event in `notification-deliveries.json`.
 
 ---
 

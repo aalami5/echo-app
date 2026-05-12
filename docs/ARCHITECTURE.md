@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** May 6, 2026
+**Last Updated:** May 11, 2026
 
 ---
 
@@ -532,7 +532,7 @@ The sync server (`server/index.js`) includes endpoints:
 - `POST /notify/message` — Send message preview (also queues for sync)
 - `POST /notify/brief` — Send daily brief
 - `GET /messages/pending` — Get queued messages for sync (Build 25)
-- `POST /messages/ack` — Acknowledge synced messages (Build 25)
+- `POST /messages/ack` — Acknowledge synced messages and record an `acked` event in `notification-deliveries.json` (Build 25 / Build 66 ledger)
 - `POST /dictations/sync` and `POST /patients/dictations/sync` — Persist the current finalized operative-report set to `dictations.json`
 - `GET /dictations/list` / `GET /dictations/:id` — Root-level finalized dictation retrieval
 - `GET /patients/dictations/list` / `GET /patients/dictations/:id` — Cloudflare-tunneled finalized dictation retrieval
@@ -572,6 +572,8 @@ Push notifications can fail (device offline, iOS limits, etc). Build 25 adds ser
          │                         │ <───────────────────────│
          │                         │                         │
 ```
+
+The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements.
 
 This ensures messages appear in chat even if:
 - Push notification is delayed or dropped

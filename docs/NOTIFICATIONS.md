@@ -1,5 +1,7 @@
 # Push Notifications Setup
 
+**Last Updated:** May 11, 2026
+
 ## Overview
 
 Echo app supports three types of push notifications:
@@ -92,9 +94,10 @@ curl -X POST http://localhost:18790/notify/brief \
 When a push notification carries a message (reminders, briefs, alerts):
 
 1. `messageContent` in push `data` is capped at **2000 chars** to stay within APNs 4KB limit
-2. Full messages are preserved in the server's pending-messages queue
+2. Full messages are preserved in the server's pending-messages queue (`pending-messages.json`)
 3. Sync routes through `/patients/messages/*` (Cloudflare-tunneled path)
 4. On tap, the app fetches the full message from the server queue if needed
+5. When the app acknowledges synced messages, the server records an `acked` receipt in `notification-deliveries.json` for delivery diagnostics
 
 ### TTS Auto-Play
 

@@ -6,12 +6,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Build 66] - 2026-05-05
+## [Build 66] - 2026-05-11
 
 ### Added
 - **Finalized Operative Report Sync** — `patientDictationsStore` now syncs the current set of finalized patient dictations to the Mac mini sync server via new `dictationSync` retry logic. The server persists finalized reports in `dictations.json` and exposes authenticated list/detail endpoints for retrieval and backup
 - **Dedicated Dictation Sync Service** — New `src/services/dictationSync.ts` sanitizes transcript parts, queues the latest finalized payload in memory, and retries failed syncs up to 3 times
 - **Server Dictation Endpoints** — Sync server now serves both root-level and `/patients/*` dictation sync/list/detail endpoints backed by `dictations.json`
+- **Notification Delivery Ledger** — Sync server now initializes `notification-deliveries.json` and records message sync acknowledgements, giving notification/message delivery a local audit trail alongside the existing pending-message queue
 
 ### Changed
 - **Patient Dictation Store Sync Triggers** — Finalized dictations now re-sync when finalized, edited after finalization, or deleted after finalization, keeping the server copy aligned with the device
