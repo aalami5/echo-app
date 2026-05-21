@@ -6,16 +6,19 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Build 66] - 2026-05-11
+## [Build 66] - 2026-05-20
 
 ### Added
 - **Finalized Operative Report Sync** — `patientDictationsStore` now syncs the current set of finalized patient dictations to the Mac mini sync server via new `dictationSync` retry logic. The server persists finalized reports in `dictations.json` and exposes authenticated list/detail endpoints for retrieval and backup
 - **Dedicated Dictation Sync Service** — New `src/services/dictationSync.ts` sanitizes transcript parts, queues the latest finalized payload in memory, and retries failed syncs up to 3 times
 - **Server Dictation Endpoints** — Sync server now serves both root-level and `/patients/*` dictation sync/list/detail endpoints backed by `dictations.json`
 - **Notification Delivery Ledger** — Sync server now initializes `notification-deliveries.json` and records message sync acknowledgements, giving notification/message delivery a local audit trail alongside the existing pending-message queue
+- **Meeting Reply Cards** — New `/notify/meeting-reply` server endpoint checks Oliver's Google Calendar via `gog`, finds clean workday slots, queues a rich `meeting_reply` card, and can push a copy-ready suggested reply into chat
+- **Rich Notification Cards** — Push/message sync paths now preserve optional `card` payloads so notifications can hydrate structured UI, not just plain text
 
 ### Changed
 - **Patient Dictation Store Sync Triggers** — Finalized dictations now re-sync when finalized, edited after finalization, or deleted after finalization, keeping the server copy aligned with the device
+- **Chat Message Rendering** — Assistant messages with `meeting_reply` cards now render suggested times, checked conflicts, a reply preview, and a copy action; the message detail sheet also exposes copy reply
 - **Build bump to 66** for the next iOS/TestFlight build
 
 ---

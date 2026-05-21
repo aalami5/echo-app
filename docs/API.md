@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** May 11, 2026
+**Last Updated:** May 20, 2026
 
 ---
 
@@ -189,6 +189,62 @@ Authorization: Bearer <gateway-token>
 ```
 
 Acknowledges synced messages, removes them from the pending queue, and records an `acked` receipt event in `notification-deliveries.json`.
+
+Queued messages can include an optional `card` object. Build 66 defines `meeting_reply` cards with `replyText`, `suggestions`, `conflictSummary`, `durationMinutes`, `windowLabel`, and `timeZone` fields under `card.data`.
+
+---
+
+## Meeting Reply Cards
+
+Generate a conflict-checked scheduling reply and queue it as a rich chat card.
+
+```http
+POST /notify/meeting-reply
+Content-Type: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:**
+
+```json
+{
+  "requester": "Jane",
+  "subject": "Biodesign sync",
+  "windowStart": "2026-05-21T15:00:00.000Z",
+  "windowEnd": "2026-05-28T00:00:00.000Z",
+  "durationMinutes": 30,
+  "maxSuggestions": 3,
+  "location": "Zoom",
+  "sendPush": true
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "messageId": "meeting-reply-...",
+  "card": {
+    "type": "meeting_reply",
+    "title": "Meeting reply: Biodesign sync",
+    "subtitle": "3 clean options found",
+    "body": "Hi Jane...",
+    "data": {
+      "replyText": "Hi Jane...",
+      "suggestions": [
+        { "start": "2026-05-21T16:00:00.000Z", "end": "2026-05-21T16:30:00.000Z", "label": "Thu, May 21, 9:00-9:30 AM" }
+      ],
+      "conflictSummary": ["Thu, May 21, 10:00-11:00 AM: Clinic"],
+      "durationMinutes": 30,
+      "windowLabel": "Thu, May 21 - Wed, May 27",
+      "timeZone": "America/Los_Angeles"
+    }
+  }
+}
+```
+
+Defaults: `MEETING_REPLY_ACCOUNT` or `aalami@gmail.com`, `MEETING_REPLY_TIME_ZONE` or `America/Los_Angeles`, 14-day search window, and 8 AM-5 PM workday bounds.
 
 ---
 

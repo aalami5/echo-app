@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** May 11, 2026
+**Last Updated:** May 20, 2026
 
 ---
 
@@ -447,6 +447,7 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 - `deleteDictation()` re-syncs only when removing a finalized dictation, so the server copy stays in step
 - `finalizeDictation()` always syncs immediately after flipping status to `final`
 - Sync payloads include only finalized dictations and only the transcript-part fields needed downstream (`id`, `type`, `content`, `timestamp`)
+- The retry queue lives in `src/services/dictationSync.ts`, not Zustand state, so retries are best-effort for the current app process and the next store change re-sends the latest finalized set
 
 **Helpers:** `getDictationsForPatient(patientId)` — returns all dictations for a patient, sorted by date. `buildPatientDictationHeader(name, mrn, date)` — generates report header. `formatPatientDictationDate(iso)` — display-friendly date.
 

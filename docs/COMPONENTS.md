@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** March 20, 2026
+**Last Updated:** May 20, 2026
 
 ---
 
@@ -184,12 +184,16 @@ Displays a single message bubble.
 - **ThinkingIndicator** for "thinking" status messages
   - Pulsing dots animation while AI is processing
   - Shows placeholder text: "Got it, working on this..."
+- **MeetingReplyCard** for assistant messages whose `message.card.type` is `meeting_reply`
+  - Shows suggested available times and checked conflicts
+  - Displays a bounded reply preview
+  - Copies the generated reply text via `expo-clipboard`
 
 **Message Status States:**
-- `sending` — Message in flight
-- `sent` — Delivered successfully
-- `failed` — Error occurred (shows "Tap to retry")
-- `thinking` — AI is processing (shows ThinkingIndicator)
+- `sending` - Message in flight
+- `sent` - Delivered successfully
+- `failed` - Error occurred (shows "Tap to retry")
+- `thinking` - AI is processing (shows ThinkingIndicator)
 
 **Usage:**
 
@@ -334,9 +338,9 @@ OR dictation for generating structured operative reports:
 - Save reports as examples for future context learning
 
 **Supporting Files:**
-- `src/services/dictationService.ts` — Report generation service
-- `src/stores/dictationStore.ts` — Session + persisted state
-- `src/data/vascularProcedures.ts` — Categorized procedure library
+- `src/services/dictationService.ts` - Report generation service
+- `src/stores/dictationStore.ts` - Session + persisted state
+- `src/data/vascularProcedures.ts` - Categorized procedure library
 
 ---
 
@@ -352,7 +356,7 @@ On-call patient tracking with:
 - Image scanning for patient info
 - Search functionality
 - CSV export
-- **Op Report button** on each patient card — shows draft indicator badge, opens patient-linked dictation
+- **Op Report button** on each patient card - shows draft indicator badge, opens patient-linked dictation
 
 ---
 
@@ -388,7 +392,7 @@ App configuration:
 - Voice settings (on/off, voice selection)
 - API key management
 - Haptic feedback toggle
-- Crash Logs — View and clear stored crash logs (max 20 entries)
+- Crash Logs - View and clear stored crash logs (max 20 entries)
 
 ---
 
@@ -485,15 +489,11 @@ const styles = StyleSheet.create({
 
 ### Naming Conventions
 
-- `container` — Root wrapper
-- `header` — Top section
-- `content` — Main scrollable area
-- `footer` / `bottomBar` — Bottom fixed section
-- `*Row` — Horizontal flex container
-- `*Input` — Text input field
-- `*Button` — Touchable element
-- `*Text` — Text element within component
-� Horizontal flex container
-- `*Input` — Text input field
-- `*Button` — Touchable element
-- `*Text` — Text element within component
+- `container` - Root wrapper
+- `header` - Top section
+- `content` - Main scrollable area
+- `footer` / `bottomBar` - Bottom fixed section
+- `*Row` - Horizontal flex container
+- `*Input` - Text input field
+- `*Button` - Touchable element
+- `*Text` - Text element within component

@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** May 11, 2026
+**Last Updated:** May 20, 2026
 
 ---
 
@@ -256,6 +256,30 @@ echo-app/
                     │
                     ▼
 6. On failure, in-memory retry queue retries up to 3 times
+```
+
+### Meeting Reply Card Flow
+
+```
+1. OpenClaw posts a scheduling request to /notify/meeting-reply
+                    │
+                    ▼
+2. Sync server validates the requested window, duration, and workday bounds
+                    │
+                    ▼
+3. Server calls gog calendar events for Oliver's configured calendar account
+                    │
+                    ▼
+4. Busy events are converted into conflict blocks and clean slots are suggested
+                    │
+                    ▼
+5. Server builds a meeting_reply RichCard with reply text, slots, and conflicts
+                    │
+                    ▼
+6. Card is queued in pending-messages.json and optionally sent via Expo push
+                    │
+                    ▼
+7. Echo App hydrates the card from push/server sync and renders copy-ready UI
 ```
 
 ---
@@ -531,6 +555,7 @@ The sync server (`server/index.js`) includes endpoints:
 - `POST /notify/meeting` — Send meeting reminder
 - `POST /notify/message` — Send message preview (also queues for sync)
 - `POST /notify/brief` — Send daily brief
+- `POST /notify/meeting-reply` — Generate a calendar-checked scheduling reply and queue a `meeting_reply` rich card
 - `GET /messages/pending` — Get queued messages for sync (Build 25)
 - `POST /messages/ack` — Acknowledge synced messages and record an `acked` event in `notification-deliveries.json` (Build 25 / Build 66 ledger)
 - `POST /dictations/sync` and `POST /patients/dictations/sync` — Persist the current finalized operative-report set to `dictations.json`
@@ -573,7 +598,7 @@ Push notifications can fail (device offline, iOS limits, etc). Build 25 adds ser
          │                         │                         │
 ```
 
-The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements.
+The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements. Queued messages may include compact rich-card payloads; Build 66 uses this for `meeting_reply` cards while keeping the full card in the server queue.
 
 This ensures messages appear in chat even if:
 - Push notification is delayed or dropped
