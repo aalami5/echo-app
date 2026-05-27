@@ -1,6 +1,6 @@
 # Push Notifications Setup
 
-**Last Updated:** May 20, 2026
+**Last Updated:** May 26, 2026
 
 ## Overview
 
