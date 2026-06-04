@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** June 1, 2026
+**Last Updated:** June 3, 2026
 
 ---
 
