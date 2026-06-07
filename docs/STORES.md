@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** June 3, 2026
+**Last Updated:** June 6, 2026
 
 ---
 
@@ -492,6 +492,7 @@ const secureStorage = {
 |-------|-----|------------|
 | Chat | `echo-chat` | ~100 messages |
 | Patients | `echo-patients` | No hard limit |
+| Patient dictations | `patient-dictations` | No hard limit |
 | Settings | `echo-settings` | Small |
 
 ### Rehydration
@@ -500,52 +501,6 @@ On app startup:
 1. Zustand's persist middleware reads from AsyncStorage or SecureStore, depending on the store
 2. State is hydrated before first render
 3. `onRehydrateStorage` callback cleans up data if needed
-
----
-
-## Best Practices
-
-### Accessing State
-
-```typescript
-// ✅ Inside components - use hook
-const { messages } = useChatStore();
-
-// ✅ Outside components - use getState()
-const messages = useChatStore.getState().messages;
-
-// ✅ Subscribe to changes outside React
-const unsub = useChatStore.subscribe(
-  (state) => state.isConnected,
-  (connected) => console.log('Connection:', connected)
-);
-```
-
-### Updating State
-
-```typescript
-// ✅ Use actions
-addMessage(newMessage);
-
-// ✅ For complex updates
-set((state) => ({
-  messages: [...state.messages, newMessage].slice(-100),
-}));
-
-// ❌ Don't mutate directly
-state.messages.push(newMessage); // BAD
-```
-
-### Performance
-
-```typescript
-// ✅ Select only what you need
-const avatarState = useChatStore((s) => s.avatarState);
-
-// ❌ Don't select entire state if you only need one field
-const { avatarState } = useChatStore(); // Re-renders on ANY state change
-```
-f needed
 
 ---
 

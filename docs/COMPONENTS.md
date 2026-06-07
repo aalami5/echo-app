@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** June 3, 2026
+**Last Updated:** June 6, 2026
 
 ---
 
@@ -188,6 +188,7 @@ Displays a single message bubble.
   - Shows suggested available times and checked conflicts
   - Displays a bounded reply preview
   - Copies the generated reply text via `expo-clipboard`
+- Long-press detail sheet exposes **Copy reply** for meeting-reply cards
 
 **Message Status States:**
 - `sending` - Message in flight

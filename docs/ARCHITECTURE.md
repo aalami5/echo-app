@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** June 3, 2026
+**Last Updated:** June 6, 2026
 
 ---
 
@@ -280,6 +280,7 @@ echo-app/
                     │
                     ▼
 7. Echo App hydrates the card from push/server sync and renders copy-ready UI
+   in both ChatMessage and the message detail sheet
 ```
 
 ---
@@ -598,7 +599,7 @@ Push notifications can fail (device offline, iOS limits, etc). Build 25 adds ser
          │                         │                         │
 ```
 
-The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements. Queued messages may include compact rich-card payloads; Build 66 uses this for `meeting_reply` cards while keeping the full card in the server queue.
+The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements. Queued messages may include rich-card payloads; Build 66 uses this for `meeting_reply` cards, sends a compact card through APNs, and preserves the full card in the server queue.
 
 This ensures messages appear in chat even if:
 - Push notification is delayed or dropped
