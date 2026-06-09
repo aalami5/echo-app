@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** June 6, 2026
+**Last Updated:** June 8, 2026
 
 ---
 
