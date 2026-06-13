@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** June 10, 2026
+**Last Updated:** June 12, 2026
 
 ---
 
@@ -95,7 +95,7 @@ GET /ping
 
 ### Finalized Dictation Sync
 
-Upload the current finalized operative-report set to the sync server.
+Upload the current finalized operative-report set to the sync server. The payload is a snapshot of all finalized reports currently known to the app, not a per-report delta.
 
 ```http
 POST /patients/dictations/sync

@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** June 10, 2026
+**Last Updated:** June 12, 2026
 
 ---
 
@@ -252,7 +252,7 @@ echo-app/
                     │
                     ▼
 5. Mac mini sync server writes dictations.json
-   for retrieval/backstop outside the device
+   as the current finalized-report snapshot for retrieval/backstop outside the device
                     │
                     ▼
 6. On failure, in-memory retry queue retries up to 3 times
@@ -599,7 +599,7 @@ Push notifications can fail (device offline, iOS limits, etc). Build 25 adds ser
          │                         │                         │
 ```
 
-The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements. Queued messages may include rich-card payloads; Build 66 uses this for `meeting_reply` cards, sends a compact card through APNs, and preserves the full card in the server queue.
+The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements. Queued messages may include rich-card payloads; Build 66 uses this for `meeting_reply` cards, sends a compact card through APNs, and preserves the full card in the server queue so missed-notification sync can still render the full structured card.
 
 This ensures messages appear in chat even if:
 - Push notification is delayed or dropped
