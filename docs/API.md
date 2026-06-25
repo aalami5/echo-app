@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** June 13, 2026
+**Last Updated:** June 24, 2026
 
 ---
 
@@ -164,6 +164,14 @@ Authorization: Bearer <gateway-token>
 ```
 
 Returns one finalized dictation or `404` if not found.
+
+The sync server also exposes root-level mirrors for local/direct use:
+
+```http
+POST /dictations/sync
+GET /dictations/list
+GET /dictations/:id
+```
 
 ---
 
