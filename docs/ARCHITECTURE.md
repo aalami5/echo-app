@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** June 24, 2026
+**Last Updated:** July 16, 2026
 
 ---
 
@@ -256,6 +256,26 @@ echo-app/
                     │
                     ▼
 6. On failure, in-memory retry queue retries up to 3 times
+```
+
+### Operative Report Email Flow
+
+```
+1. User taps Email after generating or opening a finalized operative report
+                    │
+                    ▼
+2. Dictation screen calls GatewayService.sendOperativeReportEmail(report)
+                    │
+                    ▼
+3. POST /patients/dictations/email
+   Authorization: Bearer <gateway-token>
+                    │
+                    ▼
+4. Mac mini sync server sends the report via gog gmail send
+   to the configured operative-report recipient list
+                    │
+                    ▼
+5. App receives success/error and updates email sent state
 ```
 
 ### Meeting Reply Card Flow
@@ -558,8 +578,9 @@ The sync server (`server/index.js`) includes endpoints:
 - `POST /notify/brief` — Send daily brief
 - `POST /notify/meeting-reply` — Generate a calendar-checked scheduling reply and queue a `meeting_reply` rich card
 - `GET /messages/pending` — Get queued messages for sync (Build 25)
-- `POST /messages/ack` — Acknowledge synced messages and record an `acked` event in `notification-deliveries.json` (Build 25 / Build 66 ledger)
+- `POST /messages/ack` — Acknowledge synced messages and record an `acked` event in `notification-deliveries.json` (Build 25 / Build 67 ledger)
 - `POST /dictations/sync` and `POST /patients/dictations/sync` — Persist the current finalized operative-report set to `dictations.json`
+- `POST /dictations/email` and `POST /patients/dictations/email` — Send operative report text through the configured Gmail account via `gog`
 - `GET /dictations/list` / `GET /dictations/:id` — Root-level finalized dictation retrieval
 - `GET /patients/dictations/list` / `GET /patients/dictations/:id` — Cloudflare-tunneled finalized dictation retrieval
 
@@ -599,7 +620,7 @@ Push notifications can fail (device offline, iOS limits, etc). Build 25 adds ser
          │                         │                         │
 ```
 
-The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements. Queued messages may include rich-card payloads; Build 66 uses this for `meeting_reply` cards, sends a compact card through APNs, and preserves the full card in the server queue so missed-notification sync can still render the full structured card.
+The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements. Queued messages may include rich-card payloads; Build 67 uses this for `meeting_reply` cards, sends a compact card through APNs, and preserves the full card in the server queue so missed-notification sync can still render the full structured card.
 
 This ensures messages appear in chat even if:
 - Push notification is delayed or dropped

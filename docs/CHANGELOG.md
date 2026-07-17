@@ -6,20 +6,22 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Build 66] - 2026-06-24
+## [Build 67] - 2026-07-16
 
 ### Added
 - **Finalized Operative Report Sync** — `patientDictationsStore` now syncs the current set of finalized patient dictations to the Mac mini sync server via new `dictationSync` retry logic. The server persists finalized reports in `dictations.json` and exposes authenticated list/detail endpoints for retrieval and backup
 - **Dedicated Dictation Sync Service** — New `src/services/dictationSync.ts` sanitizes transcript parts, queues the latest finalized payload in memory, and retries failed syncs up to 3 times
 - **Server Dictation Endpoints** — Sync server now serves both root-level and `/patients/*` dictation sync/list/detail endpoints backed by `dictations.json`
+- **Direct Operative Report Email Endpoint** — Sync server now exposes `/patients/dictations/email` and `/dictations/email`, sending report text through `gog gmail send` to the configured operative-report recipients without routing through a long-running chat request
 - **Notification Delivery Ledger** — Sync server now initializes `notification-deliveries.json` and records message sync acknowledgements, giving notification/message delivery a local audit trail alongside the existing pending-message queue
 - **Meeting Reply Cards** — New `/notify/meeting-reply` server endpoint checks Oliver's Google Calendar via `gog`, finds clean workday slots, queues a rich `meeting_reply` card, and can push a copy-ready suggested reply into chat
 - **Rich Notification Cards** — Push/message sync paths now preserve optional `card` payloads so notifications can hydrate structured UI, not just plain text
 
 ### Changed
 - **Patient Dictation Store Sync Triggers** — Finalized dictations now re-sync when finalized, edited after finalization, or deleted after finalization, keeping the server copy aligned with the device
+- **Operative Report Email Sending** — Dictation screens now call `GatewayService.sendOperativeReportEmail()` instead of building an email prompt and sending it through the chat endpoint
 - **Chat Message Rendering** — Assistant messages with `meeting_reply` cards now render suggested times, checked conflicts, a reply preview, and a copy action; the message detail sheet also exposes copy reply
-- **Build bump to 66** for the next iOS/TestFlight build
+- **Build bump to 67** for the next iOS/TestFlight build
 
 ---
 

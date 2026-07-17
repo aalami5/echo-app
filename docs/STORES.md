@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** June 24, 2026
+**Last Updated:** July 16, 2026
 
 ---
 
@@ -419,7 +419,7 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 
 **Persistence:** AsyncStorage (key: `patient-dictations`)
 
-**Sync Behavior (Build 66):** Any time a finalized dictation is created, edited, re-finalized, or deleted, the store calls `syncFinalizedDictations()` from `src/services/dictationSync.ts`. Only dictations with `status: 'final'` are sent to the Mac mini sync server, and each sync sends the current finalized set rather than a single delta. Sync is best-effort with an in-memory pending payload, single-flight protection, transcript-part sanitization, and up to 3 retries.
+**Sync Behavior (Build 67):** Any time a finalized dictation is created, edited, re-finalized, or deleted, the store calls `syncFinalizedDictations()` from `src/services/dictationSync.ts`. Only dictations with `status: 'final'` are sent to the Mac mini sync server, and each sync sends the current finalized set rather than a single delta. Sync is best-effort with an in-memory pending payload, single-flight protection, transcript-part sanitization, and up to 3 retries.
 
 **State:**
 

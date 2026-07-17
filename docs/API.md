@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** June 24, 2026
+**Last Updated:** July 16, 2026
 
 ---
 
@@ -175,6 +175,51 @@ GET /dictations/:id
 
 ---
 
+### Operative Report Email
+
+Send generated operative report text through the sync server's configured Gmail account.
+
+```http
+POST /patients/dictations/email
+Content-Type: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:**
+
+```json
+{
+  "report": "This is Dr. Aalami with a dictated operative report...",
+  "subject": "Operative Report - July 16, 2026"
+}
+```
+
+`subject` is optional. If omitted, the server generates a date-based operative-report subject.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "recipients": [
+    "aalami@gmail.com",
+    "Oliver.Aalami@sutterhealth.org",
+    "Rajka.Campbell@sutterhealth.org"
+  ],
+  "subject": "Operative Report - July 16, 2026",
+  "messageId": "gmail-message-id",
+  "sentAt": "2026-07-16T19:00:00.000Z"
+}
+```
+
+The sync server also exposes a root-level mirror for local/direct use:
+
+```http
+POST /dictations/email
+```
+
+---
+
 ## Message Sync Queue
 
 Push-backed messages and briefs are queued server-side so the app can recover them after missed/delayed APNs delivery.
@@ -198,7 +243,7 @@ Authorization: Bearer <gateway-token>
 
 Acknowledges synced messages, removes them from the pending queue, and records an `acked` receipt event in `notification-deliveries.json`.
 
-Queued messages can include an optional `card` object. Build 66 defines `meeting_reply` cards with `replyText`, `suggestions`, `conflictSummary`, `durationMinutes`, `windowLabel`, and `timeZone` fields under `card.data`.
+Queued messages can include an optional `card` object. Build 67 defines `meeting_reply` cards with `replyText`, `suggestions`, `conflictSummary`, `durationMinutes`, `windowLabel`, and `timeZone` fields under `card.data`.
 
 ---
 
