@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** July 16, 2026
+**Last Updated:** July 17, 2026
 
 ---
 
@@ -383,8 +383,11 @@ The app receives calendar data as part of chat responses.
 | Status | Meaning | App Behavior |
 |--------|---------|--------------|
 | 401 | Invalid token | Prompt to check Settings |
-| 502/503 | Gateway down | Show offline, enable retry |
-| 408 | Timeout | Show timeout message |
+| 403 | Access denied or expired token | Show access-denied token guidance |
+| 502/503/504 | Gateway temporarily unavailable | Show retryable gateway message |
+| 524 | Cloudflare timeout | Explain that the request may still finish in the background |
+
+Gateway calls parse JSON error bodies when available and reuse the same error-message helper for chat completions, OpenResponses/image requests, and operative-report email sends.
 
 ### Network Errors
 

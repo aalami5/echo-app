@@ -6,7 +6,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
-## [Build 67] - 2026-07-16
+## [Build 67] - 2026-07-17
 
 ### Added
 - **Finalized Operative Report Sync** — `patientDictationsStore` now syncs the current set of finalized patient dictations to the Mac mini sync server via new `dictationSync` retry logic. The server persists finalized reports in `dictations.json` and exposes authenticated list/detail endpoints for retrieval and backup
@@ -21,6 +21,7 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 - **Patient Dictation Store Sync Triggers** — Finalized dictations now re-sync when finalized, edited after finalization, or deleted after finalization, keeping the server copy aligned with the device
 - **Operative Report Email Sending** — Dictation screens now call `GatewayService.sendOperativeReportEmail()` instead of building an email prompt and sending it through the chat endpoint
 - **Chat Message Rendering** — Assistant messages with `meeting_reply` cards now render suggested times, checked conflicts, a reply preview, and a copy action; the message detail sheet also exposes copy reply
+- **Gateway Error Handling** — Gateway calls now share error parsing so JSON error bodies, 403s, temporary 5xx failures, and Cloudflare 524 timeouts surface clearer app messages
 - **Build bump to 67** for the next iOS/TestFlight build
 
 ---

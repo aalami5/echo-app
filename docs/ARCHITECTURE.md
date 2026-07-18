@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** July 16, 2026
+**Last Updated:** July 17, 2026
 
 ---
 
@@ -201,8 +201,8 @@ echo-app/
 6. If voice enabled: speak(response) via ElevenLabs
                     │
                     ▼
-7. Zustand persist middleware → SecureStore
-   (Messages persisted to encrypted Keychain)
+7. Zustand persist middleware → AsyncStorage
+   (Messages persisted locally after hydration-safe replay)
 ```
 
 ### Voice Input Flow
