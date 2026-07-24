@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** July 22, 2026
+**Last Updated:** July 23, 2026
 
 ---
 
