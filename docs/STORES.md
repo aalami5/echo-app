@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** August 10, 2026
+**Last Updated:** August 21, 2026
 
 ---
 
@@ -419,7 +419,7 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 
 **Persistence:** AsyncStorage (key: `patient-dictations`)
 
-**Sync Behavior (Build 67):** Any time a finalized dictation is created, edited, re-finalized, or deleted, the store calls `syncFinalizedDictations()` from `src/services/dictationSync.ts`. Only dictations with `status: 'final'` are sent to the Mac mini sync server, and each sync sends the current finalized set rather than a single delta. Sync is best-effort with an in-memory pending payload, single-flight protection, transcript-part sanitization, and up to 3 retries.
+**Sync Behavior (Build 67):** Any time a finalized dictation is created, edited, re-finalized, or deleted, the store calls `syncFinalizedDictations()` from `src/services/dictationSync.ts`. Only dictations with `status: 'final'` are sent to the Mac mini sync server, and each sync sends the current finalized set rather than a single delta. Sync is best-effort with a durable AsyncStorage outbox, single-flight protection, transcript-part sanitization, and up to 3 in-process retries before the outbox is retried on the next app launch.
 
 **State:**
 
@@ -447,7 +447,7 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 - `deleteDictation()` re-syncs only when removing a finalized dictation, so the server copy stays in step
 - `finalizeDictation()` always syncs immediately after flipping status to `final`
 - Sync payloads include only finalized dictations and only the transcript-part fields needed downstream (`id`, `type`, `content`, `timestamp`)
-- The retry queue lives in `src/services/dictationSync.ts`, not Zustand state, so retries are best-effort for the current app process and the next store change re-sends the latest finalized set
+- The retry outbox lives in `src/services/dictationSync.ts` and persists under `operative-dictation-sync-outbox-v1`, so pending finalized-report snapshots survive app restarts and are retried from `_layout.tsx`
 
 **Helpers:** `getDictationsForPatient(patientId)` — returns all dictations for a patient, sorted by date. `buildPatientDictationHeader(name, mrn, date)` — generates report header. `formatPatientDictationDate(iso)` — display-friendly date.
 

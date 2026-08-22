@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** August 10, 2026
+**Last Updated:** August 21, 2026
 
 ---
 
@@ -141,7 +141,7 @@ echo-app/
 │   │   ├── timezone.ts           # Timezone detection & dual-time formatting
 │   │   ├── calendar.ts           # Google Calendar
 │   │   ├── dictationService.ts   # OR report generation via Gateway
-│   │   ├── dictationSync.ts      # Finalized dictation sync + retry queue
+│   │   ├── dictationSync.ts      # Finalized dictation sync + durable retry outbox
 │   │   ├── notifications/        # Push notification service
 │   │   │   └── index.ts          # Expo push registration & handling
 │   │   └── supabase.ts           # Supabase client for push tokens
@@ -255,7 +255,8 @@ echo-app/
    as the current finalized-report snapshot for retrieval/backstop outside the device
                     │
                     ▼
-6. On failure, in-memory retry queue retries up to 3 times
+6. On failure, a durable AsyncStorage outbox preserves the latest payload
+   and retries up to 3 times in-process, then again on next app launch
 ```
 
 ### Operative Report Email Flow
