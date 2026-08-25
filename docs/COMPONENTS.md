@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** August 23, 2026
+**Last Updated:** August 24, 2026
 
 ---
 
@@ -320,6 +320,7 @@ Main conversation interface with:
 - Message list with auto-scroll
 - Text input toggle
 - Photo attachment button
+- Live Voice control for native OpenAI Realtime/WebRTC sessions
 - Next meeting card
 
 ---

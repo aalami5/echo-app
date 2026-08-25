@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** August 10, 2026
+**Last Updated:** August 24, 2026
 
 ---
 
@@ -92,6 +92,35 @@ GET /ping
 ```
 
 **Response:** `200 OK` with body `pong` or similar.
+
+### Realtime Voice Session
+
+Proxy a native WebRTC SDP offer to OpenAI Realtime and return the answer SDP. The server owns the OpenAI API key; the app authenticates to Echo with the gateway token.
+
+```http
+POST /patients/voice/realtime/session?model=gpt-realtime-2.1&voice=marin
+Content-Type: application/sdp
+Accept: application/sdp
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:** raw WebRTC offer SDP.
+
+**Response:** raw WebRTC answer SDP (`application/sdp`).
+
+Optional query parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `model` | `OPENAI_REALTIME_MODEL` or `gpt-realtime-2.1` | OpenAI Realtime model |
+| `voice` | `OPENAI_REALTIME_VOICE` or `marin` | Realtime voice |
+| `instructions` | server default | Session instructions |
+
+The sync server also exposes a root-level mirror:
+
+```http
+POST /voice/realtime/session
+```
 
 ### Finalized Dictation Sync
 

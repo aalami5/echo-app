@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** August 23, 2026
+**Last Updated:** August 24, 2026
 
 ---
 
@@ -14,7 +14,7 @@ Echo App is a React Native (Expo) application that provides Oliver with a privat
 ┌─────────────────────────────────────────────────────────────────┐
 │                         ECHO APP (iOS)                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │  React Native + Expo SDK 52                               │  │
+│  │  React Native + Expo SDK 54                               │  │
 │  │                                                           │  │
 │  │  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌──────────┐ │  │
 │  │  │ Chat UI   │ │ Dictation │ │ Patients  │ │ Settings │ │  │
@@ -64,12 +64,12 @@ Echo App is a React Native (Expo) application that provides Oliver with a privat
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **Framework** | React Native + Expo SDK 52 | Cross-platform mobile |
+| **Framework** | React Native + Expo SDK 54 | Cross-platform mobile |
 | **Language** | TypeScript 5.x | Type safety |
 | **State** | Zustand + persist middleware | State management |
 | **Storage** | AsyncStorage + expo-secure-store | Split local transcript storage and encrypted Keychain storage |
 | **Navigation** | Expo Router (file-based) | Tab navigation |
-| **Audio** | expo-av | Recording & playback |
+| **Audio** | expo-av + react-native-webrtc | Recording, playback, and native realtime voice |
 | **Haptics** | expo-haptics | Tactile feedback |
 | **HTTP** | fetch (native) | Gateway API calls |
 | **Push** | expo-notifications | Remote push notifications |
@@ -107,7 +107,8 @@ echo-app/
 │   │
 │   ├── hooks/                    # Custom React hooks
 │   │   ├── useGateway.ts         # Gateway API connection
-│   │   ├── useVoiceChat.ts       # Voice recording + TTS
+│   │   ├── useVoiceChat.ts       # Whisper + ElevenLabs voice recording/TTS
+│   │   ├── useRealtimeVoice.ts   # OpenAI Realtime WebRTC voice sessions
 │   │   ├── useCalendar.ts        # Calendar integration
 │   │   ├── usePatientVoiceInput.ts  # Voice for patient forms
 │   │   ├── usePatientScan.ts     # Image scanning for patients
@@ -137,6 +138,7 @@ echo-app/
 │   │   ├── gateway.ts            # OpenClaw Gateway API
 │   │   ├── gatewayBootstrap.ts   # Supabase RPC bootstrap (gateway config + API keys)
 │   │   ├── elevenlabs.ts         # Text-to-speech (+ generateAudio/playAudioFile/pause/resume)
+│   │   ├── realtimeVoice.ts      # WebRTC SDP proxy client for OpenAI Realtime
 │   │   ├── whisper.ts            # Speech-to-text
 │   │   ├── timezone.ts           # Timezone detection & dual-time formatting
 │   │   ├── calendar.ts           # Google Calendar
@@ -231,6 +233,31 @@ echo-app/
                     ▼
 7. Playback complete
    Avatar state → "idle"
+```
+
+### Native Live Voice Flow
+
+```
+1. User taps Live on the chat screen
+                    │
+                    ▼
+2. useRealtimeVoice requests microphone access and creates a WebRTC offer
+                    │
+                    ▼
+3. App POSTs offer SDP to /patients/voice/realtime/session
+   Authorization: Bearer <gateway-token>
+   Content-Type: application/sdp
+                    │
+                    ▼
+4. Sync server forwards the SDP offer to OpenAI Realtime
+   using the server-side OPENAI_API_KEY
+                    │
+                    ▼
+5. Server returns OpenAI answer SDP to the app
+                    │
+                    ▼
+6. App sets the remote description and streams two-way audio over WebRTC
+   Avatar state → "listening" while connected
 ```
 
 ### Finalized Dictation Sync Flow
@@ -406,6 +433,7 @@ const chatStorage = {
 - All traffic over HTTPS via Cloudflare Tunnel
 - Gateway URL: `https://echo.oppersmedical.com`
 - Bearer token authentication for API calls
+- OpenAI Realtime WebRTC sessions use authenticated SDP proxy endpoints (`/voice/realtime/session` and `/patients/voice/realtime/session`) so the OpenAI API key stays on the sync server
 - **Gateway Bootstrap (Build 55):** No secrets in binary — gateway config and API keys fetched from Supabase RPC after authentication
   - `get_gateway_config()` RPC with SECURITY DEFINER + RLS
   - Replaces baked-in obfuscated credentials (Level 1 bridge removed)
@@ -452,6 +480,16 @@ Patient data is minimized by design:
 - Fallback for restrictive networks (hospital Wi-Fi that blocks WebSocket)
 - Tries `/poll` endpoint with 25s long-hang; degrades to `/ping` short-polling every 10s on 404
 - Same message handling pipeline as WebSocket via shared `messageHandler.ts`
+
+### Native WebRTC Voice
+
+**Chose:** Keep the original Whisper + ElevenLabs path for dictation-style voice, and add OpenAI Realtime over WebRTC for live two-way conversation.
+
+**Why:**
+- Native WebRTC gives lower-latency voice interactions than record/transcribe/respond/playback
+- The app still avoids storing the OpenAI API key on-device by exchanging SDP through the authenticated Echo sync server
+- The Live control is isolated behind `useRealtimeVoice`, leaving the existing dictation and TTS code paths intact
+- Expo SDK 54, `react-native-webrtc`, the WebRTC config plugin, and React Native New Architecture are part of the native build requirements
 
 ### 2. SecureStore vs AsyncStorage
 
