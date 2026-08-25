@@ -7,6 +7,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { TranscriptPart } from './dictationStore';
 import { usePatientsStore } from './patientsStore';
+import { syncFinalizedDictations } from '../services/dictationSync';
 
 export interface PatientDictation {
   id: string;                    // UUID
@@ -62,6 +63,12 @@ const buildHeaderText = (patientName: string, mrn: string, isoDate: string): str
   return `This is Dr. Aalami with a dictated operative report for ${patientName}, medical record number ${mrn}. The date of operation is ${dateText}.`;
 };
 
+const syncFinals = (dictations: Record<string, PatientDictation>) => {
+  syncFinalizedDictations(dictations).catch((e) => {
+    console.log('[PatientDictations] Sync error:', e);
+  });
+};
+
 export const usePatientDictationsStore = create<PatientDictationsState>()(
   persist(
     (set, get) => ({
@@ -109,44 +116,54 @@ export const usePatientDictationsStore = create<PatientDictationsState>()(
         return id;
       },
 
-      updateDictation: (id, updates) =>
-        set((state) => {
-          const existing = state.dictations[id];
-          if (!existing) return state;
-          return {
-            dictations: {
-              ...state.dictations,
-              [id]: {
-                ...existing,
-                ...updates,
-                updatedAt: new Date().toISOString(),
-              },
+      updateDictation: (id, updates) => {
+        const existing = get().dictations[id];
+        if (!existing) return;
+        set((state) => ({
+          dictations: {
+            ...state.dictations,
+            [id]: {
+              ...existing,
+              ...updates,
+              updatedAt: new Date().toISOString(),
             },
-          };
-        }),
+          },
+        }));
 
-      deleteDictation: (id) =>
+        if (existing.status === 'final' || updates.status === 'final') {
+          syncFinals(get().dictations);
+        }
+      },
+
+      deleteDictation: (id) => {
+        const existing = get().dictations[id];
         set((state) => {
           const next = { ...state.dictations };
           delete next[id];
           return { dictations: next };
-        }),
+        });
 
-      finalizeDictation: (id) =>
-        set((state) => {
-          const existing = state.dictations[id];
-          if (!existing) return state;
-          return {
-            dictations: {
-              ...state.dictations,
-              [id]: {
-                ...existing,
-                status: 'final',
-                updatedAt: new Date().toISOString(),
-              },
+        if (existing?.status === 'final') {
+          syncFinals(get().dictations);
+        }
+      },
+
+      finalizeDictation: (id) => {
+        const existing = get().dictations[id];
+        if (!existing) return;
+        set((state) => ({
+          dictations: {
+            ...state.dictations,
+            [id]: {
+              ...existing,
+              status: 'final',
+              updatedAt: new Date().toISOString(),
             },
-          };
-        }),
+          },
+        }));
+
+        syncFinals(get().dictations);
+      },
     }),
     {
       name: 'patient-dictations-store',

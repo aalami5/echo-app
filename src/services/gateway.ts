@@ -91,6 +91,39 @@ interface OpenResponsesResponse {
   };
 }
 
+function getGatewayErrorMessage(status: number, errorText: string): string {
+  const trimmed = errorText.trim();
+
+  if (status === 401) {
+    return 'Invalid gateway token. Please check your settings.';
+  }
+  if (status === 403) {
+    return 'Access denied. Token may be expired.';
+  }
+  if (status === 502 || status === 503 || status === 504) {
+    return 'Gateway temporarily unavailable. Please try again.';
+  }
+  if (status === 524) {
+    return 'Gateway timed out while waiting for the server. The request may still finish in the background.';
+  }
+
+  if (trimmed) {
+    try {
+      const errorJson = JSON.parse(trimmed);
+      const message =
+        errorJson.error?.message ||
+        errorJson.message ||
+        errorJson.error ||
+        trimmed;
+      return typeof message === 'string' ? message : JSON.stringify(message);
+    } catch {
+      return trimmed;
+    }
+  }
+
+  return `Gateway error: ${status}`;
+}
+
 /**
  * Create a fetch request with timeout using AbortController
  * Pass timeoutMs = 0 to disable timeout (no abort).
@@ -180,6 +213,48 @@ export class GatewayService {
   }
 
   /**
+   * Send an operative report through the Echo sync server's direct Gmail endpoint.
+   * This avoids using a long-running agent chat request for a deterministic send.
+   */
+  async sendOperativeReportEmail(report: string, subject?: string): Promise<{
+    success: boolean;
+    messageId?: string | null;
+    recipients?: string[];
+    subject?: string;
+  }> {
+    const { baseUrl: rawUrl, token } = this.config;
+    const baseUrl = rawUrl.trim().replace(/\/+$/, '');
+
+    if (!baseUrl) {
+      throw new Error('Gateway URL not configured');
+    }
+    if (!token) {
+      throw new Error('Gateway token not configured');
+    }
+
+    const response = await fetchWithTimeout(
+      `${baseUrl}/patients/dictations/email`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ report, subject }),
+      },
+      60000
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Gateway] Operative report email error:', response.status, errorText);
+      throw new Error(getGatewayErrorMessage(response.status, errorText));
+    }
+
+    return response.json();
+  }
+
+  /**
    * Send message with image using OpenResponses API
    */
   private async sendMessageWithImage(
@@ -245,24 +320,7 @@ export class GatewayService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Gateway] OpenResponses API error:', response.status, errorText);
-      
-      if (response.status === 401) {
-        throw new Error('Invalid gateway token. Please check your settings.');
-      } else if (response.status === 403) {
-        throw new Error('Access denied. Token may be expired.');
-      } else if (response.status === 400) {
-        // Parse error for more details
-        try {
-          const errorJson = JSON.parse(errorText);
-          throw new Error(errorJson.error?.message || `Bad request: ${errorText}`);
-        } catch {
-          throw new Error(`Bad request: ${errorText}`);
-        }
-      } else if (response.status === 502 || response.status === 503 || response.status === 504) {
-        throw new Error('Gateway temporarily unavailable. Please try again.');
-      } else {
-        throw new Error(`Gateway error: ${response.status}`);
-      }
+      throw new Error(getGatewayErrorMessage(response.status, errorText));
     }
 
     const result: OpenResponsesResponse = await response.json();
@@ -342,16 +400,7 @@ export class GatewayService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Gateway] Chat Completions API error:', response.status, errorText);
-      
-      if (response.status === 401) {
-        throw new Error('Invalid gateway token. Please check your settings.');
-      } else if (response.status === 403) {
-        throw new Error('Access denied. Token may be expired.');
-      } else if (response.status === 502 || response.status === 503 || response.status === 504) {
-        throw new Error('Gateway temporarily unavailable. Please try again.');
-      } else {
-        throw new Error(`Gateway error: ${response.status}`);
-      }
+      throw new Error(getGatewayErrorMessage(response.status, errorText));
     }
 
     const result: ChatCompletionResponse = await response.json();

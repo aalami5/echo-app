@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 68] - 2026-08-24
+
+### Added
+- **Native Live Voice** — Added OpenAI Realtime/WebRTC voice mode behind a new Live control on the chat screen, keeping the existing Whisper/ElevenLabs flow available for dictation-style interactions
+- **Realtime Session Proxy** — Echo sync server now exposes authenticated `/voice/realtime/session` and `/patients/voice/realtime/session` SDP proxy endpoints so the app can connect to OpenAI Realtime without exposing the OpenAI API key on-device
+
+### Changed
+- **Native Build Readiness** — Updated Expo SDK 54 patch dependencies, added the WebRTC config plugin, and disabled React Native New Architecture for this first WebRTC build
+- **Build bump to 68** for the next iOS/TestFlight build
+
 ## [Build 67] - 2026-08-21
 
 ### Added

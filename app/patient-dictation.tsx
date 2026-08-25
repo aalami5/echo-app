@@ -35,9 +35,9 @@ import {
 import { useDictationStore, CustomProcedure, TranscriptPart } from '../src/stores/dictationStore';
 import { useSettingsStore } from '../src/stores/settingsStore';
 import { GatewayService } from '../src/services/gateway';
-import { ElevenLabsService } from '../src/services/elevenlabs';
+import { ElevenLabsService, VOICES } from '../src/services/elevenlabs';
 import { transcribeAudio } from '../src/services/whisper';
-import { generateReport, regenerateWithCorrections, buildEmailMessage } from '../src/services/dictationService';
+import { generateReport, regenerateWithCorrections } from '../src/services/dictationService';
 import { Avatar } from '../src/components/Avatar';
 import { ImagePickerModal } from '../src/components/ImagePicker';
 import {
@@ -46,7 +46,6 @@ import {
   ProcedureCategory,
 } from '../src/data/vascularProcedures';
 
-const OLIVER_VOICE_ID = 'grLAj0YuamNRv9WBJxB4';
 const ALL_CATEGORIES: ProcedureCategory[] = ['aortic', 'carotid', 'peripheral_arterial', 'venous', 'dialysis_access', 'other'];
 
 type ScreenState = 'input' | 'generating' | 'review' | 'editing' | 'direct-editing';
@@ -93,7 +92,7 @@ export default function PatientDictationScreen() {
     removeCustomProcedure,
   } = useDictationStore();
 
-  const { gatewayUrl, gatewayToken, openaiApiKey, elevenlabsApiKey } = useSettingsStore();
+  const { gatewayUrl, gatewayToken, openaiApiKey, elevenlabsApiKey, voiceName } = useSettingsStore();
 
   const activeDictation = dictationId ? dictations[dictationId] : null;
   const patientDictations = useMemo(() => (patientId ? getDictationsForPatient(patientId) : []), [getDictationsForPatient, patientId, dictations]);
@@ -401,8 +400,7 @@ export default function PatientDictationScreen() {
     if (!gw || emailSent || isSendingEmail) return;
     setIsSendingEmail(true);
     try {
-      const msg = buildEmailMessage(activeDictation.generatedReport, activeDictation.selectedProcedures);
-      await gw.sendMessage(msg);
+      await gw.sendOperativeReportEmail(activeDictation.generatedReport);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setEmailSent(true);
     } catch (e: any) {
@@ -425,11 +423,12 @@ export default function PatientDictationScreen() {
         setReadBackState('processing');
         setIsReadingBack(true);
         try {
-          const ttsService = new ElevenLabsService({ apiKey: elevenlabsApiKey, voiceId: OLIVER_VOICE_ID });
+          const reportVoiceId = VOICES[voiceName || 'river'] || VOICES.river;
+          const ttsService = new ElevenLabsService({ apiKey: elevenlabsApiKey, voiceId: reportVoiceId });
           ttsServiceRef.current = ttsService;
           const audioUri = await ttsService.generateAudio({
             text: activeDictation.generatedReport,
-            voiceId: OLIVER_VOICE_ID,
+            voiceId: reportVoiceId,
           });
           setReadBackAudioUri(audioUri);
           setReadBackState('ready');

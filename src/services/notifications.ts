@@ -14,6 +14,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '../lib/supabase';
 import Constants from 'expo-constants';
+import type { RichCard } from '../types';
 
 // Configure notification behavior
 Notifications.setNotificationHandler({
@@ -37,6 +38,7 @@ export interface NotificationData {
   meetingTime?: string;
   messageId?: string;
   messageContent?: string;
+  card?: RichCard;
   timestamp?: string;
 }
 
@@ -204,7 +206,7 @@ export function setupNotificationReceivedHandler(
  */
 export function setupNotificationResponseHandler(
   onMeetingTap: (eventId: string) => void,
-  onMessageTap: (messageData?: { id: string; content: string; timestamp: string }) => void,
+  onMessageTap: (messageData?: { id: string; content: string; timestamp: string; card?: RichCard }) => void,
   onBriefTap: () => void
 ): Notifications.EventSubscription {
   return Notifications.addNotificationResponseReceivedListener((response) => {
@@ -216,7 +218,7 @@ export function setupNotificationResponseHandler(
       onMeetingTap(data.eventId);
     } else if (data.type === 'message') {
       const messageData = data.messageId && data.messageContent && data.timestamp
-        ? { id: data.messageId, content: data.messageContent, timestamp: data.timestamp }
+        ? { id: data.messageId, content: data.messageContent, timestamp: data.timestamp, card: data.card }
         : undefined;
       onMessageTap(messageData);
     } else if (data.type === 'brief') {

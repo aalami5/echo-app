@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "echoapp",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.oppersmedical.echo",
-      "buildNumber": "65",
+      "buildNumber": "68",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "Echo needs microphone access for voice conversations",
@@ -43,12 +43,16 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "@config-plugins/react-native-webrtc",
       [
         "expo-notifications",
         {
           "color": "#6366f1"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

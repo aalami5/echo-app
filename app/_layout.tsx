@@ -12,6 +12,7 @@ import { colors } from '../src/constants/theme';
 import { logCrash } from '../src/services/crashLog';
 import { supabase } from '../src/lib/supabase';
 import { ensureGatewayConfig } from '../src/services/gatewayBootstrap';
+import { retryPendingDictationSync } from '../src/services/dictationSync';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -157,6 +158,14 @@ function RootLayoutNav() {
     if (!isAuthenticated || !settingsHydrated) return;
     ensureGatewayConfig().then((ok) => {
       if (!ok) console.warn('[Layout] Gateway bootstrap failed — will retry next launch');
+    });
+  }, [isAuthenticated, settingsHydrated]);
+
+  // Resume operative-report sync after app restart once credentials/settings are available.
+  useEffect(() => {
+    if (!isAuthenticated || !settingsHydrated) return;
+    retryPendingDictationSync().catch((e) => {
+      console.warn('[Layout] Pending dictation sync retry failed', e);
     });
   }, [isAuthenticated, settingsHydrated]);
 

@@ -30,6 +30,7 @@ import { NetworkIndicator } from '../../src/components/NetworkIndicator';
 import { ToastContainer } from '../../src/components/ToastContainer';
 import { useGateway, LONG_TASK_MARKER } from '../../src/hooks/useGateway';
 import { useVoiceChat } from '../../src/hooks/useVoiceChat';
+import { useRealtimeVoice } from '../../src/hooks/useRealtimeVoice';
 import { colors, spacing, typography, borderRadius } from '../../src/constants/theme';
 import type { Message } from '../../src/types';
 import {
@@ -79,13 +80,18 @@ export default function ChatScreen() {
     stopSpeaking,
     isConfigured: voiceConfigured,
   } = useVoiceChat();
+  const liveVoice = useRealtimeVoice();
 
   // Sync avatar state with voice chat state
   // - isLoadingAudio: show 'thinking' (fetching audio from ElevenLabs)
   // - isSpeaking: show 'speaking' (audio is actually playing)
   // - neither: idle (unless something else set it)
   useEffect(() => {
-    if (isSpeaking) {
+    if (liveVoice.isConnected) {
+      setAvatarState('listening');
+    } else if (liveVoice.status === 'connecting') {
+      setAvatarState('thinking');
+    } else if (isSpeaking) {
       setAvatarState('speaking');
     } else if (isLoadingAudio) {
       setAvatarState('thinking');
@@ -93,7 +99,7 @@ export default function ChatScreen() {
       // Audio just finished
       setAvatarState('idle');
     }
-  }, [isSpeaking, isLoadingAudio, avatarState, setAvatarState]);
+  }, [liveVoice.isConnected, liveVoice.status, isSpeaking, isLoadingAudio, avatarState, setAvatarState]);
 
   // For inverted FlatList, we reverse the messages so newest appears at top of reversed list (bottom of screen)
   const reversedMessages = [...messages].reverse();
@@ -400,6 +406,38 @@ export default function ChatScreen() {
     }
   };
 
+  const handleLiveVoicePress = async () => {
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    if (liveVoice.isConnected || liveVoice.status === 'connecting') {
+      await liveVoice.stop();
+      setAvatarState('idle');
+      return;
+    }
+
+    try {
+      if (isSpeaking) {
+        await stopSpeaking();
+      }
+      await liveVoice.start({
+        instructions: 'You are Echo, Oliver Aalami\'s concise, practical voice assistant. Keep spoken replies brief and conversational.',
+      });
+      if (liveVoice.error) {
+        addToast({
+          message: liveVoice.error,
+          type: 'warning',
+          duration: 5000,
+        });
+      }
+    } catch (e: any) {
+      addToast({
+        message: e?.message || 'Live Voice failed to start',
+        type: 'error',
+        duration: 5000,
+      });
+    }
+  };
+
   const toggleTextInput = () => {
     setShowTextInput(!showTextInput);
     if (!showTextInput) {
@@ -554,7 +592,16 @@ export default function ChatScreen() {
           <View style={{ height: spacing.lg }} />
           
           {/* Status info */}
-          {isRecording ? (
+          {liveVoice.status === 'connecting' ? (
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusText}>Starting Live Voice...</Text>
+            </View>
+          ) : liveVoice.isConnected ? (
+            <View style={styles.statusContainer}>
+              <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
+              <Text style={styles.statusText}>Live Voice</Text>
+            </View>
+          ) : isRecording ? (
             <View style={styles.statusContainer}>
               <View style={[styles.statusDot, { backgroundColor: colors.error }]} />
               <Text style={styles.statusText}>Listening...</Text>
@@ -664,6 +711,25 @@ export default function ChatScreen() {
                 <Ionicons name="keypad-outline" size={22} color={colors.textSecondary} />
                 <Text style={styles.actionButtonText}>Type</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleLiveVoicePress}
+                style={[
+                  styles.actionButton,
+                  liveVoice.isConnected && styles.actionButtonActive,
+                ]}
+              >
+                <Ionicons
+                  name={liveVoice.isConnected ? 'stop-circle-outline' : 'radio-outline'}
+                  size={22}
+                  color={liveVoice.isConnected ? colors.textInverse : colors.textSecondary}
+                />
+                <Text style={[
+                  styles.actionButtonText,
+                  liveVoice.isConnected && styles.actionButtonTextActive,
+                ]}>
+                  {liveVoice.isConnected ? 'Stop' : 'Live'}
+                </Text>
+              </TouchableOpacity>
             </View>
           )}
         </View>
@@ -768,9 +834,18 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     padding: spacing.sm,
   },
+  actionButtonActive: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.md,
+  },
   actionButtonText: {
     color: colors.textSecondary,
     fontSize: typography.xs,
+  },
+  actionButtonTextActive: {
+    color: colors.textInverse,
+    fontWeight: '600',
   },
   textInputContainer: {
     flexDirection: 'row',

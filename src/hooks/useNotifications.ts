@@ -62,6 +62,7 @@ async function syncMissedNotifications(retryCount: number = 0): Promise<number> 
             role: 'assistant',
             content: data.messageContent,
             timestamp: data.timestamp || new Date().toISOString(),
+            card: data.card,
           });
           syncedCount++;
         } else {
@@ -157,6 +158,7 @@ async function syncMessagesFromServer(): Promise<number> {
           role: 'assistant',
           content: msg.content,
           timestamp: msg.timestamp || new Date().toISOString(),
+          card: msg.card,
         });
         syncedCount++;
       }
@@ -224,6 +226,7 @@ export function useNotifications() {
                 role: 'assistant',
                 content: data.messageContent,
                 timestamp: data.timestamp || new Date().toISOString(),
+                card: data.card,
               });
             }
           }
@@ -268,6 +271,7 @@ export function useNotifications() {
           role: 'assistant',
           content: data.messageContent,
           timestamp: data.timestamp || new Date().toISOString(),
+          card: data.card,
         });
       }
     });
@@ -294,6 +298,7 @@ export function useNotifications() {
               role: 'assistant',
               content: messageData.content,
               timestamp: messageData.timestamp,
+              card: messageData.card,
             });
           }
         }

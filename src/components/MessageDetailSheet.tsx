@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import * as Clipboard from 'expo-clipboard';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import type { Message } from '../types';
 
@@ -104,6 +105,13 @@ export function MessageDetailSheet({ message, visible, onClose, onSpeak }: Messa
       dismiss();
     }
   }, [message, onSpeak, dismiss]);
+
+  const handleCopyReply = useCallback(async () => {
+    const replyText = message?.card?.data?.replyText || message?.card?.body || message?.content;
+    if (!replyText) return;
+    await Clipboard.setStringAsync(String(replyText));
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }, [message]);
 
   if (!message) return null;
 
@@ -199,6 +207,15 @@ export function MessageDetailSheet({ message, visible, onClose, onSpeak }: Messa
               >
                 <Ionicons name="volume-medium-outline" size={20} color={colors.primary} />
                 <Text style={styles.actionText}>Speak</Text>
+              </TouchableOpacity>
+            )}
+            {message.card?.type === 'meeting_reply' && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleCopyReply}
+              >
+                <Ionicons name="copy-outline" size={20} color={colors.primary} />
+                <Text style={styles.actionText}>Copy reply</Text>
               </TouchableOpacity>
             )}
           </View>

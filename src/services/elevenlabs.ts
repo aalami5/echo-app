@@ -21,6 +21,25 @@ export const VOICES = {
 
 export type VoiceName = keyof typeof VOICES;
 
+const parseElevenLabsError = (status: number, body: string, voiceId: string): string => {
+  let detail = body.trim();
+
+  try {
+    const parsed = JSON.parse(body);
+    detail =
+      parsed?.detail?.message ||
+      parsed?.detail?.status ||
+      parsed?.message ||
+      parsed?.error ||
+      detail;
+  } catch {
+    // ElevenLabs sometimes returns plain text.
+  }
+
+  const suffix = detail ? `: ${detail}` : '';
+  return `ElevenLabs API error ${status} for voice ${voiceId}${suffix}`;
+};
+
 interface TTSConfig {
   apiKey: string;
   voiceId?: string;
@@ -97,7 +116,7 @@ export class ElevenLabsService {
       if (!response.ok) {
         const error = await response.text();
         console.error('[ElevenLabs] API error:', error);
-        throw new Error(`ElevenLabs API error: ${response.status}`);
+        throw new Error(parseElevenLabsError(response.status, error, targetVoiceId));
       }
 
       // Get audio data as blob
@@ -202,7 +221,7 @@ export class ElevenLabsService {
     if (!response.ok) {
       const error = await response.text();
       console.error('[ElevenLabs] API error:', error);
-      throw new Error(`ElevenLabs API error: ${response.status}`);
+      throw new Error(parseElevenLabsError(response.status, error, targetVoiceId));
     }
 
     const audioBlob = await response.blob();

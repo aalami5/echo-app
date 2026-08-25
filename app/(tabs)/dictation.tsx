@@ -36,7 +36,7 @@ import { useSettingsStore } from '../../src/stores/settingsStore';
 import { GatewayService } from '../../src/services/gateway';
 import { ElevenLabsService } from '../../src/services/elevenlabs';
 import { transcribeAudio } from '../../src/services/whisper';
-import { generateReport, regenerateWithCorrections, buildEmailMessage } from '../../src/services/dictationService';
+import { generateReport, regenerateWithCorrections } from '../../src/services/dictationService';
 import { Avatar } from '../../src/components/Avatar';
 import { ImagePickerModal } from '../../src/components/ImagePicker';
 import {
@@ -237,8 +237,7 @@ export default function DictationScreen() {
     if (!gw || !generatedReport || emailSent || isSendingEmail) return;
     setIsSendingEmail(true);
     try {
-      const msg = buildEmailMessage(generatedReport, selectedProcedures);
-      await gw.sendMessage(msg);
+      await gw.sendOperativeReportEmail(generatedReport);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setEmailSent(true);
     } catch (e: any) {
