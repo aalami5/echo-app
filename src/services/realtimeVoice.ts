@@ -10,6 +10,7 @@ import * as NativeWebRTC from 'react-native-webrtc';
 
 const REALTIME_SESSION_PATH = '/patients/voice/realtime/session';
 const REALTIME_TOKEN_PATH = '/patients/voice/realtime/token';
+const VOICE_BRIDGE_ASK_PATH = '/patients/voice/bridge/ask';
 const OPENAI_REALTIME_CALLS_URL = 'https://api.openai.com/v1/realtime/calls';
 
 export type RealtimeVoiceModel = 'gpt-realtime-2.1' | string;
@@ -26,6 +27,12 @@ export interface RealtimeVoiceSessionOptions {
 
 export interface RealtimeVoiceSessionResult {
   answerSdp: string;
+}
+
+export interface VoiceBridgeAskOptions {
+  baseUrl: string;
+  token: string;
+  request: string;
 }
 
 interface RealtimeClientSecretResult {
@@ -114,6 +121,44 @@ export async function createRealtimeVoiceSession({
   }
 
   return { answerSdp };
+}
+
+export async function askEchoVoiceBridge({
+  baseUrl,
+  token,
+  request,
+}: VoiceBridgeAskOptions): Promise<string> {
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, '');
+  if (!normalizedBaseUrl) {
+    throw new Error('Gateway URL not configured');
+  }
+  if (!token) {
+    throw new Error('Gateway token not configured');
+  }
+  if (!request.trim()) {
+    throw new Error('Missing voice bridge request');
+  }
+
+  const response = await fetch(`${normalizedBaseUrl}${VOICE_BRIDGE_ASK_PATH}`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ request }),
+  });
+
+  if (!response.ok) {
+    throw new Error(await getGatewayErrorMessage(response));
+  }
+
+  const data = await response.json() as { answer?: string };
+  if (!data.answer?.trim()) {
+    throw new Error('Echo voice bridge returned an empty answer');
+  }
+
+  return data.answer.trim();
 }
 
 async function createRealtimeClientSecret({

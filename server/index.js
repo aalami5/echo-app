@@ -53,6 +53,10 @@ const DICTATION_LEGACY_JSON_FALLBACK = process.env.DICTATION_LEGACY_JSON_FALLBAC
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const REALTIME_MODEL = process.env.OPENAI_REALTIME_MODEL || 'gpt-realtime-2.1';
 const REALTIME_VOICE = process.env.OPENAI_REALTIME_VOICE || 'marin';
+const OPENCLAW_GATEWAY_URL = (process.env.OPENCLAW_GATEWAY_URL || 'http://127.0.0.1:18789').replace(/\/+$/, '');
+const OPENCLAW_AGENT_ID = process.env.OPENCLAW_AGENT_ID || 'main';
+const OPENCLAW_USER_ID = process.env.OPENCLAW_USER_ID || 'echo-app-live-voice';
+const VOICE_BRIDGE_TIMEOUT_MS = Number(process.env.VOICE_BRIDGE_TIMEOUT_MS || 180000);
 
 // Ensure data directory exists
 if (!fs.existsSync(DATA_DIR)) {
@@ -775,12 +779,37 @@ const buildRealtimeSessionConfig = (body = {}) => {
     : REALTIME_VOICE;
   const instructions = typeof body.instructions === 'string' && body.instructions.trim()
     ? body.instructions.trim().slice(0, 8000)
-    : 'You are Echo, Oliver Aalami\'s concise, practical voice assistant. Keep spoken replies brief, natural, and useful.';
+    : [
+        'You are Echo, Oliver Aalami\'s concise, practical voice assistant.',
+        'Keep spoken replies brief, natural, and useful.',
+        'You have one tool, ask_echo, that reaches Echo\'s full OpenClaw brain and tools.',
+        'Use ask_echo whenever Oliver asks for personal context, memory, email, calendar, reminders, files, projects, app status, morning brief, or any action outside this live voice session.',
+        'Do not claim you lack access for those requests; call ask_echo with Oliver\'s request in plain language, then summarize the result conversationally.',
+      ].join(' ');
 
   return {
     type: 'realtime',
     model,
     instructions,
+    tools: [
+      {
+        type: 'function',
+        name: 'ask_echo',
+        description: 'Ask Echo/OpenClaw to answer using Oliver\'s memory, tools, files, Gmail, calendar, reminders, and current project context.',
+        parameters: {
+          type: 'object',
+          properties: {
+            request: {
+              type: 'string',
+              description: 'Oliver\'s request or question, rewritten clearly enough for Echo to answer or act on.',
+            },
+          },
+          required: ['request'],
+          additionalProperties: false,
+        },
+      },
+    ],
+    tool_choice: 'auto',
     audio: {
       output: {
         voice,
@@ -880,6 +909,81 @@ const createRealtimeSession = async (req, res) => {
   }
 };
 
+const askEchoFromLiveVoice = async (req, res) => {
+  const request = typeof req.body?.request === 'string' ? req.body.request.trim() : '';
+  if (!request) {
+    return res.status(400).json({ error: 'Missing request' });
+  }
+  if (!AUTH_TOKEN) {
+    return res.status(503).json({ error: 'Echo gateway token is not configured' });
+  }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), VOICE_BRIDGE_TIMEOUT_MS);
+  const prompt = [
+    'Oliver is speaking to Echo through the iPhone Live Voice interface.',
+    'Answer as Echo with the same personal context, memory, and tool access you normally use.',
+    'Keep the final answer concise and spoken-friendly unless Oliver explicitly asks for detail.',
+    'If the request requires checking email, calendar, reminders, files, projects, or current app state, use the available tools before answering.',
+    '',
+    `Oliver said: ${request}`,
+  ].join('\n');
+
+  try {
+    const response = await fetch(`${OPENCLAW_GATEWAY_URL}/v1/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${AUTH_TOKEN}`,
+        'x-openclaw-scopes': 'operator.write',
+        'x-openclaw-agent-id': OPENCLAW_AGENT_ID,
+        'X-App-State': req.headers['x-app-state'] || 'active',
+      },
+      body: JSON.stringify({
+        model: `openclaw:${OPENCLAW_AGENT_ID}`,
+        messages: [{ role: 'user', content: prompt }],
+        stream: false,
+        user: OPENCLAW_USER_ID,
+      }),
+      signal: controller.signal,
+    });
+
+    const text = await response.text();
+    if (!response.ok) {
+      console.error('[VoiceBridge] OpenClaw gateway error:', response.status, text.slice(0, 1000));
+      return res.status(response.status).json({
+        error: 'Echo brain request failed',
+        detail: text.slice(0, 1000),
+      });
+    }
+
+    let answer = '';
+    try {
+      const data = JSON.parse(text);
+      answer = data.choices?.[0]?.message?.content
+        || data.output_text
+        || data.output?.flatMap(item => item.content || []).map(part => part.text || '').join('')
+        || '';
+    } catch {
+      answer = text.trim();
+    }
+
+    if (!answer.trim()) {
+      return res.status(502).json({ error: 'Echo brain returned an empty answer' });
+    }
+
+    res.json({ answer: answer.trim() });
+  } catch (e) {
+    const message = e.name === 'AbortError'
+      ? `Echo brain request timed out after ${VOICE_BRIDGE_TIMEOUT_MS / 1000} seconds`
+      : e.message;
+    console.error('[VoiceBridge] Error:', message);
+    res.status(500).json({ error: message });
+  } finally {
+    clearTimeout(timeout);
+  }
+};
+
 // Health check endpoints (root level for direct access)
 app.get('/ping', (req, res) => {
   res.send('pong');
@@ -917,6 +1021,8 @@ app.post('/voice/realtime/token', createRealtimeClientSecret);
 app.post('/patients/voice/realtime/token', createRealtimeClientSecret);
 app.post('/voice/realtime/session', createRealtimeSession);
 app.post('/patients/voice/realtime/session', createRealtimeSession);
+app.post('/voice/bridge/ask', askEchoFromLiveVoice);
+app.post('/patients/voice/bridge/ask', askEchoFromLiveVoice);
 
 /**
  * POST /sync

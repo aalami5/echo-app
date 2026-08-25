@@ -8,6 +8,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { useSettingsStore } from '../stores/settingsStore';
 import {
+  askEchoVoiceBridge,
   createRealtimeVoiceSession,
   getWebRtcRuntime,
   hasWebRtcRuntime,
@@ -58,7 +59,9 @@ export function useRealtimeVoice(): UseRealtimeVoiceResult {
   const [status, setStatus] = useState<LiveVoiceStatus>(() => hasWebRtcRuntime() ? 'idle' : 'unsupported');
   const [error, setError] = useState<string | null>(null);
   const peerConnection = useRef<any>(null);
+  const dataChannel = useRef<any>(null);
   const localStream = useRef<any>(null);
+  const pendingToolCalls = useRef<Set<string>>(new Set());
 
   const stop = useCallback(async () => {
     setStatus((current) => current === 'idle' || current === 'unsupported' ? current : 'stopping');
@@ -72,10 +75,98 @@ export function useRealtimeVoice(): UseRealtimeVoiceResult {
       }
     } finally {
       localStream.current = null;
+      dataChannel.current = null;
+      pendingToolCalls.current.clear();
       peerConnection.current = null;
       setStatus(hasWebRtcRuntime() ? 'idle' : 'unsupported');
     }
   }, []);
+
+  const sendRealtimeEvent = useCallback((event: Record<string, any>) => {
+    const channel = dataChannel.current;
+    if (!channel || channel.readyState !== 'open') {
+      console.warn('[RealtimeVoice] Data channel is not open for event:', event.type);
+      return;
+    }
+    channel.send(JSON.stringify(event));
+  }, []);
+
+  const handleToolCall = useCallback(async (event: any) => {
+    const callId = event.call_id || event.item_id || event.item?.call_id;
+    const name = event.name || event.item?.name;
+    if (name && name !== 'ask_echo') {
+      return;
+    }
+    if (!callId || pendingToolCalls.current.has(callId)) {
+      return;
+    }
+
+    pendingToolCalls.current.add(callId);
+    let request = '';
+    try {
+      const args = typeof event.arguments === 'string'
+        ? JSON.parse(event.arguments || '{}')
+        : event.arguments || {};
+      request = typeof args.request === 'string' ? args.request : '';
+
+      const answer = await askEchoVoiceBridge({
+        baseUrl: gatewayUrl,
+        token: gatewayToken || '',
+        request,
+      });
+
+      sendRealtimeEvent({
+        type: 'conversation.item.create',
+        item: {
+          type: 'function_call_output',
+          call_id: callId,
+          output: answer,
+        },
+      });
+      sendRealtimeEvent({
+        type: 'response.create',
+        response: {
+          modalities: ['audio', 'text'],
+          instructions: 'Speak this Echo tool result naturally and briefly. Do not mention that a tool was called.',
+        },
+      });
+    } catch (e: any) {
+      const message = e?.message || 'Echo voice bridge failed';
+      console.error('[RealtimeVoice] Tool call failed:', message);
+      sendRealtimeEvent({
+        type: 'conversation.item.create',
+        item: {
+          type: 'function_call_output',
+          call_id: callId,
+          output: `I could not reach Echo's tools for "${request || 'that request'}": ${message}`,
+        },
+      });
+      sendRealtimeEvent({
+        type: 'response.create',
+        response: {
+          modalities: ['audio', 'text'],
+          instructions: 'Apologize briefly and say Echo could not reach its tools for that request.',
+        },
+      });
+    } finally {
+      pendingToolCalls.current.delete(callId);
+    }
+  }, [gatewayToken, gatewayUrl, sendRealtimeEvent]);
+
+  const handleRealtimeEvent = useCallback((rawMessage: any) => {
+    try {
+      const data = typeof rawMessage === 'string' ? rawMessage : rawMessage?.data;
+      if (typeof data !== 'string') {
+        return;
+      }
+      const event = JSON.parse(data);
+      if (event.type === 'response.function_call_arguments.done') {
+        void handleToolCall(event);
+      }
+    } catch (e) {
+      console.warn('[RealtimeVoice] Failed to handle realtime event:', e);
+    }
+  }, [handleToolCall]);
 
   const start = useCallback(async (options?: { voice?: RealtimeVoiceName; instructions?: string }) => {
     const runtime = getWebRtcRuntime();
@@ -113,7 +204,12 @@ export function useRealtimeVoice(): UseRealtimeVoiceResult {
         pc.addTrack(audioTrack, stream);
       }
 
-      pc.createDataChannel('oai-events');
+      const channel = pc.createDataChannel('oai-events');
+      dataChannel.current = channel;
+      channel.onmessage = handleRealtimeEvent;
+      channel.onerror = (event: any) => {
+        console.warn('[RealtimeVoice] Data channel error:', event);
+      };
 
       if (runtime.document?.createElement) {
         const audioElement = runtime.document.createElement('audio');
@@ -152,7 +248,7 @@ export function useRealtimeVoice(): UseRealtimeVoiceResult {
       setError(message);
       throw new Error(message);
     }
-  }, [gatewayToken, gatewayUrl, stop]);
+  }, [gatewayToken, gatewayUrl, handleRealtimeEvent, stop]);
 
   return {
     status,

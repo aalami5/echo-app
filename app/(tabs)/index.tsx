@@ -420,7 +420,12 @@ export default function ChatScreen() {
         await stopSpeaking();
       }
       await liveVoice.start({
-        instructions: 'You are Echo, Oliver Aalami\'s concise, practical voice assistant. Keep spoken replies brief and conversational.',
+        instructions: [
+          'You are Echo, Oliver Aalami\'s concise, practical voice assistant.',
+          'Keep spoken replies brief and conversational.',
+          'Use the ask_echo tool whenever Oliver asks for personal context, memory, email, calendar, reminders, files, current projects, app status, morning brief, or anything that requires Echo\'s wider brain and tools.',
+          'Do not say you lack access for those requests; call ask_echo and then speak the result naturally.',
+        ].join(' '),
       });
       if (liveVoice.error) {
         addToast({
