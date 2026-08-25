@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.oppersmedical.echo",
-      "buildNumber": "70",
+      "buildNumber": "71",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "Echo needs microphone access for voice conversations",
@@ -44,6 +44,7 @@
       "expo-router",
       "expo-secure-store",
       "@config-plugins/react-native-webrtc",
+      "./plugins/withEchoAudioSession",
       [
         "expo-notifications",
         {

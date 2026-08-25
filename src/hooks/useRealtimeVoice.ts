@@ -14,6 +14,7 @@ import {
   hasWebRtcRuntime,
   RealtimeVoiceName,
 } from '../services/realtimeVoice';
+import { prepareLiveVoiceAudioRoute, releaseLiveVoiceAudioRoute } from '../services/liveAudioRoute';
 
 type LiveVoiceStatus = 'idle' | 'connecting' | 'connected' | 'stopping' | 'unsupported' | 'error';
 const ICE_GATHERING_TIMEOUT_MS = 2500;
@@ -67,6 +68,9 @@ export function useRealtimeVoice(): UseRealtimeVoiceResult {
     setStatus((current) => current === 'idle' || current === 'unsupported' ? current : 'stopping');
 
     try {
+      await releaseLiveVoiceAudioRoute().catch((e) => {
+        console.warn('[RealtimeVoice] Failed to release audio route:', e);
+      });
       if (localStream.current?.getTracks) {
         localStream.current.getTracks().forEach((track: any) => track.stop());
       }
@@ -188,6 +192,7 @@ export function useRealtimeVoice(): UseRealtimeVoiceResult {
     setError(null);
 
     try {
+      await prepareLiveVoiceAudioRoute();
       const pc = new runtime.RTCPeerConnection();
       peerConnection.current = pc;
 
@@ -240,6 +245,7 @@ export function useRealtimeVoice(): UseRealtimeVoiceResult {
         ? new runtime.RTCSessionDescription({ type: 'answer', sdp: answerSdp })
         : { type: 'answer', sdp: answerSdp };
       await pc.setRemoteDescription(answer);
+      await prepareLiveVoiceAudioRoute();
       setStatus('connected');
     } catch (e: any) {
       await stop();
