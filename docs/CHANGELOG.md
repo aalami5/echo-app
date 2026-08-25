@@ -6,6 +6,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 69] - 2026-08-25
+
+### Fixed
+- **Live Voice startup** — Switched mobile Realtime startup to an ephemeral OpenAI token flow with the existing authenticated Echo backend as issuer, kept the backend SDP proxy as fallback, and waited for a complete mobile WebRTC audio offer before starting the session
+
+### Changed
+- **Build bump to 69** for the next iOS/TestFlight build
+
+---
+
 ## [Build 68] - 2026-08-24
 
 ### Added

@@ -792,6 +792,48 @@ const buildRealtimeSessionConfig = (body = {}) => {
   };
 };
 
+const buildRealtimeClientSecretConfig = (body = {}) => ({
+  session: buildRealtimeSessionConfig(body),
+});
+
+const createRealtimeClientSecret = async (req, res) => {
+  if (!OPENAI_API_KEY) {
+    return res.status(503).json({ error: 'OPENAI_API_KEY is not configured on the Echo server' });
+  }
+
+  const sessionConfig = buildRealtimeClientSecretConfig({
+    model: req.query.model || req.body?.model,
+    voice: req.query.voice || req.body?.voice,
+    instructions: req.query.instructions || req.body?.instructions,
+  });
+
+  try {
+    const response = await fetch('https://api.openai.com/v1/realtime/client_secrets', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+        'OpenAI-Safety-Identifier': 'echo-app-oliver',
+      },
+      body: JSON.stringify(sessionConfig),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('[RealtimeVoice] OpenAI client secret error:', response.status, data);
+      return res.status(response.status).json({
+        error: 'OpenAI realtime token failed',
+        detail: data?.error?.message || JSON.stringify(data).slice(0, 1000),
+      });
+    }
+
+    res.json(data);
+  } catch (e) {
+    console.error('[RealtimeVoice] Client secret error:', e.message);
+    res.status(500).json({ error: e.message });
+  }
+};
+
 const createRealtimeSession = async (req, res) => {
   if (!OPENAI_API_KEY) {
     return res.status(503).json({ error: 'OPENAI_API_KEY is not configured on the Echo server' });
@@ -871,6 +913,8 @@ app.get('/patients/health', (req, res) => {
  * POST /patients/voice/realtime/session
  * Proxies a client WebRTC SDP offer to OpenAI Realtime and returns the answer SDP.
  */
+app.post('/voice/realtime/token', createRealtimeClientSecret);
+app.post('/patients/voice/realtime/token', createRealtimeClientSecret);
 app.post('/voice/realtime/session', createRealtimeSession);
 app.post('/patients/voice/realtime/session', createRealtimeSession);
 
