@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** August 24, 2026
+**Last Updated:** August 25, 2026
 
 ---
 
@@ -93,9 +93,43 @@ GET /ping
 
 **Response:** `200 OK` with body `pong` or similar.
 
+### Realtime Voice Token
+
+Create an ephemeral OpenAI Realtime client secret for mobile WebRTC setup. The server owns the OpenAI API key; the app authenticates to Echo with the gateway token, then exchanges its SDP offer directly with OpenAI using the returned secret.
+
+```http
+POST /patients/voice/realtime/token?model=gpt-realtime-2.1&voice=marin
+Accept: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Response:**
+
+```json
+{
+  "client_secret": {
+    "value": "ek_..."
+  }
+}
+```
+
+Optional query parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `model` | `OPENAI_REALTIME_MODEL` or `gpt-realtime-2.1` | OpenAI Realtime model |
+| `voice` | `OPENAI_REALTIME_VOICE` or `marin` | Realtime voice |
+| `instructions` | server default | Session instructions |
+
+The sync server also exposes a root-level mirror:
+
+```http
+POST /voice/realtime/token
+```
+
 ### Realtime Voice Session
 
-Proxy a native WebRTC SDP offer to OpenAI Realtime and return the answer SDP. The server owns the OpenAI API key; the app authenticates to Echo with the gateway token.
+Fallback endpoint that proxies a native WebRTC SDP offer to OpenAI Realtime and returns the answer SDP. The app now prefers the token endpoint for direct OpenAI SDP exchange, but keeps this server-side proxy path for recovery.
 
 ```http
 POST /patients/voice/realtime/session?model=gpt-realtime-2.1&voice=marin
@@ -120,6 +154,39 @@ The sync server also exposes a root-level mirror:
 
 ```http
 POST /voice/realtime/session
+```
+
+### Realtime Voice Bridge
+
+Bridge an `ask_echo` Realtime data-channel tool call to Echo through the authenticated OpenClaw gateway and return the answer text to the app.
+
+```http
+POST /patients/voice/bridge/ask
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:**
+
+```json
+{
+  "request": "What is next on my schedule?"
+}
+```
+
+**Response:**
+
+```json
+{
+  "answer": "Your next event is..."
+}
+```
+
+The sync server also exposes a root-level mirror:
+
+```http
+POST /voice/bridge/ask
 ```
 
 ### Finalized Dictation Sync

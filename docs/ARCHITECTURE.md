@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** August 24, 2026
+**Last Updated:** August 25, 2026
 
 ---
 
@@ -138,7 +138,8 @@ echo-app/
 │   │   ├── gateway.ts            # OpenClaw Gateway API
 │   │   ├── gatewayBootstrap.ts   # Supabase RPC bootstrap (gateway config + API keys)
 │   │   ├── elevenlabs.ts         # Text-to-speech (+ generateAudio/playAudioFile/pause/resume)
-│   │   ├── realtimeVoice.ts      # WebRTC SDP proxy client for OpenAI Realtime
+│   │   ├── realtimeVoice.ts      # OpenAI Realtime token/session + Echo tool bridge client
+│   │   ├── liveAudioRoute.ts     # Native Live Voice audio-session routing
 │   │   ├── whisper.ts            # Speech-to-text
 │   │   ├── timezone.ts           # Timezone detection & dual-time formatting
 │   │   ├── calendar.ts           # Google Calendar
@@ -164,6 +165,9 @@ echo-app/
 ├── assets/                       # Static assets (images, fonts)
 ├── docs/                         # Documentation (you are here)
 ├── scripts/                      # Build & utility scripts
+│
+├── plugins/                      # Expo config plugins
+│   └── withEchoAudioSession.js   # iOS speaker route native module for Live Voice
 │
 ├── app.json                      # Expo configuration
 ├── package.json                  # Dependencies
@@ -241,23 +245,28 @@ echo-app/
 1. User taps Live on the chat screen
                     │
                     ▼
-2. useRealtimeVoice requests microphone access and creates a WebRTC offer
+2. useRealtimeVoice prepares the Live Voice audio route,
+   requests microphone access, creates a WebRTC offer,
+   and opens the Realtime data channel
                     │
                     ▼
-3. App POSTs offer SDP to /patients/voice/realtime/session
+3. App requests /patients/voice/realtime/token
    Authorization: Bearer <gateway-token>
-   Content-Type: application/sdp
                     │
                     ▼
-4. Sync server forwards the SDP offer to OpenAI Realtime
-   using the server-side OPENAI_API_KEY
+4. Sync server returns an ephemeral OpenAI Realtime client secret
                     │
                     ▼
-5. Server returns OpenAI answer SDP to the app
+5. App exchanges the SDP offer directly with OpenAI Realtime
+   (falls back to /patients/voice/realtime/session if direct exchange fails)
                     │
                     ▼
 6. App sets the remote description and streams two-way audio over WebRTC
    Avatar state → "listening" while connected
+                    │
+                    ▼
+7. Realtime tool calls named ask_echo are sent to /patients/voice/bridge/ask;
+   Echo replies are returned as function_call_output and spoken by Realtime
 ```
 
 ### Finalized Dictation Sync Flow
@@ -433,7 +442,9 @@ const chatStorage = {
 - All traffic over HTTPS via Cloudflare Tunnel
 - Gateway URL: `https://echo.oppersmedical.com`
 - Bearer token authentication for API calls
-- OpenAI Realtime WebRTC sessions use authenticated SDP proxy endpoints (`/voice/realtime/session` and `/patients/voice/realtime/session`) so the OpenAI API key stays on the sync server
+- OpenAI Realtime WebRTC sessions prefer authenticated token endpoints (`/voice/realtime/token` and `/patients/voice/realtime/token`) that return ephemeral client secrets, keeping the OpenAI API key on the sync server while allowing direct SDP exchange with OpenAI
+- Authenticated SDP proxy endpoints (`/voice/realtime/session` and `/patients/voice/realtime/session`) remain available as fallback
+- Live Voice tool requests go through authenticated bridge endpoints (`/voice/bridge/ask` and `/patients/voice/bridge/ask`) rather than exposing OpenClaw gateway credentials beyond the app's existing bearer token
 - **Gateway Bootstrap (Build 55):** No secrets in binary — gateway config and API keys fetched from Supabase RPC after authentication
   - `get_gateway_config()` RPC with SECURITY DEFINER + RLS
   - Replaces baked-in obfuscated credentials (Level 1 bridge removed)
@@ -487,9 +498,11 @@ Patient data is minimized by design:
 
 **Why:**
 - Native WebRTC gives lower-latency voice interactions than record/transcribe/respond/playback
-- The app still avoids storing the OpenAI API key on-device by exchanging SDP through the authenticated Echo sync server
+- The app still avoids storing the OpenAI API key on-device by requesting ephemeral Realtime client secrets from the authenticated Echo sync server; the older server-side SDP proxy remains a fallback path
+- Realtime data-channel function calls named `ask_echo` bridge spoken requests to the OpenClaw gateway through the sync server, then return the result to Realtime as tool output
+- iOS speaker routing is handled by the `withEchoAudioSession` config plugin and `liveAudioRoute` service, which force the `.playAndRecord` voice chat category to speaker while Live Voice is active
 - The Live control is isolated behind `useRealtimeVoice`, leaving the existing dictation and TTS code paths intact
-- Expo SDK 54, `react-native-webrtc`, the WebRTC config plugin, and React Native New Architecture are part of the native build requirements
+- Expo SDK 54, `react-native-webrtc`, the WebRTC config plugin, the Echo audio-session config plugin, and React Native New Architecture are part of the native build requirements
 
 ### 2. SecureStore vs AsyncStorage
 

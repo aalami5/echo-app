@@ -6,6 +6,37 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ---
 
+## [Build 72] - 2026-08-25
+
+### Fixed
+- **Operative report readback voice** — Restored the Oliver ElevenLabs cloned voice for patient operative report readback while keeping the general Echo voice controls on the standard assistant voice
+
+### Changed
+- **Build bump to 72** for the next iOS/TestFlight build
+
+---
+
+## [Build 71] - 2026-08-25
+
+### Fixed
+- **Live Voice speaker output** — Added a native iOS audio-session config plugin and `liveAudioRoute` service so realtime voice audio routes to the speaker during Live Voice sessions, then clears the override when the session stops
+
+### Changed
+- **Build bump to 71** for the next iOS/TestFlight build
+
+---
+
+## [Build 70] - 2026-08-25
+
+### Added
+- **Live Voice Echo tool bridge** — Realtime voice sessions can now call Echo through a dedicated `ask_echo` data-channel tool, letting spoken requests reach the authenticated OpenClaw gateway and return a concise spoken result
+- **Realtime token endpoint support** — Mobile Live Voice now requests an authenticated `/patients/voice/realtime/token` client secret and exchanges SDP directly with OpenAI, with the existing sync-server SDP proxy retained as fallback
+
+### Changed
+- **Build bump to 70** for the next iOS/TestFlight build
+
+---
+
 ## [Build 69] - 2026-08-25
 
 ### Fixed
