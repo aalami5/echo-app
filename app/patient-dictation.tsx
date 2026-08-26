@@ -35,7 +35,7 @@ import {
 import { useDictationStore, CustomProcedure, TranscriptPart } from '../src/stores/dictationStore';
 import { useSettingsStore } from '../src/stores/settingsStore';
 import { GatewayService } from '../src/services/gateway';
-import { ElevenLabsService, VOICES } from '../src/services/elevenlabs';
+import { ElevenLabsService, OLIVER_VOICE_ID } from '../src/services/elevenlabs';
 import { transcribeAudio } from '../src/services/whisper';
 import { generateReport, regenerateWithCorrections } from '../src/services/dictationService';
 import { Avatar } from '../src/components/Avatar';
@@ -92,7 +92,7 @@ export default function PatientDictationScreen() {
     removeCustomProcedure,
   } = useDictationStore();
 
-  const { gatewayUrl, gatewayToken, openaiApiKey, elevenlabsApiKey, voiceName } = useSettingsStore();
+  const { gatewayUrl, gatewayToken, openaiApiKey, elevenlabsApiKey } = useSettingsStore();
 
   const activeDictation = dictationId ? dictations[dictationId] : null;
   const patientDictations = useMemo(() => (patientId ? getDictationsForPatient(patientId) : []), [getDictationsForPatient, patientId, dictations]);
@@ -423,12 +423,11 @@ export default function PatientDictationScreen() {
         setReadBackState('processing');
         setIsReadingBack(true);
         try {
-          const reportVoiceId = VOICES[voiceName || 'river'] || VOICES.river;
-          const ttsService = new ElevenLabsService({ apiKey: elevenlabsApiKey, voiceId: reportVoiceId });
+          const ttsService = new ElevenLabsService({ apiKey: elevenlabsApiKey, voiceId: OLIVER_VOICE_ID });
           ttsServiceRef.current = ttsService;
           const audioUri = await ttsService.generateAudio({
             text: activeDictation.generatedReport,
-            voiceId: reportVoiceId,
+            voiceId: OLIVER_VOICE_ID,
           });
           setReadBackAudioUri(audioUri);
           setReadBackState('ready');

@@ -34,7 +34,7 @@ import { colors, spacing, borderRadius, typography } from '../../src/constants/t
 import { useDictationStore, CustomProcedure } from '../../src/stores/dictationStore';
 import { useSettingsStore } from '../../src/stores/settingsStore';
 import { GatewayService } from '../../src/services/gateway';
-import { ElevenLabsService } from '../../src/services/elevenlabs';
+import { ElevenLabsService, OLIVER_VOICE_ID } from '../../src/services/elevenlabs';
 import { transcribeAudio } from '../../src/services/whisper';
 import { generateReport, regenerateWithCorrections } from '../../src/services/dictationService';
 import { Avatar } from '../../src/components/Avatar';
@@ -45,7 +45,6 @@ import {
   ProcedureCategory,
 } from '../../src/data/vascularProcedures';
 
-const OLIVER_VOICE_ID = 'grLAj0YuamNRv9WBJxB4';
 const ALL_CATEGORIES: ProcedureCategory[] = ['aortic', 'carotid', 'peripheral_arterial', 'venous', 'dialysis_access', 'other'];
 
 type ScreenState = 'input' | 'generating' | 'review' | 'editing' | 'direct-editing';
