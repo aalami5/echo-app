@@ -156,7 +156,9 @@ function RootLayoutNav() {
   // Bootstrap gateway config once authenticated and settings are hydrated
   useEffect(() => {
     if (!isAuthenticated || !settingsHydrated) return;
-    ensureGatewayConfig().then((ok) => {
+    // Refresh on every authenticated launch so a rotated gateway credential
+    // cannot remain indefinitely in SecureStore.
+    ensureGatewayConfig(true).then((ok) => {
       if (!ok) console.warn('[Layout] Gateway bootstrap failed — will retry next launch');
     });
   }, [isAuthenticated, settingsHydrated]);

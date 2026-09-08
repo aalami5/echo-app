@@ -32,9 +32,9 @@ export async function bootstrapGatewayConfig(): Promise<{
   };
 }
 
-export async function ensureGatewayConfig(): Promise<boolean> {
+export async function ensureGatewayConfig(forceRefresh = false): Promise<boolean> {
   const { gatewayToken } = useSettingsStore.getState();
-  if (gatewayToken) {
+  if (gatewayToken && !forceRefresh) {
     return true;
   }
 
@@ -56,4 +56,33 @@ export async function ensureGatewayConfig(): Promise<boolean> {
 
   console.log('[GatewayBootstrap] Gateway config applied');
   return true;
+}
+
+/**
+ * Fetch the current server-owned gateway credentials and replace any cached
+ * values. Use this after an authentication rejection so a rotated token does
+ * not remain stuck in SecureStore indefinitely.
+ */
+export async function refreshGatewayConfig(): Promise<{
+  url: string;
+  token: string;
+} | null> {
+  const config = await bootstrapGatewayConfig();
+  if (!config) {
+    return null;
+  }
+
+  const settings = useSettingsStore.getState();
+  settings.setGatewayUrl(config.url);
+  settings.setGatewayToken(config.token);
+
+  if (config.openaiApiKey) {
+    settings.setOpenAIKey(config.openaiApiKey);
+  }
+  if (config.elevenlabsApiKey) {
+    settings.setElevenLabsKey(config.elevenlabsApiKey);
+  }
+
+  console.log('[GatewayBootstrap] Gateway config refreshed');
+  return { url: config.url, token: config.token };
 }

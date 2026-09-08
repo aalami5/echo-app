@@ -10,6 +10,7 @@
 
 import { AppState } from 'react-native';
 import { getCachedDevicePushToken } from './notifications';
+import { refreshGatewayConfig } from './gatewayBootstrap';
 
 // Request timeout in milliseconds (3 minutes - allows long responses)
 const REQUEST_TIMEOUT_MS = 180000;
@@ -91,14 +92,36 @@ interface OpenResponsesResponse {
   };
 }
 
-function getGatewayErrorMessage(status: number, errorText: string): string {
+function parseGatewayError(errorText: string): string | null {
   const trimmed = errorText.trim();
 
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const errorJson = JSON.parse(trimmed);
+    const errorValue = errorJson.error;
+    const message =
+      errorValue?.message ||
+      errorJson.message ||
+      (typeof errorValue === 'string' ? errorValue : null);
+    return typeof message === 'string' && message.trim() ? message.trim() : null;
+  } catch {
+    return trimmed;
+  }
+}
+
+function getGatewayErrorMessage(status: number, errorText: string): string {
+  const serverMessage = parseGatewayError(errorText);
+
   if (status === 401) {
-    return 'Invalid gateway token. Please check your settings.';
+    return serverMessage || 'Gateway authentication failed. Echo refreshed its connection; please try again.';
   }
   if (status === 403) {
-    return 'Access denied. Token may be expired.';
+    return serverMessage
+      ? `Gateway access denied: ${serverMessage}`
+      : 'Gateway access denied. Please try again or contact support.';
   }
   if (status === 502 || status === 503 || status === 504) {
     return 'Gateway temporarily unavailable. Please try again.';
@@ -107,21 +130,21 @@ function getGatewayErrorMessage(status: number, errorText: string): string {
     return 'Gateway timed out while waiting for the server. The request may still finish in the background.';
   }
 
-  if (trimmed) {
-    try {
-      const errorJson = JSON.parse(trimmed);
-      const message =
-        errorJson.error?.message ||
-        errorJson.message ||
-        errorJson.error ||
-        trimmed;
-      return typeof message === 'string' ? message : JSON.stringify(message);
-    } catch {
-      return trimmed;
-    }
+  if (serverMessage) {
+    return serverMessage;
   }
 
   return `Gateway error: ${status}`;
+}
+
+class GatewayHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly responseBody: string
+  ) {
+    super(getGatewayErrorMessage(status, responseBody));
+    this.name = 'GatewayHttpError';
+  }
 }
 
 /**
@@ -186,8 +209,6 @@ export class GatewayService {
     imageMimeType?: string,
     noTimeout?: boolean
   ): Promise<string> {
-    const { baseUrl: rawUrl, token, agentId, userId } = this.config;
-    const baseUrl = rawUrl.trim().replace(/\/+$/, ''); // Normalize URL
     const devicePushToken = await getCachedDevicePushToken();
     const appState = AppState.currentState;
     const timeoutMs = noTimeout ? 0 : REQUEST_TIMEOUT_MS;
@@ -195,21 +216,36 @@ export class GatewayService {
     console.log('[Gateway] Sending message:', content.slice(0, 100), noTimeout ? '(no timeout)' : '');
     console.log('[Gateway] Has image:', !!imageBase64, 'type:', imageMimeType || 'none');
     
-    // Validate config before sending
-    if (!baseUrl) {
-      throw new Error('Gateway URL not configured');
-    }
-    if (!token) {
-      throw new Error('Gateway token not configured');
-    }
+    const send = async (): Promise<string> => {
+      const { baseUrl: rawUrl, token, agentId, userId } = this.config;
+      const baseUrl = rawUrl.trim().replace(/\/+$/, '');
 
-    // Use OpenResponses API for images (it properly supports them)
-    if (imageBase64 && imageMimeType) {
-      return this.sendMessageWithImage(baseUrl, token, agentId!, userId!, content, imageBase64, imageMimeType, devicePushToken, appState, timeoutMs);
+      if (!baseUrl) throw new Error('Gateway URL not configured');
+      if (!token) throw new Error('Gateway token not configured');
+
+      if (imageBase64 && imageMimeType) {
+        return this.sendMessageWithImage(baseUrl, token, agentId!, userId!, content, imageBase64, imageMimeType, devicePushToken, appState, timeoutMs);
+      }
+
+      return this.sendMessageTextOnly(baseUrl, token, agentId!, userId!, content, history, devicePushToken, appState, timeoutMs);
+    };
+
+    try {
+      return await send();
+    } catch (error) {
+      if (!(error instanceof GatewayHttpError) || (error.status !== 401 && error.status !== 403)) {
+        throw error;
+      }
+
+      console.warn(`[Gateway] Authentication rejected (${error.status}); refreshing gateway config once`);
+      const refreshed = await refreshGatewayConfig();
+      if (!refreshed) {
+        throw error;
+      }
+
+      this.updateConfig({ baseUrl: refreshed.url, token: refreshed.token });
+      return send();
     }
-    
-    // Use OpenAI Chat Completions API for text-only (simpler response format)
-    return this.sendMessageTextOnly(baseUrl, token, agentId!, userId!, content, history, devicePushToken, appState, timeoutMs);
   }
 
   /**
@@ -248,7 +284,7 @@ export class GatewayService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Gateway] Operative report email error:', response.status, errorText);
-      throw new Error(getGatewayErrorMessage(response.status, errorText));
+      throw new GatewayHttpError(response.status, errorText);
     }
 
     return response.json();
@@ -320,7 +356,7 @@ export class GatewayService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Gateway] OpenResponses API error:', response.status, errorText);
-      throw new Error(getGatewayErrorMessage(response.status, errorText));
+      throw new GatewayHttpError(response.status, errorText);
     }
 
     const result: OpenResponsesResponse = await response.json();
@@ -400,7 +436,7 @@ export class GatewayService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Gateway] Chat Completions API error:', response.status, errorText);
-      throw new Error(getGatewayErrorMessage(response.status, errorText));
+      throw new GatewayHttpError(response.status, errorText);
     }
 
     const result: ChatCompletionResponse = await response.json();

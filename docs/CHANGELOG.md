@@ -1,5 +1,13 @@
 # Changelog
 
+## [Unreleased] - 2026-09-08
+
+### Fixed
+
+- Refresh server-owned OpenClaw gateway credentials on authenticated app launch.
+- Retry a gateway request once after a genuine 401/403 authentication rejection.
+- Display the gateway's actual access-denial reason instead of incorrectly blaming an expired token or ElevenLabs.
+
 All notable changes to Echo App are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
