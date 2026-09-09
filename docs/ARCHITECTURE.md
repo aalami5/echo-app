@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** August 25, 2026
+**Last Updated:** September 8, 2026
 
 ---
 
@@ -449,6 +449,8 @@ const chatStorage = {
   - `get_gateway_config()` RPC with SECURITY DEFINER + RLS
   - Replaces baked-in obfuscated credentials (Level 1 bridge removed)
   - Also bootstraps OpenAI and ElevenLabs keys if missing (Build 59)
+  - Gateway URL and token are refreshed on every authenticated app launch so rotated server credentials replace stale SecureStore values
+  - A gateway request rejected with 401/403 refreshes the server-owned credentials and retries once; repeated rejection is surfaced with the gateway's access-denial reason
 - **Credential Hardening (Build 54):** Keychain accessibility set to `AFTER_FIRST_UNLOCK`; obfuscated XOR fallback survives SecureStore loss
 - **WebSocket URL Derivation (Build 58):** WS URL derived from gateway URL (no hardcoded endpoints); uses `wss://` for TLS on hospital Wi-Fi
 
