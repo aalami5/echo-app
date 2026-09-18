@@ -25,3 +25,12 @@ Copy the staged file (0600) to DATA_DIR/operative-email-receipts-import.json, th
 - Test APIs use isolated temporary DATA_DIR and a fake gog executable; no real email sends.
 
 Phone acceptance: open an emailed draft from Patients, verify Sent and date; reopen and restart; edit and verify Updated since last email; check history and multi-report count. Use Resend only when an actual extra email is intended.
+
+## Release result — 2026-09-17
+
+- PR https://github.com/aalami5/echo-app/pull/1 merged into the shipped release line (`6768f4a`); implementation `645d7c8`.
+- Backend rollout verified locally and through https://echo.oppersmedical.com/patients: receipt history returns 200 with 155 imported receipts and no-store; no bearer token returns 401. 51 server-held reports have exact historical content matches. Local drafts are matched when the phone refreshes.
+- Launchd's old Node 22 executable had been removed from the host. Backed up the existing plist (0600) and replaced only the runtime executable with `/opt/homebrew/bin/node`, retaining all settings and environment references. Service healthy afterward.
+- EAS Build 73 FINISHED: https://expo.dev/accounts/aalami/projects/echo-app/builds/1a0af1bb-c4e7-4f35-ae3a-5e7f362cc3a1 . Downloaded IPA confirms bundle `com.oppersmedical.echo`, version 1.0.0, build 73, and the new receipt/status strings in the packaged Hermes bundle.
+- TestFlight submission FINISHED, no error: https://expo.dev/accounts/aalami/projects/echo-app/submissions/8f41107a-02f5-4364-9496-4c9fddc5a1b1 . Apple processing/tester availability is separate; physical-device installation was not verified.
+- No real email sends during implementation or tests. Sender and recipients unchanged.
