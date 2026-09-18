@@ -1,3 +1,7 @@
+import { ReportEmailStatus } from '../../src/components/ReportEmailStatus';
+import { useEmailReceiptsStore } from '../../src/stores/emailReceiptsStore';
+import { emailReceiptStatus } from '../../src/utils/emailReceiptStatus';
+import { sendReportWithReceipt } from '../../src/services/emailReceipts';
 /**
  * OR Dictation Screen
  * 
@@ -62,7 +66,7 @@ export default function DictationScreen() {
   const [newProcName, setNewProcName] = useState('');
   const [newProcCategory, setNewProcCategory] = useState<ProcedureCategory>('other');
   const [editingCustomProc, setEditingCustomProc] = useState<CustomProcedure | null>(null);
-  const [emailSent, setEmailSent] = useState(false);
+
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isReadingBack, setIsReadingBack] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -71,6 +75,7 @@ export default function DictationScreen() {
   const ttsServiceRef = useRef<ElevenLabsService | null>(null);
 
   const {
+    reportId,
     transcriptParts,
     generatedReport,
     isGenerating,
@@ -90,6 +95,10 @@ export default function DictationScreen() {
   } = useDictationStore();
 
   const { gatewayUrl, gatewayToken, openaiApiKey, elevenlabsApiKey } = useSettingsStore();
+
+  const receipts = useEmailReceiptsStore((s) => s.receipts);
+  const emailStatus = emailReceiptStatus(receipts, reportId, generatedReport, true);
+  const emailSent = emailStatus.sent;
 
   const reviewScrollRef = useRef<ScrollView>(null);
 
@@ -231,14 +240,14 @@ export default function DictationScreen() {
   };
 
   // ─── Report Actions ───
-  const handleEmail = async () => {
+  const handleEmail = async (resend = false) => {
     const gw = getGateway();
-    if (!gw || !generatedReport || emailSent || isSendingEmail) return;
+    if (!gw || !generatedReport || (emailSent && !resend) || isSendingEmail) return;
     setIsSendingEmail(true);
     try {
-      await gw.sendOperativeReportEmail(generatedReport);
+      await sendReportWithReceipt(gw, generatedReport, reportId, resend);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setEmailSent(true);
+
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to send email.');
     } finally {
@@ -340,7 +349,7 @@ export default function DictationScreen() {
           clearSession();
           setScreenState('input');
           setShowTextInput(false);
-          setEmailSent(false);
+
         },
       },
     ]);
@@ -657,10 +666,16 @@ export default function DictationScreen() {
               <Text style={styles.reportText}>{generatedReport}</Text>
             </View>
 
+            <ReportEmailStatus reportId={reportId} report={generatedReport} tracked details />
+            {emailSent && <TouchableOpacity disabled={isSendingEmail} style={{ paddingVertical: 14 }} onPress={() => Alert.alert(
+              emailStatus.updated ? 'Email revised report?' : 'Resend report?',
+              'This sends another email to the configured operative-report recipients. Existing send history will be preserved.',
+              [{ text: 'Cancel', style: 'cancel' }, { text: emailStatus.updated ? 'Email revision' : 'Resend', onPress: () => handleEmail(true) }]
+            )}><Text style={{ color: colors.primary }}>{emailStatus.updated ? 'Email revision…' : 'Resend…'}</Text></TouchableOpacity>}
             <View style={styles.actionsGrid}>
               <TouchableOpacity
                 style={[styles.actionButton, emailSent && styles.actionButtonSent]}
-                onPress={handleEmail}
+                onPress={() => handleEmail()}
                 disabled={emailSent || isSendingEmail}
               >
                 {isSendingEmail ? (
@@ -708,7 +723,7 @@ export default function DictationScreen() {
               clearSession();
               setScreenState('input');
               setShowTextInput(false);
-              setEmailSent(false);
+
             }}>
               <Ionicons name="add-circle-outline" size={20} color={colors.textInverse} />
               <Text style={styles.newDictationButtonText}>New Dictation</Text>

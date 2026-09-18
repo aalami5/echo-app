@@ -1,3 +1,5 @@
+import { AppState } from 'react-native';
+import { refreshEmailReceipts } from '../src/services/emailReceipts';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
@@ -160,7 +162,18 @@ function RootLayoutNav() {
     // cannot remain indefinitely in SecureStore.
     ensureGatewayConfig(true).then((ok) => {
       if (!ok) console.warn('[Layout] Gateway bootstrap failed — will retry next launch');
+      else refreshEmailReceipts().catch(() => {});
     });
+  }, [isAuthenticated, settingsHydrated]);
+
+  // Refresh durable delivery history on launch/foreground, preserving offline cache.
+  useEffect(() => {
+    if (!isAuthenticated || !settingsHydrated) return;
+    const refresh = () => { refreshEmailReceipts().catch(() => {}); };
+    refresh();
+    const listener = AppState.addEventListener('change', (state) => { if (state === 'active') refresh(); });
+    const timer = setInterval(refresh, 5 * 60 * 1000);
+    return () => { listener.remove(); clearInterval(timer); };
   }, [isAuthenticated, settingsHydrated]);
 
   // Resume operative-report sync after app restart once credentials/settings are available.

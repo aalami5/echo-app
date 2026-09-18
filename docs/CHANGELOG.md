@@ -1,5 +1,15 @@
 # Changelog
 
+## Build 73 — Persistent operative-report email receipts (2026-09-17)
+
+- Server-owned, permission-restricted atomic receipt ledger, independent of clinical report sync. Records Gmail confirmation, recipients, send time, and SHA-256 report version; no duplicate report bodies stored.
+- Patient cards and report history show Sent, Not sent (new tracked reports), or Send history unknown (legacy reports). Report detail retains Sent and marks edits Updated since last email; explicit Resend/Email revision preserves history and does not finalize the report.
+- Phone cache survives restarts and refreshes on launch/foreground. Exact historical content matches acquire stable report links so later edits do not erase Sent.
+- Persisted send-intent IDs prevent duplicate sends on retry; ambiguous failures require reconciliation rather than blind retry.
+- Read-only Gmail reconciliation stages metadata-only historical receipts for idempotent import at server startup.
+- Verified with backend/client/API tests, TypeScript and iOS production bundle export. TestFlight device validation remains required after installation.
+
+
 ## [Unreleased] - 2026-09-08
 
 ### Fixed

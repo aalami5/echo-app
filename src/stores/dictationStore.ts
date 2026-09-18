@@ -57,6 +57,7 @@ interface DictationPersistedState {
 }
 
 interface DictationSessionState {
+  reportId: string;
   transcriptParts: TranscriptPart[];
   generatedReport: string | null;
   isGenerating: boolean;
@@ -93,6 +94,7 @@ export const useDictationStore = create<DictationState>()(
       customProcedures: [],
 
       // Session state (not persisted — reset on app restart)
+      reportId: `standalone-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       transcriptParts: [],
       generatedReport: null,
       isGenerating: false,
@@ -108,6 +110,7 @@ export const useDictationStore = create<DictationState>()(
 
       clearSession: () =>
         set({
+          reportId: `standalone-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           transcriptParts: [],
           generatedReport: null,
           isGenerating: false,

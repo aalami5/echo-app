@@ -1,3 +1,7 @@
+import { ReportEmailStatus } from '../src/components/ReportEmailStatus';
+import { useEmailReceiptsStore } from '../src/stores/emailReceiptsStore';
+import { emailReceiptStatus } from '../src/utils/emailReceiptStatus';
+import { sendReportWithReceipt, refreshEmailReceipts } from '../src/services/emailReceipts';
 /**
  * Patient-linked Operative Report Dictation (Modal)
  */
@@ -109,7 +113,10 @@ export default function PatientDictationScreen() {
   const [newProcName, setNewProcName] = useState('');
   const [newProcCategory, setNewProcCategory] = useState<ProcedureCategory>('other');
   const [editingCustomProc, setEditingCustomProc] = useState<CustomProcedure | null>(null);
-  const [emailSent, setEmailSent] = useState(false);
+  const receipts = useEmailReceiptsStore((s) => s.receipts);
+  const emailStatus = useMemo(() => emailReceiptStatus(receipts, activeDictation?.id, activeDictation?.generatedReport || null, activeDictation?.emailTrackingEnabled), [receipts, activeDictation?.id, activeDictation?.generatedReport, activeDictation?.emailTrackingEnabled]);
+  const emailSent = emailStatus.sent;
+  useEffect(() => { refreshEmailReceipts().catch(() => {}); }, [dictationId]);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isReadingBack, setIsReadingBack] = useState(false);
   const [readBackState, setReadBackState] = useState<'idle' | 'processing' | 'ready' | 'playing' | 'paused'>('idle');
@@ -134,7 +141,7 @@ export default function PatientDictationScreen() {
   }, [activeDictation]);
 
   useEffect(() => {
-    setEmailSent(false);
+
     setIsSendingEmail(false);
     setIsReadingBack(false);
     setReadBackState('idle');
@@ -394,15 +401,15 @@ export default function PatientDictationScreen() {
   };
 
   // ─── Report Actions ───
-  const handleEmail = async () => {
+  const handleEmail = async (resend = false) => {
     if (!activeDictation?.generatedReport) return;
     const gw = getGateway();
-    if (!gw || emailSent || isSendingEmail) return;
+    if (!gw || (emailSent && !resend) || isSendingEmail) return;
     setIsSendingEmail(true);
     try {
-      await gw.sendOperativeReportEmail(activeDictation.generatedReport);
+      await sendReportWithReceipt(gw, activeDictation.generatedReport, activeDictation.id, resend);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setEmailSent(true);
+
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to send email.');
     } finally {
@@ -600,7 +607,7 @@ export default function PatientDictationScreen() {
           });
           setScreenState('input');
           setShowTextInput(false);
-          setEmailSent(false);
+
         },
       },
     ]);
@@ -947,6 +954,7 @@ export default function PatientDictationScreen() {
                     <Text style={styles.statusText}>{d.status === 'final' ? 'Final' : 'Draft'}</Text>
                   </View>
                 </View>
+                <ReportEmailStatus reportId={d.id} report={d.generatedReport} tracked={d.emailTrackingEnabled} />
                 {d.selectedProcedures.length > 0 && (
                   <Text style={styles.timelineProcedures} numberOfLines={2}>
                     {d.selectedProcedures.join(', ')}
@@ -1184,10 +1192,16 @@ export default function PatientDictationScreen() {
               <Text style={styles.reportText} selectable>{activeDictation.generatedReport}</Text>
             </View>
 
+            <ReportEmailStatus reportId={activeDictation.id} report={activeDictation.generatedReport} tracked={activeDictation.emailTrackingEnabled} details />
+            {emailSent && <TouchableOpacity disabled={isSendingEmail} style={{ paddingVertical: 14 }} onPress={() => Alert.alert(
+              emailStatus.updated ? 'Email revised report?' : 'Resend report?',
+              'This sends another email to the configured operative-report recipients. Existing send history will be preserved.',
+              [{ text: 'Cancel', style: 'cancel' }, { text: emailStatus.updated ? 'Email revision' : 'Resend', onPress: () => handleEmail(true) }]
+            )}><Text style={{ color: colors.primary }}>{emailStatus.updated ? 'Email revision…' : 'Resend…'}</Text></TouchableOpacity>}
             <View style={styles.actionsGrid}>
               <TouchableOpacity
                 style={[styles.actionButton, emailSent && styles.actionButtonSent]}
-                onPress={handleEmail}
+                onPress={() => handleEmail()}
                 disabled={emailSent || isSendingEmail}
               >
                 {isSendingEmail ? (

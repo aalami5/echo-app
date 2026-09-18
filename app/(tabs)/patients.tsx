@@ -1,3 +1,5 @@
+import { useEmailReceiptsStore } from '../../src/stores/emailReceiptsStore';
+import { emailReceiptStatus } from '../../src/utils/emailReceiptStatus';
 /**
  * Patients Tab
  * 
@@ -443,6 +445,7 @@ export default function PatientsScreen() {
   }, [router]);
   
   // Render patient row - tap to edit, long press to delete
+  const emailReceipts = useEmailReceiptsStore((s) => s.receipts);
   const renderPatient = useCallback((patient: Patient, showHospital = false) => {
     const patientDictations = getDictationsForPatient(patient.id);
     const drafts = patientDictations.filter((d) => d.status === 'draft');
@@ -451,6 +454,10 @@ export default function PatientsScreen() {
     const latestFinal = finals[0];
     const hasDraft = drafts.length > 0;
     const finalCount = finals.length;
+    const reports = patientDictations.filter((d) => d.generatedReport);
+    const states = reports.map((d) => emailReceiptStatus(emailReceipts, d.id, d.generatedReport, d.emailTrackingEnabled));
+    const sentCount = states.filter((s) => s.sent).length;
+    const emailLabel = reports.length === 1 ? states[0].label : `${sentCount} of ${reports.length} emailed${states.some((s) => s.updated) ? ' · Updates not emailed' : ''}${states.some((s) => !s.sent && s.label === 'Send history unknown') ? ' · Some history unknown' : ''}`;
 
     let actionLabel = 'Op Report';
     let actionIcon: React.ComponentProps<typeof Ionicons>['name'] = 'mic';
@@ -507,6 +514,7 @@ export default function PatientsScreen() {
             <Ionicons name="pencil" size={16} color={colors.textTertiary} />
           </View>
         </View>
+        {reports.length > 0 && <Text style={{ color: sentCount ? '#4ade80' : colors.textTertiary, fontSize: 12, marginVertical: 6 }}>{emailLabel}</Text>}
         {/* Details below badges */}
         <View style={styles.patientDetails}>
           <Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>
@@ -520,7 +528,7 @@ export default function PatientsScreen() {
         )}
       </TouchableOpacity>
     );
-  }, [getDictationsForPatient, handleContinueDictation, handleDeletePatient, handleEditPatient, handleStartNewDictation, handleViewReport]);
+  }, [dictations, emailReceipts, getDictationsForPatient, handleContinueDictation, handleDeletePatient, handleEditPatient, handleStartNewDictation, handleViewReport]);
   
   // Render hospital section
   const renderHospitalSection = useCallback((callDayId: string, hospital: Hospital) => {
