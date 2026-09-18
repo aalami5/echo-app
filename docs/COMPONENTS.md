@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** August 24, 2026
+**Last Updated:** September 17, 2026
 
 ---
 
@@ -121,6 +121,23 @@ function ChatMessage({ message }) {
 ---
 
 ## Core Components
+
+### ReportEmailStatus
+
+**File:** `src/components/ReportEmailStatus.tsx`
+
+Receipt-backed status used in standalone dictation, patient report detail/history, and patient cards.
+
+| Prop | Type | Default | Purpose |
+|------|------|---------|---------|
+| `reportId` | `string?` | — | Stable report identity across edits |
+| `report` | `string \| null` | Required | Current content for version comparison |
+| `tracked` | `boolean` | `false` | Distinguishes new tracked reports from legacy unknown history |
+| `details` | `boolean` | `false` | Shows last emailed local date/time and recipient list |
+
+Subscribes to `useEmailReceiptsStore` and derives status with `emailReceiptStatus()`. Displays “✓ Sent,” “Sent · Updated since last email,” “Not sent,” or “Send history unknown,” with the same accessibility label. Renders nothing when there is neither report content nor a confirmed receipt. Sent reflects Gmail acceptance, not recipient delivery/read confirmation.
+
+---
 
 ### Avatar
 

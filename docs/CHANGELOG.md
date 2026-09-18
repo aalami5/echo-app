@@ -1,5 +1,7 @@
 # Changelog
 
+**Last Updated:** September 17, 2026
+
 ## Build 73 — Persistent operative-report email receipts (2026-09-17)
 
 - Server-owned, permission-restricted atomic receipt ledger, independent of clinical report sync. Records Gmail confirmation, recipients, send time, and SHA-256 report version; no duplicate report bodies stored.

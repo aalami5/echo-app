@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** September 8, 2026
+**Last Updated:** September 17, 2026
 
 ---
 
@@ -297,23 +297,15 @@ echo-app/
 
 ### Operative Report Email Flow
 
-```
-1. User taps Email after generating or opening a finalized operative report
-                    │
-                    ▼
-2. Dictation screen calls GatewayService.sendOperativeReportEmail(report)
-                    │
-                    ▼
-3. POST /patients/dictations/email
-   Authorization: Bearer <gateway-token>
-                    │
-                    ▼
-4. Mac mini sync server sends the report via gog gmail send
-   to the configured operative-report recipient list
-                    │
-                    ▼
-5. App receives success/error and updates email sent state
-```
+1. Dictation screens call `sendReportWithReceipt()` with a stable report ID and a persisted per-version request ID.
+2. `GatewayService.sendOperativeReportEmail()` posts to `/patients/dictations/email` with gateway bearer authentication.
+3. The sync server records pending intent in `DATA_DIR/operative-email-receipts.json` before sending via `gog gmail send`. Confirmed Gmail message IDs become receipts; retries reuse existing receipts, while ambiguous failures block further sends for the report pending reconciliation.
+4. The app merges confirmed receipts into its AsyncStorage cache. Sending does not finalize a report. Explicit Resend/Email revision retains prior history.
+5. Receipt refresh runs on authenticated launch, foreground, and a five-minute interval. `GET /patients/email-receipts` fetches history; `POST /patients/email-receipts/link` binds exact historical content hashes to stable patient report IDs. Both also have root-level aliases, require authentication, and return `Cache-Control: no-store`.
+
+The server-owned ledger is independent of device-supplied dictation snapshots, with atomic replacement, fsync, and owner-only file permissions. It stores delivery metadata and normalized SHA-256 report hashes, not report bodies. Client refresh failures retain cached history. Sent means Gmail accepted the message, not recipient delivery or read confirmation.
+
+Historical receipts can be staged with `scripts/reconcile-operative-email-history.cjs` and imported idempotently at server startup. See [Build 73 email receipts](changes/build-73-email-receipts.md) for reconciliation and release details.
 
 ### Meeting Reply Card Flow
 
@@ -374,6 +366,7 @@ echo-app/
 | `chatStore` | AsyncStorage | ❌ | Last 100 messages |
 | `dictationStore` | AsyncStorage | ❌ | Learned templates, examples, custom procedures |
 | `patientDictationsStore` | AsyncStorage | ❌ local store, synced finals over HTTPS | Per-patient draft/final dictations |
+| `emailReceiptsStore` | AsyncStorage | ❌ | Confirmed email receipt cache; server ledger is authoritative |
 | `patientsStore` | SecureStore | ✅ Keychain | Patient list, call days |
 | `settingsStore` | SecureStore | ✅ Keychain | API keys, preferences |
 
