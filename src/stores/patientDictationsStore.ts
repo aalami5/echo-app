@@ -10,6 +10,7 @@ import { usePatientsStore } from './patientsStore';
 import { syncFinalizedDictations } from '../services/dictationSync';
 
 export interface PatientDictation {
+  emailTrackingEnabled?: boolean; // Missing on legacy reports: history is unknown, not unsent.
   id: string;                    // UUID
   patientId: string;             // Links to Patient.id
   status: 'draft' | 'final';    // Draft = in-progress, Final = completed
@@ -95,6 +96,7 @@ export const usePatientDictationsStore = create<PatientDictationsState>()(
 
         const id = generateUUID();
         const dictation: PatientDictation = {
+          emailTrackingEnabled: true,
           id,
           patientId,
           status: 'draft',

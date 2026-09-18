@@ -17,6 +17,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
+const { createReceiptLedger } = require('./email-receipts');
 const { execFileSync, spawn } = require('child_process');
 const { Expo } = require('expo-server-sdk');
 const { createClient } = require('@supabase/supabase-js');
@@ -756,9 +757,9 @@ const sendOperativeReportEmail = async ({ report, subject }) => {
   let messageId = null;
   try {
     const parsed = JSON.parse(stdout);
-    messageId = parsed.id || parsed.message?.id || parsed.result?.id || null;
+    messageId = parsed.messageId || parsed.message_id || parsed.id || parsed.message?.id || parsed.result?.id || null;
   } catch {
-    messageId = stdout.trim() || null;
+    messageId = null; // Unparseable output is not proof of delivery.
   }
 
   return {
@@ -769,6 +770,30 @@ const sendOperativeReportEmail = async ({ report, subject }) => {
     sentAt: new Date().toISOString(),
   };
 };
+
+const emailReceipts = createReceiptLedger(path.join(DATA_DIR, 'operative-email-receipts.json'), sendOperativeReportEmail);
+const receiptImportFile = path.join(DATA_DIR, 'operative-email-receipts-import.json');
+if (fs.existsSync(receiptImportFile)) {
+  const imported = JSON.parse(fs.readFileSync(receiptImportFile, 'utf8'));
+  let count = 0;
+  for (const receipt of imported.receipts || []) if (emailReceipts.importReceipt(receipt)) count++;
+  console.log(`[Dictations] Imported ${count} verified historical email receipts`);
+}
+app.post(['/email-receipts/link', '/patients/email-receipts/link'], (req, res) => {
+  if (!AUTH_TOKEN) return res.status(503).json({ error: 'Email history authentication unavailable' });
+  res.set('Cache-Control', 'no-store');
+  try { res.json(emailReceipts.linkKnownReports(req.body?.links)); }
+  catch (e) { res.status(e.statusCode || 503).json({ error: 'Unable to link email history' }); }
+});
+
+
+// Shared gateway authentication applies to both aliases; fail closed without a token.
+app.get(['/email-receipts', '/patients/email-receipts'], (req, res) => {
+  if (!AUTH_TOKEN) return res.status(503).json({ error: 'Email history authentication unavailable' });
+  res.set('Cache-Control', 'no-store');
+  try { res.json(emailReceipts.publicHistory()); }
+  catch (_) { res.status(503).json({ error: 'Email history unavailable' }); }
+});
 
 const buildRealtimeSessionConfig = (body = {}) => {
   const model = typeof body.model === 'string' && body.model.trim()
@@ -1198,7 +1223,8 @@ app.get('/dictations/:id', (req, res) => {
 
 app.post('/dictations/email', async (req, res) => {
   try {
-    const result = await sendOperativeReportEmail(req.body || {});
+    if (!AUTH_TOKEN) return res.status(503).json({ error: 'Email authentication unavailable' });
+    const result = await emailReceipts.send(req.body || {});
     console.log(`[Dictations] Emailed operative report ${result.messageId || '(no message id)'} to ${result.recipients.join(', ')}`);
     res.json(result);
   } catch (e) {
@@ -1262,7 +1288,8 @@ app.get('/patients/dictations/:id', (req, res) => {
 
 app.post('/patients/dictations/email', async (req, res) => {
   try {
-    const result = await sendOperativeReportEmail(req.body || {});
+    if (!AUTH_TOKEN) return res.status(503).json({ error: 'Email authentication unavailable' });
+    const result = await emailReceipts.send(req.body || {});
     console.log(`[Dictations] Emailed operative report ${result.messageId || '(no message id)'} to ${result.recipients.join(', ')}`);
     res.json(result);
   } catch (e) {

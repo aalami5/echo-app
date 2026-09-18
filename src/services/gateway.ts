@@ -1,3 +1,4 @@
+import type { EmailReceipt } from '../utils/emailReceiptStatus';
 /**
  * OpenClaw Gateway API Service
  * 
@@ -252,7 +253,8 @@ export class GatewayService {
    * Send an operative report through the Echo sync server's direct Gmail endpoint.
    * This avoids using a long-running agent chat request for a deterministic send.
    */
-  async sendOperativeReportEmail(report: string, subject?: string): Promise<{
+  async sendOperativeReportEmail(report: string, subject?: string, delivery?: { reportId: string; requestId: string; resend: boolean }): Promise<{
+    receipt?: EmailReceipt;
     success: boolean;
     messageId?: string | null;
     recipients?: string[];
@@ -276,7 +278,7 @@ export class GatewayService {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ report, subject }),
+        body: JSON.stringify({ report, subject, ...delivery }),
       },
       60000
     );
