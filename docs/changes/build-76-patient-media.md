@@ -26,3 +26,10 @@ OCR also forced a crop, compressed captures at quality 0.3, read photos while as
 ## Rollout
 
 Backend deployed by restarting the existing patient-sync service with unchanged environment. Client requires Build 76 installed in place; do not uninstall Echo. Existing builds keep using the old direct-provider routes. No OpenClaw upgrade required.
+
+## Verified release
+
+- PR https://github.com/aalami5/echo-app/pull/3 merged as `0b65c801a03d16e48966eaafe673f2b1b143d1ab`. All 37 targeted tests passed.
+- EAS Build 76 `7f76fc77-4a28-4327-9a9e-c78777277bb5` FINISHED. Downloaded IPA confirms `com.oppersmedical.echo`, version1.0.0/build76, and the shipped authenticated media endpoint/error UI. Native build logs include ExpoImageManipulator.
+- TestFlight submission `9465aa7d-1f15-4744-93b3-132e15951a6f` FINISHED at the 2026-09-20T04:26:45Z status check. First auto-submit request rejected optional release notes as Enterprise-only; retried without that field successfully, same build.
+- Apple processing/tester availability and physical-phone acceptance remain separate; install Build76 in place, scan a label and verify fields, then dictate a chief complaint.
