@@ -154,6 +154,10 @@ export const usePatientsStore = create<PatientsState>()(
       restoreMissing: (data) => {
         const state=get();
         const patients={...data.patients,...state.patients};
+        for (const [id, local] of Object.entries(state.patients)) {
+          const remote=data.patients[id];
+          if (local.recoveredFromReport && !local.updatedAt && remote && !remote.recoveredFromReport) patients[id]=remote;
+        }
         for (const id of state.removedPatientIds) delete patients[id];
         const callDays={...data.callDays,...state.callDays};
         for (const [id,day] of Object.entries(callDays)) {

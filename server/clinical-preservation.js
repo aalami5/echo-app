@@ -44,7 +44,7 @@ function mergePatients(current, incoming) {
     const old = patients[id];
     // A reconstructed header must never replace a full record from the old phone.
     if (old && !old.recoveredFromReport && value?.recoveredFromReport) continue;
-    if (old?.updatedAt && value?.updatedAt && old.updatedAt > value.updatedAt) continue;
+    if (old?.updatedAt && (!value?.updatedAt || old.updatedAt > value.updatedAt)) continue;
     patients[id] = value;
   }
   const callDays = { ...current.callDays };

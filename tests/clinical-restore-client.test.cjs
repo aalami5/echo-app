@@ -43,3 +43,13 @@ test('removed records stay hidden on the same device after restore, server histo
  global.fetch=async url=>({ok:true,json:async()=>url.includes('dictations')?remoteReports:remote});
  await restoreClinicalData();assert.equal(patients.getState().patients.remote,undefined);assert.equal(reports.getState().dictations.report,undefined);
 });
+
+test('full old-phone record enriches a recovered placeholder, but never overwrites a manual edit',()=>{
+ const complete=remote.patients.remote;
+ patients.setState({patients:{remote:{...complete,name:'Recovered Header',recoveredFromReport:true}},removedPatientIds:[]});
+ patients.getState().restoreMissing(remote);
+ assert.equal(patients.getState().patients.remote.name,'Synthetic Remote');
+ patients.setState({patients:{remote:{...complete,name:'Locally corrected name',recoveredFromReport:true,updatedAt:'2026-09-20T00:00:00Z'}}});
+ patients.getState().restoreMissing(remote);
+ assert.equal(patients.getState().patients.remote.name,'Locally corrected name');
+});
