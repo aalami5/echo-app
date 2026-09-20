@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** September 17, 2026
+**Last Updated:** September 19, 2026
 
 ---
 
@@ -144,7 +144,7 @@ echo-app/
 │   │   ├── timezone.ts           # Timezone detection & dual-time formatting
 │   │   ├── calendar.ts           # Google Calendar
 │   │   ├── dictationService.ts   # OR report generation via Gateway
-│   │   ├── dictationSync.ts      # Finalized dictation sync + durable retry outbox
+│   │   ├── dictationSync.ts      # Draft/final dictation backup + durable retry outbox
 │   │   ├── notifications/        # Push notification service
 │   │   │   └── index.ts          # Expo push registration & handling
 │   │   └── supabase.ts           # Supabase client for push tokens
@@ -224,7 +224,7 @@ echo-app/
 3. User taps again to stop
                     │
                     ▼
-4. Audio sent to Whisper API for transcription
+4. Audio sent to authenticated /patients/media/transcribe; server calls Whisper
    Avatar state → "thinking"
                     │
                     ▼
@@ -269,16 +269,16 @@ echo-app/
    Echo replies are returned as function_call_output and spoken by Realtime
 ```
 
-### Finalized Dictation Sync Flow
+### Draft and Final Dictation Backup Flow
 
 ```
-1. User finalizes or edits a patient dictation
+1. User creates, edits, or finalizes a patient dictation
                     │
                     ▼
 2. patientDictationsStore updates local AsyncStorage state
                     │
                     ▼
-3. dictationSync.ts filters to finalized dictations only
+3. dictationSync.ts includes draft and final dictations
    and strips transcript parts to sync-safe fields
                     │
                     ▼
@@ -287,13 +287,25 @@ echo-app/
    Authorization: Bearer <gateway-token>
                     │
                     ▼
-5. Mac mini sync server writes dictations.json
-   as the current finalized-report snapshot for retrieval/backstop outside the device
+5. Mac mini sync server merges dictations by ID and timestamp
+   into encrypted dictations.json, preserving omitted records and prior versions
                     │
                     ▼
 6. On failure, a durable AsyncStorage outbox preserves the latest payload
    and retries up to 3 times in-process, then again on next app launch
 ```
+
+### Clinical Restore and Preservation (Builds 74–75)
+
+`clinicalRestore.ts` waits for patient/report store hydration, fetches authenticated `/patients/list` and `/patients/dictations/list`, validates both datasets, then merges missing records. Root layout runs restore → backup → receipt refresh after successful bootstrap, on foreground, and every five minutes; Patients also offers manual restore.
+
+`server/clinical-preservation.js` merges uploads by ID, rejects older timestamped revisions, rebuilds call-day references, and writes encrypted files atomically with fsync and owner-only permissions. Prior versions live in `clinical-history/`. The key is selected by `CLINICAL_KEY_FILE` or `.clinical-storage-key` beside the data; missing keys fail closed for existing ciphertext. Empty phone uploads do not erase backups or queued report payloads.
+
+### Patient Media Processing (Build 76)
+
+`clinicalMedia.ts` sends gateway-authenticated requests to `/patients/media/scan` and `/patients/media/transcribe`, refreshing gateway authentication once after 401/403. `server/clinical-media.js` holds provider credentials and calls GPT-4o for structured patient-label extraction or Whisper for recorded speech. Provider authentication failures surface as service errors, not app-login failures.
+
+OCR accepts validated JPEG/PNG; the client normalizes supported iPhone images to bounded JPEG and removes temporary conversions. Transcription accepts one audio file up to 25 MiB. Upload limits, provider/client timeouts, no-store responses, and sanitized errors bound processing. Extracted fields require user review before saving. This does not replace the separate general chat-image or Live Voice flows.
 
 ### Operative Report Email Flow
 
@@ -365,7 +377,7 @@ Historical receipts can be staged with `scripts/reconcile-operative-email-histor
 |-------|---------|------------|----------|
 | `chatStore` | AsyncStorage | ❌ | Last 100 messages |
 | `dictationStore` | AsyncStorage | ❌ | Learned templates, examples, custom procedures |
-| `patientDictationsStore` | AsyncStorage | ❌ local store, synced finals over HTTPS | Per-patient draft/final dictations |
+| `patientDictationsStore` | AsyncStorage | ❌ local store, drafts/finals backed up over HTTPS | Per-patient draft/final dictations |
 | `emailReceiptsStore` | AsyncStorage | ❌ | Confirmed email receipt cache; server ledger is authoritative |
 | `patientsStore` | SecureStore | ✅ Keychain | Patient list, call days |
 | `settingsStore` | SecureStore | ✅ Keychain | API keys, preferences |
@@ -449,11 +461,10 @@ const chatStorage = {
 
 ### PHI Considerations
 
-Patient data is minimized by design:
-- General patient list data remains local on device in SecureStore
-- Finalized operative report dictations are synced only to Oliver's Mac mini sync server over authenticated HTTPS for retrieval and backup, using dedicated `dictations.json` storage plus authenticated list/detail endpoints
-- Patient data is not sent to the OpenClaw chat completion endpoint
-- Export feature produces local CSV only
+- Patient lists remain local-first in SecureStore and are backed up to the Mac mini over authenticated HTTPS; patient-linked draft/final reports use local AsyncStorage and server backup.
+- Server clinical files and prior versions use AES-256-GCM. Host-local history is not offsite backup; the recovery key needs independent protected backup.
+- Patient-label OCR and recorded speech are processed by OpenAI through authenticated backend routes. These routes process uploads in memory and do not log media, transcripts, or provider response bodies.
+- Export produces local CSV. See [the proposed cloud migration](clinical-cloud-migration-plan.md); no managed-cloud clinical deployment is implied.
 
 ---
 
@@ -523,15 +534,13 @@ Patient data is minimized by design:
 - Works well with React Native
 - Simple async actions
 
-### 4. Local-First Patient Storage with Finalized Dictation Sync
+### 4. Local-First Clinical Data with Additive Recovery
 
-**Chose:** Keep patient lists local, but sync finalized operative reports to Oliver's Mac mini
+**Chose:** Retain local editing while backing up patient lists and draft/final reports to the Mac mini.
 
-**Why:**
-- PHI security requirements still favor local-first storage on device
-- Finalized reports benefit from server-side retrieval/backstop without sending patient context into chat completion flows
-- Sync is narrow in scope: finalized dictations only, over authenticated HTTPS, with retry logic on failure
-- Export to CSV remains available for local backup
+- Missing snapshot records are not deletions; server merges preserve records from other phones.
+- Restore fills missing records without replacing local edits, except that an unedited reconstructed patient placeholder can be enriched from a full record.
+- Device-local removal lists suppress restoration on that device, not on a new installation. This is additive recovery, not full multi-device conflict resolution.
 
 ### 5. Inverted FlatList for Chat
 
@@ -626,10 +635,10 @@ The sync server (`server/index.js`) includes endpoints:
 - `POST /notify/meeting-reply` — Generate a calendar-checked scheduling reply and queue a `meeting_reply` rich card
 - `GET /messages/pending` — Get queued messages for sync (Build 25)
 - `POST /messages/ack` — Acknowledge synced messages and record an `acked` event in `notification-deliveries.json` (Build 25 / Build 67 ledger)
-- `POST /dictations/sync` and `POST /patients/dictations/sync` — Persist the current finalized operative-report set to `dictations.json`
+- `POST /dictations/sync` and `POST /patients/dictations/sync` — Merge draft/final operative reports into encrypted `dictations.json`
 - `POST /dictations/email` and `POST /patients/dictations/email` — Send operative report text through the configured Gmail account via `gog`
-- `GET /dictations/list` / `GET /dictations/:id` — Root-level finalized dictation retrieval
-- `GET /patients/dictations/list` / `GET /patients/dictations/:id` — Cloudflare-tunneled finalized dictation retrieval
+- `GET /dictations/list` / `GET /dictations/:id` — Root-level draft/final dictation retrieval
+- `GET /patients/dictations/list` / `GET /patients/dictations/:id` — Cloudflare-tunneled draft/final dictation retrieval
 
 Uses `expo-server-sdk` for push delivery.
 

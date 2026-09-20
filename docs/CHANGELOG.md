@@ -1,6 +1,22 @@
 # Changelog
 
-**Last Updated:** September 17, 2026
+**Last Updated:** September 19, 2026
+
+## Build 76 — Authenticated patient media (2026-09-19)
+
+- Patient OCR and recorded transcription now use authenticated backend routes with server-owned OpenAI credentials; app authentication refreshes once on rejection.
+- Scanning retains the full image, converts supported iPhone formats to bounded JPEG, preserves leading-zero MRNs, and exposes permission/processing errors for review before Save.
+- Chief-complaint, operative-report, and chat recordings share the backend transcription route.
+- Build 76 and TestFlight submission finished; Apple availability and physical-phone acceptance remain unverified. See [release and verification details](changes/build-76-patient-media.md).
+
+## Builds 74–75 — New-phone clinical recovery (2026-09-19)
+
+- Added restore on launch/foreground and manual Restore saved cases, preserving local edits and device-local removals.
+- Server snapshots now merge by ID instead of deleting omitted records, with encrypted atomic storage and encrypted prior versions. Draft reports join final reports in the durable backup outbox.
+- Build 75 enriches unedited recovered placeholders from full records without replacing manual corrections; older untimestamped uploads cannot overwrite newer timestamped server records.
+- Fixed Add patient handling for missing/stale date groups and filters hiding newly added cases; added rendered-screen regression coverage.
+- Added recovery utilities for report headers and exact sent-report copies. Recovery remains partial, and managed-cloud migration is proposed, not deployed.
+- Builds 74 and 75 were submitted to TestFlight; Build 75 supersedes 74. See [recovery details and limitations](changes/build-74-new-phone-recovery.md).
 
 ## Build 73 — Persistent operative-report email receipts (2026-09-17)
 

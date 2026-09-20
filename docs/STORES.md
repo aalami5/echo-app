@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** September 17, 2026
+**Last Updated:** September 19, 2026
 
 ---
 
@@ -100,6 +100,7 @@ Manages on-call patient tracking.
 | Field | Type | Persisted | Description |
 |-------|------|-----------|-------------|
 | `patients` | `Record<string, Patient>` | ✅ | All patients indexed by ID |
+| `removedPatientIds` | `string[]` | ✅ | Device-local removals excluded from restore |
 | `callDays` | `Record<string, CallDay>` | ✅ | Call days indexed by ID |
 | `callDayOrder` | `string[]` | ✅ | Ordered call day IDs |
 | `searchQuery` | `string` | ❌ | Current search filter |
@@ -143,6 +144,8 @@ type Hospital = 'SEQ' | 'ECH' | 'SMCMC' | 'Mills' | 'OTHER';
 
 interface Patient {
   id: string;
+  recoveredFromReport?: boolean;
+  updatedAt?: string;
   name: string;
   mrn: string;
   dob: string;
@@ -164,8 +167,10 @@ interface CallDay {
 
 **Persistence Details:**
 - Key: `echo-patients`
-- Auto-deduplicates call days on hydration
-- Merges patients when duplicate dates detected
+- Hydration no longer triggers date reorganization or unsolicited uploads.
+- `restoreMissing(data)` merges missing patients/call days, rebuilds references and date order, and respects `removedPatientIds`.
+- Existing local records win except unedited `recoveredFromReport` placeholders without `updatedAt`, which can be enriched from full remote records. New records and edits receive `updatedAt`.
+- Missing/stale call-day references fall back to today when adding a patient; deleting a patient or call day records device-local removals.
 
 ---
 
@@ -439,13 +444,14 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 
 **Persistence:** AsyncStorage (key: `patient-dictations`)
 
-**Sync Behavior (Build 67):** Any time a finalized dictation is created, edited, re-finalized, or deleted, the store calls `syncFinalizedDictations()` from `src/services/dictationSync.ts`. Only dictations with `status: 'final'` are sent to the Mac mini sync server, and each sync sends the current finalized set rather than a single delta. Sync is best-effort with a durable AsyncStorage outbox, single-flight protection, transcript-part sanitization, and up to 3 in-process retries before the outbox is retried on the next app launch.
+**Sync Behavior (Builds 74–75):** Creation, every update, and finalization call the legacy-named `syncFinalizedDictations()`, which now backs up both drafts and finals. Server merges preserve omitted records rather than treating snapshots as deletions. Sync uses a durable AsyncStorage outbox, single-flight protection, sanitized transcript parts, and up to 3 in-process retries; a completed older request cannot clear a newer queued payload. Empty uploads leave queued backups intact.
 
 **State:**
 
 | Field | Type | Persisted | Description |
 |-------|------|-----------|-------------|
 | `dictations` | `Record<string, PatientDictation>` | ✅ | All dictations keyed by ID |
+| `removedReportIds` | `string[]` | ✅ | Device-local removals excluded from restore |
 
 **PatientDictation Shape:**
 
@@ -463,13 +469,22 @@ Manages per-patient operative report dictations with draft/final lifecycle.
 **Actions:** `createDictation(patientId)` → returns new ID, `updateDictation(id, updates)`, `deleteDictation(id)`, `finalizeDictation(id)`
 
 **Notes:**
-- `updateDictation()` triggers sync if the dictation was already final or is being transitioned to final
-- `deleteDictation()` re-syncs only when removing a finalized dictation, so the server copy stays in step
+- `createDictation()` and every `updateDictation()` trigger backup, including drafts.
+- `deleteDictation()` records a local removal and re-syncs when removing a final report; omission does not delete server history.
 - `finalizeDictation()` always syncs immediately after flipping status to `final`
-- Sync payloads include only finalized dictations and only the transcript-part fields needed downstream (`id`, `type`, `content`, `timestamp`)
-- The retry outbox lives in `src/services/dictationSync.ts` and persists under `operative-dictation-sync-outbox-v1`, so pending finalized-report snapshots survive app restarts and are retried from `_layout.tsx`
+- Sync payloads include draft/final text and sanitized transcript fields (`id`, `type`, `content`, `timestamp`); media file URIs are not transferable recording backups.
+- `restoreMissing(reports)` preserves existing local reports and filters `removedReportIds`.
+- The retry outbox lives in `src/services/dictationSync.ts` and persists under `operative-dictation-sync-outbox-v1`, so pending draft/final report snapshots survive app restarts and are retried from `_layout.tsx`
 
 **Helpers:** `getDictationsForPatient(patientId)` — returns all dictations for a patient, sorted by date. `buildPatientDictationHeader(name, mrn, date)` — generates report header. `formatPatientDictationDate(iso)` — display-friendly date.
+
+---
+
+### useClinicalRestoreStatus
+
+**File:** `src/services/clinicalRestore.ts` (non-persisted Zustand store)
+
+Tracks `busy`, `error`, and `lastRestored` for restore/backup UI. Restore is single-flight, hydrates both clinical stores, and validates both server datasets before updating either. Backup failures expose a pending-backup message without deleting local cases.
 
 ---
 
