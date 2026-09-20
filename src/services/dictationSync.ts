@@ -1,7 +1,7 @@
 /**
  * Operative Report Sync Service
  *
- * Syncs finalized patient dictations to the Mac mini sync server.
+ * Syncs draft and finalized patient dictations to the Mac mini sync server.
  * Mirrors the patient sync retry/queue behavior.
  */
 
@@ -71,7 +71,7 @@ const sanitizeTranscriptParts = (parts: TranscriptPart[]): SanitizedTranscriptPa
 const buildFinalizedDictationsPayload = (
   dictations: Record<string, PatientDictation>
 ): DictationSyncPayload => {
-  const finalized = Object.values(dictations).filter((d) => d.status === 'final');
+  const finalized = Object.values(dictations); // Back up drafts as well as completed reports.
   const payload: Record<string, FinalizedDictationPayload> = {};
 
   for (const dictation of finalized) {
@@ -123,7 +123,7 @@ const queuePayload = async (payload: DictationSyncPayload): Promise<void> => {
 };
 
 /**
- * Sync finalized dictations to server
+ * Sync all patient dictations to server (legacy exported name retained).
  */
 export const syncFinalizedDictations = async (
   dictations: Record<string, PatientDictation>
@@ -132,7 +132,7 @@ export const syncFinalizedDictations = async (
   const payload = buildFinalizedDictationsPayload(dictations);
   const dictationCount = Object.keys(payload.dictations).length;
   if (dictationCount === 0) {
-    await persistOutbox(null);
+    // An empty installation must not clear a previously queued backup.
     return { success: true };
   }
 
@@ -198,7 +198,7 @@ const performSync = async (): Promise<{ success: boolean; error?: string }> => {
     });
 
     // Clear pending data and reset retry count
-    await persistOutbox(null);
+    if (pendingOutbox?.requestId === outbox.requestId) await persistOutbox(null);
     retryCount = 0;
     syncInProgress = false;
 
@@ -207,6 +207,7 @@ const performSync = async (): Promise<{ success: boolean; error?: string }> => {
       retryTimer = null;
     }
 
+    if (pendingOutbox) return performSync();
     return { success: true };
   } catch (error: any) {
     const message = error?.message || String(error);

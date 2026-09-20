@@ -31,6 +31,7 @@ export const syncPatients = async (data: {
   callDayOrder: string[];
 }): Promise<{ success: boolean; error?: string }> => {
   // Always update pending data with latest
+  if (!Object.keys(data.patients).length && !Object.keys(data.callDays).length) return {success:true};
   pendingSyncData = data;
   
   // If sync already in progress, it will pick up the latest data
@@ -67,13 +68,15 @@ const performSync = async (): Promise<{ success: boolean; error?: string }> => {
       callDays: Object.keys(pendingSyncData.callDays).length
     });
     
-    const response = await fetch(SYNC_ENDPOINT, {
+    const sentData = pendingSyncData;
+    const gatewayUrl = useSettingsStore.getState().gatewayUrl || "https://echo.oppersmedical.com";
+    const response = await fetch(`${gatewayUrl.replace(/\/+$/, "")}/patients/sync`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`,
       },
-      body: JSON.stringify(pendingSyncData),
+      body: JSON.stringify(sentData),
     });
     
     if (!response.ok) {
@@ -85,7 +88,7 @@ const performSync = async (): Promise<{ success: boolean; error?: string }> => {
     console.log('[PatientSync] Sync successful:', result);
     
     // Clear pending data and reset retry count
-    pendingSyncData = null;
+    if (pendingSyncData === sentData) pendingSyncData = null;
     retryCount = 0;
     syncInProgress = false;
     
@@ -94,6 +97,7 @@ const performSync = async (): Promise<{ success: boolean; error?: string }> => {
       retryTimer = null;
     }
     
+    if (pendingSyncData) return performSync();
     return { success: true };
   } catch (error: any) {
     console.error('[PatientSync] Sync error:', error.message);

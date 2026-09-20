@@ -18,6 +18,7 @@ const cors = require('cors');
 const fs = require('fs');
 const path = require('path');
 const { createReceiptLedger } = require('./email-receipts');
+const { mergePatients, mergeDictations, readClinical, preserveAndWrite } = require('./clinical-preservation');
 const { execFileSync, spawn } = require('child_process');
 const { Expo } = require('expo-server-sdk');
 const { createClient } = require('@supabase/supabase-js');
@@ -542,40 +543,13 @@ const authenticate = (req, res, next) => {
 };
 
 app.use(authenticate);
+app.use((req,res,next) => { res.set("Cache-Control", "no-store"); next(); });
 
-// Load current data
-const loadData = () => {
-  try {
-    const raw = fs.readFileSync(DATA_FILE, 'utf8');
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('[Sync] Error loading data:', e.message);
-    return { patients: {}, callDays: {}, callDayOrder: [], lastSync: null };
-  }
-};
-
-// Save data
-const saveData = (data) => {
-  data.lastSync = new Date().toISOString();
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-};
-
-// Load dictations data
-const loadDictations = () => {
-  try {
-    const raw = fs.readFileSync(DICTATIONS_FILE, 'utf8');
-    return JSON.parse(raw);
-  } catch (e) {
-    console.error('[Dictations] Error loading data:', e.message);
-    return { dictations: {}, lastSync: null };
-  }
-};
-
-// Save dictations data
-const saveDictations = (data) => {
-  data.lastSync = new Date().toISOString();
-  fs.writeFileSync(DICTATIONS_FILE, JSON.stringify(data, null, 2));
-};
+// Preserve every previous server snapshot; absence on a new phone is not deletion.
+const loadData = () => readClinical(DATA_FILE);
+const saveData = (data) => preserveAndWrite(DATA_FILE, mergePatients(loadData(), data));
+const loadDictations = () => readClinical(DICTATIONS_FILE);
+const saveDictations = (data) => preserveAndWrite(DICTATIONS_FILE, mergeDictations(loadDictations(), data.dictations));
 
 const syncDictationsToRvuBackend = async (dictations, requestId) => {
   if (!OPERATIVE_RVU_API_TOKEN) {
@@ -1068,10 +1042,10 @@ app.post('/sync', (req, res) => {
       lastSync: new Date().toISOString()
     };
     
-    saveData(data);
+    const saved = saveData(data);
     
-    const patientCount = Object.keys(patients).length;
-    const callDayCount = Object.keys(callDays).length;
+    const patientCount = Object.keys(saved.patients).length;
+    const callDayCount = Object.keys(saved.callDays).length;
     
     console.log(`[Sync] Saved ${patientCount} patients, ${callDayCount} call days`);
     
@@ -1245,9 +1219,9 @@ app.post('/patients/sync', (req, res) => {
       return res.status(400).json({ error: 'Missing required fields: patients, callDays, callDayOrder' });
     }
     const data = { patients, callDays, callDayOrder, lastSync: new Date().toISOString() };
-    saveData(data);
-    const patientCount = Object.keys(patients).length;
-    const callDayCount = Object.keys(callDays).length;
+    const saved = saveData(data);
+    const patientCount = Object.keys(saved.patients).length;
+    const callDayCount = Object.keys(saved.callDays).length;
     console.log(`[Sync] Saved ${patientCount} patients, ${callDayCount} call days`);
     res.json({ success: true, patientCount, callDayCount, lastSync: data.lastSync });
   } catch (e) {
