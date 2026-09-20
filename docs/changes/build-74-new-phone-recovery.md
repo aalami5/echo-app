@@ -33,3 +33,10 @@ The patient client uploaded full installation-local snapshots but had no downloa
 `node --test server/clinical-preservation.test.js tests/clinical-api.test.cjs tests/clinical-restore-client.test.cjs server/email-receipts.test.js tests/email-receipts-api.test.cjs tests/email-receipts-client.test.cjs`
 
 TypeScript and iOS production bundle export. Synthetic tests cover empty/partial upload preservation, encrypted history, restart/decryption, authorization, malformed/failed restore, local-edit preservation, drafts, and adding with a stale date reference. No real patient was added for tests; no real emails sent.
+
+## Release record and final Build 75 safeguard
+
+- PR #2 merged into `build-35-text-selection` (`f7f55b1`); 24 initial tests including rendered Add-patient flow passed.
+- Build 74 `a29ed35b-be4e-47e5-a106-9ec89b3b084c` finished and TestFlight submission `248132b1-337b-4cb0-8dc6-e11eeb78af25` finished successfully. IPA verified native version 1.0.0/74, matching bundle identifier, and recovery UI strings. Apple availability/phone install remains separate.
+- Final Build 75 adds enrichment: a full old-phone record can replace an unedited reconstructed placeholder, but never a manual local correction. Legacy records without update timestamps cannot replace newer timestamped server records. Added regression passes (25 targeted tests total across suites). Use Build 75 for the recovery walkthrough; Build 74 is superseded.
+- Verified Gmail archive: 155 exact receipt-matched messages, 144 distinct versions, 93 versions not matching stored reports. Two unverified candidates excluded. Stored encrypted as `emailed-report-recovery.json`; not attached to guessed patient identities. No email sent.
