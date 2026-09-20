@@ -515,6 +515,7 @@ const buildCompactPushCard = (card) => {
 
 // Middleware
 app.use(cors());
+require('./clinical-media').installClinicalMedia(app, { apiKey: OPENAI_API_KEY, authToken: AUTH_TOKEN });
 app.use(['/voice/realtime/session', '/patients/voice/realtime/session'], express.text({
   type: ['application/sdp', 'text/plain'],
   limit: '256kb',

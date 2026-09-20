@@ -103,6 +103,12 @@ export default function PatientsScreen() {
     clearScan,
   } = usePatientScan();
   
+  // Scanning closes the picker dialog before the request; show failures here,
+  // not only inside the now-hidden scan dialog.
+  useEffect(() => {
+    if (scanError) Alert.alert('Could not scan patient', scanError);
+  }, [scanError]);
+
   const restoreStatus = useClinicalRestoreStatus();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
