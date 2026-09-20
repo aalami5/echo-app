@@ -60,10 +60,10 @@ export function useVoiceChat(): UseVoiceChatResult {
   const durationRef = useRef<number>(0);
 
   // Get API keys from settings
-  const { openaiApiKey, elevenlabsApiKey, voiceName } = useSettingsStore();
+  const { gatewayToken, elevenlabsApiKey, voiceName } = useSettingsStore();
 
   // Check if services are configured
-  const isConfigured = Boolean(openaiApiKey && elevenlabsApiKey);
+  const isConfigured = Boolean(gatewayToken && elevenlabsApiKey);
 
   // Initialize TTS service when API key changes
   useEffect(() => {
@@ -218,19 +218,15 @@ export function useVoiceChat(): UseVoiceChatResult {
       }
 
       // Transcribe with Whisper
-      if (!openaiApiKey) {
-        setState(s => ({ ...s, error: 'OpenAI API key not configured' }));
-        return null;
-      }
 
       setState(s => ({ ...s, isTranscribing: true }));
 
-      const whisper = createWhisperService(openaiApiKey);
+      const whisper = createWhisperService();
       const result = await whisper.transcribe(uri);
 
       setState(s => ({ ...s, isTranscribing: false }));
 
-      console.log('[VoiceChat] Transcribed:', result.text);
+
       
       // Filter out Whisper hallucinations (common outputs when no real audio)
       const hallucinations = [
@@ -256,7 +252,7 @@ export function useVoiceChat(): UseVoiceChatResult {
       if (!cleanedText || 
           cleanedText.length < 2 ||
           hallucinations.some(h => cleanedText === h || cleanedText === h + '.')) {
-        console.log('[VoiceChat] Filtered out hallucination/empty:', result.text);
+        console.log('[VoiceChat] Filtered out empty/non-speech result');
         return null;
       }
       
@@ -272,7 +268,7 @@ export function useVoiceChat(): UseVoiceChatResult {
       recording.current = null;
       return null;
     }
-  }, [openaiApiKey]);
+  }, []);
 
   /**
    * Cancel recording without processing

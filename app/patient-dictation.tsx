@@ -317,12 +317,8 @@ export default function PatientDictationScreen() {
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
       if (!uri) return;
-      if (!openaiApiKey) {
-        Alert.alert('Setup Required', 'Please configure OpenAI API key in Settings.');
-        return;
-      }
       setIsTranscribing(true);
-      const result = await transcribeAudio(uri, { apiKey: openaiApiKey });
+      const result = await transcribeAudio(uri);
       setIsTranscribing(false);
       if (result?.text?.trim()) {
         const part: TranscriptPart = {

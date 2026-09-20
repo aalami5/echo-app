@@ -20,7 +20,7 @@ export async function bootstrapGatewayConfig(): Promise<{
   }
 
   if (!data?.gateway_url || !data?.gateway_token) {
-    console.error('[GatewayBootstrap] Invalid response:', data);
+    console.error('[GatewayBootstrap] Missing required connection configuration');
     return null;
   }
 

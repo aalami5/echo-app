@@ -8,7 +8,7 @@
 import { useState, useCallback } from 'react';
 import { useVoiceRecording } from './useVoiceRecording';
 import { createWhisperService } from '../services/whisper';
-import { useSettingsStore } from '../stores/settingsStore';
+
 
 interface PatientVoiceInputResult {
   // Recording state
@@ -28,7 +28,7 @@ export function usePatientVoiceInput(): PatientVoiceInputResult {
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const openaiApiKey = useSettingsStore((s) => s.openaiApiKey);
+
   
   const {
     isRecording,
@@ -42,13 +42,9 @@ export function usePatientVoiceInput(): PatientVoiceInputResult {
   const startRecording = useCallback(async () => {
     setError(null);
     
-    if (!openaiApiKey) {
-      setError('OpenAI API key required for voice input. Add it in Settings.');
-      return;
-    }
     
     await startRec();
-  }, [openaiApiKey, startRec]);
+  }, [startRec]);
   
   const stopAndTranscribe = useCallback(async (): Promise<string | null> => {
     const audioUri = await stopRec();
@@ -58,19 +54,19 @@ export function usePatientVoiceInput(): PatientVoiceInputResult {
       return null;
     }
     
-    if (!openaiApiKey) {
-      setError('OpenAI API key required');
-      return null;
-    }
     
     setIsTranscribing(true);
     setError(null);
     
     try {
-      const whisper = createWhisperService(openaiApiKey);
+      const whisper = createWhisperService();
       const result = await whisper.transcribe(audioUri);
       
-      return result.text || null;
+      if (!result.text?.trim()) {
+        setError('No speech was detected. Please try recording again.');
+        return null;
+      }
+      return result.text;
     } catch (e: any) {
       console.error('[PatientVoice] Transcription error:', e);
       setError(e.message || 'Transcription failed');
@@ -78,7 +74,7 @@ export function usePatientVoiceInput(): PatientVoiceInputResult {
     } finally {
       setIsTranscribing(false);
     }
-  }, [openaiApiKey, stopRec]);
+  }, [stopRec]);
   
   const cancelRecording = useCallback(async () => {
     setError(null);
