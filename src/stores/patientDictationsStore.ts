@@ -23,6 +23,8 @@ export interface PatientDictation {
 }
 
 interface PatientDictationsState {
+  removedReportIds: string[];
+  restoreMissing: (reports: Record<string, PatientDictation>) => void;
   dictations: Record<string, PatientDictation>;
   // Getters
   getDictationsForPatient: (patientId: string) => PatientDictation[];
@@ -73,6 +75,13 @@ const syncFinals = (dictations: Record<string, PatientDictation>) => {
 export const usePatientDictationsStore = create<PatientDictationsState>()(
   persist(
     (set, get) => ({
+      removedReportIds: [],
+      restoreMissing: (reports) => {
+        const state=get();
+        const dictations={...reports,...state.dictations};
+        for (const id of state.removedReportIds) delete dictations[id];
+        set({dictations});
+      },
       dictations: {},
 
       getDictationsForPatient: (patientId) => {
@@ -115,6 +124,7 @@ export const usePatientDictationsStore = create<PatientDictationsState>()(
           },
         }));
 
+        syncFinals(get().dictations);
         return id;
       },
 
@@ -132,9 +142,7 @@ export const usePatientDictationsStore = create<PatientDictationsState>()(
           },
         }));
 
-        if (existing.status === 'final' || updates.status === 'final') {
-          syncFinals(get().dictations);
-        }
+        syncFinals(get().dictations);
       },
 
       deleteDictation: (id) => {
@@ -142,7 +150,7 @@ export const usePatientDictationsStore = create<PatientDictationsState>()(
         set((state) => {
           const next = { ...state.dictations };
           delete next[id];
-          return { dictations: next };
+          return { dictations: next, removedReportIds:[...new Set([...state.removedReportIds,id])] };
         });
 
         if (existing?.status === 'final') {

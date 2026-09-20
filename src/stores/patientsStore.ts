@@ -34,6 +34,8 @@ export const HOSPITAL_NAMES: Record<Hospital, string> = {
 
 export interface Patient {
   id: string;
+  recoveredFromReport?: boolean;
+  updatedAt?: string;
   name: string;
   mrn: string;              // Medical Record Number
   dob: string;              // Date of Birth (MM/DD/YYYY)
@@ -53,6 +55,8 @@ export interface CallDay {
 }
 
 interface PatientsState {
+  removedPatientIds: string[];
+  restoreMissing: (data: {patients: Record<string, Patient>; callDays: Record<string, CallDay>; callDayOrder:string[]}) => void;
   // Data
   patients: Record<string, Patient>;      // Indexed by patient ID
   callDays: Record<string, CallDay>;      // Indexed by call day ID
@@ -146,6 +150,17 @@ export const usePatientsStore = create<PatientsState>()(
   persist(
     (set, get) => ({
       // Initial state
+      removedPatientIds: [],
+      restoreMissing: (data) => {
+        const state=get();
+        const patients={...data.patients,...state.patients};
+        for (const id of state.removedPatientIds) delete patients[id];
+        const callDays={...data.callDays,...state.callDays};
+        for (const [id,day] of Object.entries(callDays)) {
+          callDays[id]={...day,patientIds:Object.values(patients).filter(p=>p.callDayId===id).map(p=>p.id)};
+        }
+        set({patients,callDays,callDayOrder:Object.keys(callDays).sort((a,b)=>callDays[b].date.localeCompare(callDays[a].date))});
+      },
       patients: {},
       callDays: {},
       callDayOrder: [],
@@ -170,7 +185,7 @@ export const usePatientsStore = create<PatientsState>()(
         // 2. Otherwise, ALWAYS use today's date (create if needed)
         let targetCallDayId = callDayId;
         
-        if (!targetCallDayId) {
+        if (!targetCallDayId || !state.callDays[targetCallDayId]) {
           // Find or create today's call day
           const existingToday = Object.values(state.callDays).find(cd => cd.date === today);
           console.log('[Patients] Found existing today group:', existingToday?.id, existingToday?.date);
@@ -191,6 +206,7 @@ export const usePatientsStore = create<PatientsState>()(
           ...patientData,
           id: patientId,
           timeSeen: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
           callDayId: targetCallDayId,
         };
         
@@ -227,6 +243,7 @@ export const usePatientsStore = create<PatientsState>()(
             [id]: {
               ...state.patients[id],
               ...updates,
+              updatedAt: new Date().toISOString(),
             },
           },
         }));
@@ -249,6 +266,7 @@ export const usePatientsStore = create<PatientsState>()(
           const callDay = state.callDays[patient.callDayId];
           
           return {
+            removedPatientIds: [...new Set([...state.removedPatientIds, id])],
             patients: remainingPatients,
             callDays: callDay ? {
               ...state.callDays,
@@ -335,6 +353,7 @@ export const usePatientsStore = create<PatientsState>()(
           return {
             callDays: remainingCallDays,
             callDayOrder: state.callDayOrder.filter(cdId => cdId !== id),
+            removedPatientIds: [...new Set([...state.removedPatientIds, ...callDay.patientIds])],
             patients: remainingPatients,
             activeCallDayId: state.activeCallDayId === id ? null : state.activeCallDayId,
           };
@@ -545,7 +564,7 @@ export const usePatientsStore = create<PatientsState>()(
           const seenDate = new Date(patient.timeSeen);
           const patientDate = getISODate(seenDate);
           
-          console.log(`[Patients] Patient ${patient.name}: timeSeen=${patient.timeSeen} → date=${patientDate}`);
+
           
           // Find or create call day for this date
           let callDayId = dateToCallDayId.get(patientDate);
@@ -587,7 +606,7 @@ export const usePatientsStore = create<PatientsState>()(
           
           // Check if patient needs to move
           if (patient.callDayId !== callDayId) {
-            console.log(`[Patients] Moving ${patient.name} from ${patient.callDayId} to ${callDayId}`);
+
             hasChanges = true;
           }
           
@@ -695,16 +714,10 @@ export const usePatientsStore = create<PatientsState>()(
         patients: state.patients,
         callDays: state.callDays,
         callDayOrder: state.callDayOrder,
+        removedPatientIds: state.removedPatientIds,
       }),
-      onRehydrateStorage: () => (state) => {
-        if (!state) return;
-        
-        // Run cleanup after a short delay to ensure store is ready
-        setTimeout(() => {
-          // This is the master fix - reorganize all patients by their timeSeen
-          usePatientsStore.getState().reorganizePatientsByTimeSeen();
-          console.log('[Patients] Rehydration cleanup complete');
-        }, 100);
+      onRehydrateStorage: () => (_state, error) => {
+        if (error) console.warn('[Patients] Local storage could not be restored');
       },
     }
   )

@@ -1,4 +1,5 @@
 import { AppState } from 'react-native';
+import { restoreClinicalData, backupClinicalData } from '../src/services/clinicalRestore';
 import { refreshEmailReceipts } from '../src/services/emailReceipts';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { DarkTheme, ThemeProvider } from '@react-navigation/native';
@@ -162,14 +163,16 @@ function RootLayoutNav() {
     // cannot remain indefinitely in SecureStore.
     ensureGatewayConfig(true).then((ok) => {
       if (!ok) console.warn('[Layout] Gateway bootstrap failed — will retry next launch');
-      else refreshEmailReceipts().catch(() => {});
+      else {
+        restoreClinicalData().then(() => backupClinicalData()).then(() => refreshEmailReceipts()).catch(() => {});
+      }
     });
   }, [isAuthenticated, settingsHydrated]);
 
   // Refresh durable delivery history on launch/foreground, preserving offline cache.
   useEffect(() => {
     if (!isAuthenticated || !settingsHydrated) return;
-    const refresh = () => { refreshEmailReceipts().catch(() => {}); };
+    const refresh = () => { restoreClinicalData().then(() => backupClinicalData()).then(() => refreshEmailReceipts()).catch(() => {}); };
     refresh();
     const listener = AppState.addEventListener('change', (state) => { if (state === 'active') refresh(); });
     const timer = setInterval(refresh, 5 * 60 * 1000);

@@ -1,3 +1,4 @@
+import { restoreClinicalData, useClinicalRestoreStatus } from '../../src/services/clinicalRestore';
 import { useEmailReceiptsStore } from '../../src/stores/emailReceiptsStore';
 import { emailReceiptStatus } from '../../src/utils/emailReceiptStatus';
 /**
@@ -102,6 +103,7 @@ export default function PatientsScreen() {
     clearScan,
   } = usePatientScan();
   
+  const restoreStatus = useClinicalRestoreStatus();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
@@ -133,10 +135,7 @@ export default function PatientsScreen() {
   // Animation refs
   const searchBarHeight = useRef(new Animated.Value(0)).current;
   
-  // Reorganize patients by their timeSeen on mount
-  useEffect(() => {
-    reorganizePatientsByTimeSeen();
-  }, []);
+  // Date groups are authoritative; never rewrite/upload an empty installation on mount.
   
   // Show pending patient modal when new patient arrives from WhatsApp
   useEffect(() => {
@@ -174,8 +173,17 @@ export default function PatientsScreen() {
       return;
     }
     
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addPatient(newPatient);
+    try {
+      const patientId = addPatient(newPatient);
+      const saved = usePatientsStore.getState().patients[patientId];
+      setExpandedCallDays(prev => new Set([...prev, saved.callDayId]));
+      setSearchQuery('');
+      setIsSearching(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch {
+      Alert.alert('Patient not saved', 'Your form is still here. Please try again; if the problem persists, contact support.');
+      return;
+    }
     
     // Reset form
     setNewPatient({
@@ -687,6 +695,19 @@ export default function PatientsScreen() {
         </View>
       </Animated.View>
       
+      <View style={{paddingHorizontal:spacing.lg,paddingBottom:spacing.sm}}>
+        <TouchableOpacity accessibilityRole="button" disabled={restoreStatus.busy}
+          onPress={() => restoreClinicalData().catch(() => {})}>
+          <Text style={{color:colors.primary}}>{restoreStatus.busy ? 'Restoring saved cases…' : 'Restore saved cases'}</Text>
+        </TouchableOpacity>
+        {!!restoreStatus.error && <Text style={{color:colors.warning,marginTop:6}}>{restoreStatus.error}</Text>}
+        {!!restoreStatus.lastRestored && !restoreStatus.error && <Text style={{color:colors.textSecondary,marginTop:6}}>Saved cases checked. Existing local work is preserved.</Text>}
+      </View>
+      {Object.values(patients).some(p => p.recoveredFromReport) && (
+        <Text style={{color:colors.warning,paddingHorizontal:spacing.lg,paddingBottom:spacing.sm}}>
+          Some entries were recovered from saved report headers. Hospital, room, and original visit details may be missing; reports are unchanged.
+        </Text>
+      )}
       {/* Content */}
       <ScrollView 
         style={styles.content}
@@ -713,8 +734,11 @@ export default function PatientsScreen() {
                 <Ionicons name="people-outline" size={48} color={colors.textTertiary} />
                 <Text style={styles.emptyStateTitle}>No patients yet</Text>
                 <Text style={styles.emptyStateSubtitle}>
-                  Tap + to add your first patient
+                  New phone? Restore saved cases above, or add a patient below.
                 </Text>
+                <TouchableOpacity accessibilityRole="button" onPress={() => setShowAddModal(true)} style={{padding:spacing.lg}}>
+                  <Text style={{color:colors.primary,fontWeight:'600'}}>+ Add patient</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               callDayOrder.map(id => renderCallDay(id))
@@ -726,6 +750,8 @@ export default function PatientsScreen() {
       {/* FAB - Quick Add */}
       <TouchableOpacity 
         style={styles.fab}
+        accessibilityLabel="Add patient"
+        accessibilityRole="button"
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           setShowAddModal(true);
@@ -1729,6 +1755,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.lg,
+    zIndex: 10,
+    elevation: 10,
   },
   modalContainer: {
     flex: 1,
