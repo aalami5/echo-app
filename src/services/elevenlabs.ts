@@ -12,7 +12,7 @@ const ELEVENLABS_API_URL = 'https://api.elevenlabs.io/v1/text-to-speech';
 
 // Voice IDs from ElevenLabs
 export const VOICES = {
-  oliver: 'grLAj0YuamNRv9WBJxB4',    // Oliver's cloned voice for operative report readback
+  oliver: 'Hz3QgvkT6FlLPBkkLGlK',    // Oliver's current cloned voice; confirmed 2026-09-21
   river: 'SAz9YHcvj6GT2YYXdXww',     // Relaxed, Neutral, Informative - DEFAULT
   eric: 'cjVigY5qzO86Huf0OWal',       // Smooth, Trustworthy
   alice: 'Xb7hH8MSUJpSbSDYk0k2',      // Clear, Engaging Educator
