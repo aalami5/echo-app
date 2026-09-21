@@ -14,3 +14,11 @@ This app does not have an OTA update configuration; install Build 77 in place
 from TestFlight. Do not delete Echo. Native playback with the phone's saved key
 must still be verified after installation. A valid voice ID alone does not prove
 that the saved API key has access to that voice.
+
+## Release verification
+
+- TypeScript and production iOS export passed.
+- EAS Build 77 `4a1cf7f8-a7c6-4aca-93dc-f71710730f3f` FINISHED.
+- TestFlight submission `af1955e9-fcd6-4b71-9d87-5c7f78ed3816` FINISHED, verified 2026-09-21T16:33:19Z.
+- Downloaded IPA confirms com.oppersmedical.echo/build77, new Oliver ID present, old ID absent, River ID unchanged.
+- Apple processing/tester availability and physical-phone playback remain unverified.
