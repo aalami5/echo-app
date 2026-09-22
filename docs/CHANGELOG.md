@@ -1,6 +1,12 @@
 # Changelog
 
-**Last Updated:** September 19, 2026
+**Last Updated:** September 21, 2026
+
+## Build 77 — Correct Oliver's cloned voice (2026-09-21)
+
+- Corrected the shared ElevenLabs Oliver voice ID after report Read Back returned HTTP 404 for the unavailable voice. Patient-report readback, general dictation readback, and chat with Oliver selected now use the corrected mapping; other voices and credentials are unchanged.
+- Bumped the iOS build number to 77. EAS build and TestFlight submission finished; Apple processing/tester availability and physical-phone playback with the saved API key remain unverified.
+- Install Build 77 in place from TestFlight without deleting Echo; no OTA update is configured. See [release and verification details](changes/build-77-oliver-voice.md).
 
 ## Build 76 — Authenticated patient media (2026-09-19)
 
