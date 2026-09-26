@@ -30,3 +30,12 @@ Policy `brief-note-v1`, server-selected `gpt-5.4-2026-03-05` (config override `O
 Deploy only this repo's patient-sync backend; restart `com.echo.patient-sync` with unchanged environment. Preserve clinical files and encryption key. Old clients retain their old generation path; the new builder requires Build 78 installed in place. Do not uninstall the app.
 
 Rollback code by restoring the prior tracked backend version and restarting the same service; leave encrypted profile/session history intact. A Build 78 client will show an unavailable-service error if the new routes are rolled back; it does not silently fall back to old unsafe defaults.
+
+## Release evidence — September 26
+
+- Code commit: `60655e1cf1486ca78d30b8d378dd29fe3006efa8`, pushed to shipped branch `build-35-text-selection`.
+- 53 automated tests passed; TypeScript and production iOS export passed. A 390px-wide rendered builder had no horizontal overflow and exposed the full generation controls. This browser rendering is not a physical iPhone test.
+- Production backend restarted with its existing configuration. Public authenticated catalog: HTTP 200, 44 entries, policy `brief-note-v1`, no-store; anonymous request: 401. Public synthetic report returned 11 grounded facts/statements with zero open questions. Existing encrypted patients, dictations and email-receipt file hashes were unchanged.
+- Native Build 78 `a22f4c8b-1447-4a8c-8fc5-617b9c3e802c` FINISHED. TestFlight submission `df30160d-d53a-4b81-abc1-7b8174199e0e` was started automatically; see subsequent completion record.
+- Downloaded 31.3 MB IPA verifies bundle `com.oppersmedical.echo`, build 78, new builder/endpoint/case-confirmation text, retained Oliver and River IDs, and absence of the old silent no-complications default prompt.
+- TestFlight submission `df30160d-d53a-4b81-abc1-7b8174199e0e` FINISHED, verified September 26 at approximately 17:43 UTC. Apple processing/tester availability and physical-phone acceptance remain separate checks. No production patient reports were created or emailed by release verification.
