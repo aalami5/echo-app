@@ -1,3 +1,5 @@
+import { BriefReportBuilder } from '../../src/components/BriefReportBuilder';
+import { sourceFingerprint } from '../../src/services/operativeDrafting';
 import { ReportEmailStatus } from '../../src/components/ReportEmailStatus';
 import { useEmailReceiptsStore } from '../../src/stores/emailReceiptsStore';
 import { emailReceiptStatus } from '../../src/utils/emailReceiptStatus';
@@ -317,7 +319,7 @@ export default function DictationScreen() {
     setIsGenerating(true);
     try {
       const report = await regenerateWithCorrections(
-        gw, generatedReport, editText.trim(), transcriptParts, selectedProcedures,
+        gw, generatedReport, editText.trim(), transcriptParts, selectedProcedures, {confirmedSteps:useDictationStore.getState().reportReview?.confirmedSteps,onResult:r=>useDictationStore.setState({reportReview:{facts:r.facts,sourceFingerprint:sourceFingerprint(useDictationStore.getState().transcriptParts),sessionId:r.sessionId,policyVersion:r.policyVersion,review:r.review,statements:r.statements,confirmedSteps:r.confirmedSteps}}),onSource:(part)=>useDictationStore.setState(state=>({transcriptParts:state.transcriptParts.some(p=>p.id===part.id)?state.transcriptParts.map(p=>p.id===part.id?part:p):[...state.transcriptParts,part]}))},
       );
       setGeneratedReport(report);
     } catch (e: any) {
@@ -599,10 +601,13 @@ export default function DictationScreen() {
 
             {/* Generate button — directly after transcript entries */}
             {transcriptParts.length > 0 && (
-              <TouchableOpacity style={styles.generateButton} onPress={handleGenerate}>
-                <Ionicons name="document-text" size={20} color={colors.textInverse} />
-                <Text style={styles.generateButtonText}>Generate Report</Text>
-              </TouchableOpacity>
+              <BriefReportBuilder caseId={useDictationStore.getState().reportId} parts={transcriptParts} procedures={selectedProcedures}
+                onSource={(part) => useDictationStore.setState(state => ({transcriptParts:state.transcriptParts.some(p=>p.id===part.id)?state.transcriptParts.map(p=>p.id===part.id?part:p):[...state.transcriptParts,part]}))}
+                onComplete={(result, procedures, fingerprint) => {
+                  if (sourceFingerprint(useDictationStore.getState().transcriptParts)!==fingerprint) throw new Error('Case notes changed. Please reanalyze.');
+                  useDictationStore.setState({generatedReport:result.report,selectedProcedures:procedures,reportReview:{facts:result.facts,sourceFingerprint:fingerprint,sessionId:result.sessionId,policyVersion:result.policyVersion,review:result.review,statements:result.statements,confirmedSteps:result.confirmedSteps}});
+                  setScreenState('review');
+                }} />
             )}
 
             {/* Procedure tags */}
@@ -650,7 +655,7 @@ export default function DictationScreen() {
           <View style={styles.generatingContainer}>
             <Avatar state="thinking" size={80} />
             <Text style={styles.generatingText}>Generating operative report...</Text>
-            <Text style={styles.generatingSubtext}>Matching CPT/ICD-10 codes and formatting report...</Text>
+            <Text style={styles.generatingSubtext}>Using your case sources and checking the draft...</Text>
             <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
           </View>
         )}

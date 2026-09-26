@@ -544,6 +544,7 @@ const authenticate = (req, res, next) => {
 };
 
 app.use(authenticate);
+require('./operative-drafting').installOperativeDrafting(app, { apiKey: OPENAI_API_KEY, authToken: AUTH_TOKEN, dataDir: DATA_DIR });
 app.use((req,res,next) => { res.set("Cache-Control", "no-store"); next(); });
 
 // Preserve every previous server snapshot; absence on a new phone is not deletion.

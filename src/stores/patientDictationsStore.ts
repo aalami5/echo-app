@@ -10,6 +10,7 @@ import { usePatientsStore } from './patientsStore';
 import { syncFinalizedDictations } from '../services/dictationSync';
 
 export interface PatientDictation {
+  reportReview?: import('../services/operativeDrafting').ReportReview;
   emailTrackingEnabled?: boolean; // Missing on legacy reports: history is unknown, not unsent.
   id: string;                    // UUID
   patientId: string;             // Links to Patient.id

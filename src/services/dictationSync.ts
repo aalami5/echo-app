@@ -20,7 +20,7 @@ const MAX_RETRIES = 3;
 const BASE_RETRY_DELAY_MS = 5000;
 const MAX_RETRY_DELAY_MS = 60000;
 
-type SanitizedTranscriptPart = Pick<TranscriptPart, 'id' | 'type' | 'content' | 'timestamp'>;
+type SanitizedTranscriptPart = Pick<TranscriptPart, 'id' | 'type' | 'content' | 'timestamp' | 'sourceKind' | 'ocrText' | 'ocrWarnings'>;
 
 export type FinalizedDictationPayload = Omit<PatientDictation, 'transcriptParts'> & {
   transcriptParts: SanitizedTranscriptPart[];
@@ -65,6 +65,9 @@ const sanitizeTranscriptParts = (parts: TranscriptPart[]): SanitizedTranscriptPa
     type: part.type,
     content: part.content,
     timestamp: part.timestamp,
+    sourceKind: part.sourceKind,
+    ocrText: part.ocrText,
+    ocrWarnings: part.ocrWarnings,
   }));
 };
 

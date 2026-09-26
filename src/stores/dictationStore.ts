@@ -13,6 +13,9 @@ export interface TranscriptPart {
   id: string;
   type: 'voice' | 'text' | 'image';
   content: string;
+  sourceKind?: 'current' | 'historical' | 'correction';
+  ocrText?: string;
+  ocrWarnings?: string[];
   imageBase64?: string;
   imageMimeType?: string;
   timestamp: string;
@@ -57,6 +60,7 @@ interface DictationPersistedState {
 }
 
 interface DictationSessionState {
+  reportReview?: import('../services/operativeDrafting').ReportReview;
   reportId: string;
   transcriptParts: TranscriptPart[];
   generatedReport: string | null;
@@ -97,6 +101,7 @@ export const useDictationStore = create<DictationState>()(
       reportId: `standalone-${Date.now()}-${Math.random().toString(36).slice(2)}`,
       transcriptParts: [],
       generatedReport: null,
+      reportReview: undefined,
       isGenerating: false,
       selectedProcedures: [],
       editingCorrections: null,
@@ -113,6 +118,7 @@ export const useDictationStore = create<DictationState>()(
           reportId: `standalone-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           transcriptParts: [],
           generatedReport: null,
+      reportReview: undefined,
           isGenerating: false,
           selectedProcedures: [],
           editingCorrections: null,

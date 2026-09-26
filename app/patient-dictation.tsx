@@ -1,3 +1,5 @@
+import { BriefReportBuilder } from '../src/components/BriefReportBuilder';
+import { sourceFingerprint, DraftResult } from '../src/services/operativeDrafting';
 import { ReportEmailStatus } from '../src/components/ReportEmailStatus';
 import { useEmailReceiptsStore } from '../src/stores/emailReceiptsStore';
 import { emailReceiptStatus } from '../src/utils/emailReceiptStatus';
@@ -125,6 +127,7 @@ export default function PatientDictationScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [showReportSources, setShowReportSources] = useState(false);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -327,9 +330,7 @@ export default function PatientDictationScreen() {
           content: result.text.trim(),
           timestamp: new Date().toISOString(),
         };
-        updateDictation(activeDictation.id, {
-          transcriptParts: [...activeDictation.transcriptParts, part],
-        });
+        persistCaseSource(part);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setTimeout(() => scrollViewRef.current?.scrollTo({ y: 0, animated: true }), 100);
       }
@@ -354,9 +355,7 @@ export default function PatientDictationScreen() {
       content: textDraft.trim(),
       timestamp: new Date().toISOString(),
     };
-    updateDictation(activeDictation.id, {
-      transcriptParts: [...activeDictation.transcriptParts, part],
-    });
+    persistCaseSource(part);
     setTextDraft('');
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
@@ -373,10 +372,25 @@ export default function PatientDictationScreen() {
       imageMimeType: mimeType,
       timestamp: new Date().toISOString(),
     };
-    updateDictation(activeDictation.id, {
-      transcriptParts: [...activeDictation.transcriptParts, part],
-    });
+    persistCaseSource(part);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
+  // Save OCR/corrections against the latest store snapshot, not a captured render.
+  const persistCaseSource = (part: TranscriptPart) => {
+    if (!dictationId) return;
+    const current = usePatientDictationsStore.getState().dictations[dictationId];
+    if (!current) throw new Error('This report is no longer available.');
+    const found = current.transcriptParts.some(p => p.id === part.id);
+    updateDictation(current.id, { transcriptParts: found ? current.transcriptParts.map(p => p.id === part.id ? part : p) : [...current.transcriptParts, part] });
+  };
+  const acceptBriefDraft = (result: DraftResult, procedures: string[], fingerprint: string) => {
+    if (!dictationId) return;
+    const current = usePatientDictationsStore.getState().dictations[dictationId];
+    if (!current || sourceFingerprint(current.transcriptParts) !== fingerprint) throw new Error('The case note changed while drafting. Reanalyze before replacing the report.');
+    updateDictation(current.id, { generatedReport: result.report, selectedProcedures: procedures, status: 'draft',
+      reportReview: { facts:result.facts,sourceFingerprint:fingerprint,sessionId: result.sessionId, policyVersion: result.policyVersion, review: result.review, statements: result.statements, confirmedSteps: result.confirmedSteps } });
+    setScreenState('review');
   };
 
   // ─── Generate Report ───
@@ -386,8 +400,8 @@ export default function PatientDictationScreen() {
     if (!gw) return;
     setIsGenerating(true);
     try {
-      const report = await generateReport(gw, activeDictation.transcriptParts, activeDictation.selectedProcedures);
-      updateDictation(activeDictation.id, { generatedReport: report });
+      const report = await generateReport(gw, activeDictation.transcriptParts, activeDictation.selectedProcedures, {caseId:activeDictation.id,onSource:persistCaseSource});
+      updateDictation(activeDictation.id, { generatedReport: report, status:'draft' });
     } catch (e: any) {
       console.error('[PatientDictation] Generate failed', e);
       Alert.alert('Error', e.message || 'Failed to generate report.');
@@ -399,6 +413,8 @@ export default function PatientDictationScreen() {
   // ─── Report Actions ───
   const handleEmail = async (resend = false) => {
     if (!activeDictation?.generatedReport) return;
+    if (activeDictation.reportReview?.sourceFingerprint && activeDictation.reportReview.sourceFingerprint !== sourceFingerprint(activeDictation.transcriptParts)) { Alert.alert('Case notes changed', 'Regenerate or review and edit against the latest case notes before emailing.'); return; }
+    if (activeDictation.reportReview && /\*\*Open Items:\*\*/i.test(activeDictation.generatedReport)) { Alert.alert('Draft needs review', 'Resolve the open items before emailing this report. Your draft remains saved.'); return; }
     const gw = getGateway();
     if (!gw || (emailSent && !resend) || isSendingEmail) return;
     setIsSendingEmail(true);
@@ -545,7 +561,7 @@ export default function PatientDictationScreen() {
   const handleSaveDirectEdit = () => {
     if (!activeDictation) return;
     if (editText.trim()) {
-      updateDictation(activeDictation.id, { generatedReport: editText.trim() });
+      updateDictation(activeDictation.id, { generatedReport: editText.trim(), status:'draft', reportReview:activeDictation.reportReview ? {...activeDictation.reportReview,manuallyEdited:true,statements:[],reviewedAt:undefined,sourceFingerprint:sourceFingerprint(activeDictation.transcriptParts)} : undefined });
     }
     setScreenState('review');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -564,8 +580,10 @@ export default function PatientDictationScreen() {
         editText.trim(),
         activeDictation.transcriptParts,
         activeDictation.selectedProcedures,
+        { caseId: activeDictation.id, onSource: persistCaseSource, confirmedSteps: activeDictation.reportReview?.confirmedSteps,
+          onResult: r => updateDictation(activeDictation.id, { reportReview: {facts:r.facts,sourceFingerprint:sourceFingerprint(usePatientDictationsStore.getState().dictations[activeDictation.id].transcriptParts),sessionId:r.sessionId,policyVersion:r.policyVersion,review:r.review,statements:r.statements,confirmedSteps:r.confirmedSteps} }) },
       );
-      updateDictation(activeDictation.id, { generatedReport: report });
+      updateDictation(activeDictation.id, { generatedReport: report, status:'draft' });
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to regenerate.');
     } finally {
@@ -599,6 +617,7 @@ export default function PatientDictationScreen() {
           updateDictation(activeDictation.id, {
             transcriptParts: [headerPart],
             generatedReport: null,
+            reportReview: undefined,
             selectedProcedures: [],
           });
           setScreenState('input');
@@ -611,9 +630,21 @@ export default function PatientDictationScreen() {
 
   const handleFinalize = () => {
     if (!activeDictation) return;
-    finalizeDictation(activeDictation.id);
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    router.back();
+    const report = activeDictation.generatedReport || '';
+    if (activeDictation.reportReview?.sourceFingerprint && activeDictation.reportReview.sourceFingerprint !== sourceFingerprint(activeDictation.transcriptParts)) { Alert.alert('Case notes changed', 'Regenerate or review and edit the report against the latest case notes before finalizing.'); return; }
+    if (/\*\*Open Items:\*\*/i.test(report)) {
+      Alert.alert('Review open items first', 'Resolve the grouped questions with Edit → Regenerate with AI, or directly edit the report to document verified facts and remove resolved open items.');
+      return;
+    }
+    Alert.alert('Finalize reviewed report?', 'Confirm the procedure, case details and any routine steps accurately describe this operation.', [
+      {text:'Keep reviewing',style:'cancel'},
+      {text:'Confirm & finalize',onPress:()=>{
+        if (activeDictation.reportReview) updateDictation(activeDictation.id,{reportReview:{...activeDictation.reportReview,reviewedAt:new Date().toISOString()}});
+        finalizeDictation(activeDictation.id);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.back();
+      }},
+    ]);
   };
 
   const handleStartNewReport = (startFromPrevious: boolean) => {
@@ -633,6 +664,7 @@ export default function PatientDictationScreen() {
             id: `${Date.now()}-copy`,
             type: 'text',
             content: source.generatedReport,
+            sourceKind: 'historical',
             timestamp: now,
           } as TranscriptPart,
         ];
@@ -1101,8 +1133,8 @@ export default function PatientDictationScreen() {
             )}
             {transcriptParts.length === 1 && !isTranscribing && (
               <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>Start by selecting procedures below,</Text>
-                <Text style={styles.emptyText}>then tap the avatar to dictate</Text>
+                <Text style={styles.emptyText}>Paste, photograph or dictate your brief op note.</Text>
+                <Text style={styles.emptyText}>Echo will identify the procedures for you.</Text>
               </View>
             )}
 
@@ -1114,7 +1146,7 @@ export default function PatientDictationScreen() {
                     size={16}
                     color={colors.primaryMuted}
                   />
-                  <Text style={styles.transcriptType}>{index === 0 ? 'header' : part.type}</Text>
+                  <Text style={styles.transcriptType}>{index === 0 ? 'header' : part.sourceKind === 'historical' ? 'prior report — reference only' : part.type}</Text>
                   {!isReadOnly && index !== 0 && (
                     <TouchableOpacity
                       onPress={() => removeTranscriptPart(part.id, index)}
@@ -1124,15 +1156,12 @@ export default function PatientDictationScreen() {
                     </TouchableOpacity>
                   )}
                 </View>
-                <Text style={styles.transcriptText}>{part.content}</Text>
+                <Text style={styles.transcriptText}>{part.content}{part.ocrText ? `\n\nExtracted text:\n${part.ocrText}` : ''}</Text>
               </View>
             ))}
 
             {transcriptParts.length > 1 && !isReadOnly && (
-              <TouchableOpacity style={styles.generateButton} onPress={handleGenerate}>
-                <Ionicons name="document-text" size={20} color={colors.textInverse} />
-                <Text style={styles.generateButtonText}>Generate Report</Text>
-              </TouchableOpacity>
+              <BriefReportBuilder caseId={activeDictation.id} parts={transcriptParts} procedures={selectedProcedures} onSource={persistCaseSource} onComplete={acceptBriefDraft} />
             )}
 
             {renderProcedureTags()}
@@ -1149,7 +1178,7 @@ export default function PatientDictationScreen() {
               <View style={styles.textInputRow}>
                 <TextInput
                   style={styles.textInput}
-                  placeholder="Type additional notes..."
+                  placeholder="Paste your brief operative note or add case details..."
                   placeholderTextColor={colors.textTertiary}
                   value={textDraft}
                   onChangeText={setTextDraft}
@@ -1176,7 +1205,7 @@ export default function PatientDictationScreen() {
           <View style={styles.generatingContainer}>
             <Avatar state="thinking" size={80} />
             <Text style={styles.generatingText}>Generating operative report...</Text>
-            <Text style={styles.generatingSubtext}>Matching CPT/ICD-10 codes and formatting report...</Text>
+            <Text style={styles.generatingSubtext}>Using your case sources and checking the draft...</Text>
             <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
           </View>
         )}
@@ -1184,6 +1213,16 @@ export default function PatientDictationScreen() {
         {/* ─── REVIEW STATE ─── */}
         {screenState === 'review' && activeDictation.generatedReport && (
           <ScrollView ref={reviewScrollRef} style={styles.flex} contentContainerStyle={styles.scrollContent}>
+            {activeDictation.reportReview && <View style={styles.reportCard}>
+              <Text style={styles.reportText}>Draft for surgeon review · {activeDictation.reportReview.confirmedSteps.length} routine steps confirmed for this case.</Text>
+              <TouchableOpacity style={{paddingVertical:12}} onPress={()=>setShowReportSources(!showReportSources)}><Text style={{color:colors.primary}}> {showReportSources?'Hide source detail':'View source support & confirmed technique'}</Text></TouchableOpacity>
+              {showReportSources && <>
+                {activeDictation.reportReview.manuallyEdited && <Text style={styles.reportText}>Manually edited. Automated statement links apply only to the original generated draft.</Text>}
+                {activeDictation.reportReview.confirmedSteps.map((step,i)=><Text key={`step-${i}`} style={styles.reportText}>Confirmed: {step.text}</Text>)}
+                {(activeDictation.reportReview.facts||[]).map(f=><Text key={f.id} style={styles.reportText}>{f.id} · {f.field}: {f.quote}</Text>)}
+                {activeDictation.reportReview.statements.map((statement,i)=><Text key={`statement-${i}`} style={styles.reportText}>{statement.text} [{statement.evidence.join(', ')}]</Text>)}
+              </>}
+            </View>}
             <View style={styles.reportCard}>
               <Text style={styles.reportText} selectable>{activeDictation.generatedReport}</Text>
             </View>

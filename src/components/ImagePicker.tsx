@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 import * as ExpoImagePicker from 'expo-image-picker';
 import { Ionicons } from '@expo/vector-icons';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 
@@ -67,23 +69,25 @@ export function ImagePickerModal({ onImageSelected, onCancel }: ImagePickerProps
       const result = await (useCamera
         ? ExpoImagePicker.launchCameraAsync({
             mediaTypes: ExpoImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
+            allowsEditing: false,
             quality: 0.8,
             base64: true,
           })
         : ExpoImagePicker.launchImageLibraryAsync({
             mediaTypes: ExpoImagePicker.MediaTypeOptions.Images,
-            allowsEditing: true,
+            allowsEditing: false,
             quality: 0.8,
             base64: true,
           }));
 
       if (!result.canceled && result.assets[0]) {
         const asset = result.assets[0];
+        // Normalize HEIC and retain the full note; OCR should not depend on a crop.
+        const converted = await ImageManipulator.manipulateAsync(asset.uri, asset.width > 2200 ? [{resize:{width:2200}}] : [], {compress:0.9,format:ImageManipulator.SaveFormat.JPEG,base64:true});
         setSelectedImage(asset.uri);
-        setImageBase64(asset.base64 || null);
-        // expo-image-picker provides mimeType, fallback to jpeg
-        setImageMimeType(asset.mimeType || 'image/jpeg');
+        setImageBase64(converted.base64 || null);
+        setImageMimeType('image/jpeg');
+        if (converted.uri !== asset.uri) await FileSystem.deleteAsync(converted.uri,{idempotent:true}).catch(()=>{});
       }
     } catch (error) {
       console.log('Error picking image:', error);
