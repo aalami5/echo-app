@@ -1,6 +1,14 @@
 # Changelog
 
-**Last Updated:** September 21, 2026
+**Last Updated:** September 26, 2026
+
+## Build 78 — Source-grounded brief operative notes (2026-09-26)
+
+- Added a shared brief-note builder for patient-linked and standalone reports: typed, dictated, and screenshot sources drive procedure matching, quoted facts, clarification, and narrative drafts across the existing catalog and custom/mixed procedures.
+- Added explicitly approved, versioned usual-technique profiles; using routine steps in a case requires separate confirmation. Current-case facts override routine technique; historical reports are not current evidence.
+- Added authenticated backend OCR, analysis, and source-checked drafting with encrypted session/version history. Retained OCR text and warnings survive patient-report backup; full-frame images normalize to JPEG.
+- Removed silent clinical-negative defaults and unverified bundled billing-code hints from new drafts. Patient-report review tracks source changes and manual edits, with unresolved Open Items blocking finalization.
+- Native Build 78 and TestFlight submission finished. Apple processing/tester availability and physical-iPhone acceptance remain separate checks. See [release and verification details](changes/build-78-brief-operative-notes.md).
 
 ## Build 77 — Correct Oliver's cloned voice (2026-09-21)
 

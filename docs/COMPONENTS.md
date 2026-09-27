@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** September 17, 2026
+**Last Updated:** September 26, 2026
 
 ---
 
@@ -121,6 +121,24 @@ function ChatMessage({ message }) {
 ---
 
 ## Core Components
+
+### BriefReportBuilder
+
+**File:** `src/components/BriefReportBuilder.tsx`
+
+Shared source-first modal launched by “Brief note → Full report” in standalone and patient-linked dictation.
+
+| Prop | Type | Purpose |
+|------|------|---------|
+| `caseId` | `string` | Current case/report identity |
+| `parts` | `TranscriptPart[]` | Typed, dictated, or screenshot sources |
+| `procedures` | `string[]` | Procedure hints, not case evidence |
+| `onSource` | `(part: TranscriptPart) => void` | Retains extracted OCR and case corrections |
+| `onComplete` | `(result: DraftResult, procedures: string[], fingerprint: string) => void` | Returns reviewed pipeline output and source snapshot |
+
+Shows procedure matches, quoted facts, source text, and grouped clarification items. Offers editable routine-technique suggestions from approved profiles, reference outlines, or saved examples. Confirming steps for this case is separate from approving a reusable profile; editing steps clears case confirmation. Unapplied clarifications block generation. Busy/error/retry states preserve sources, and completion produces a draft only—nothing is automatically finalized or emailed.
+
+---
 
 ### ReportEmailStatus
 
@@ -312,6 +330,7 @@ Modal for selecting photos from camera or library. Includes a caption input fiel
 - Optional caption/question input (defaults to "What do you see in this image?")
 - Image preview scrolls up and shrinks when keyboard opens (Build #31 fix)
 - Camera and photo library source selection
+- Build 78 preserves the full frame (no crop), normalizes HEIC/other supported images to JPEG, and bounds width to 2200px before returning image data
 
 **Usage:**
 
@@ -350,11 +369,11 @@ OR dictation for generating structured operative reports:
 - Tag-based procedure picker (pill/chip UI) with categories: Aortic, Carotid, Peripheral Arterial, Venous, Dialysis Access, Other
 - Custom procedure tags (add, edit via long-press, delete, persisted via AsyncStorage)
 - Multi-modal transcript input: voice recording, text, photo
-- Report generation via OpenClaw Gateway with CPT/ICD-10 web search
+- Source-first `BriefReportBuilder` uses authenticated patient-sync OCR, analysis, and drafting; narrative generation does not verify or insert bundled CPT/ICD hints
 - Report actions: email, copy, TTS read-back, save as example
 - **Two edit modes** (Build 43): direct text editing for quick fixes, AI-powered regeneration for structural changes
 - "New Dictation" button in review state to start fresh without navigating away
-- Save reports as examples for future context learning
+- Save reports as examples for future reusable-technique proposals, subject to explicit review
 
 **Supporting Files:**
 - `src/services/dictationService.ts` - Report generation service
@@ -388,7 +407,8 @@ Patient-linked operative report dictation with full workflow:
 - Date of operation picker
 - Smart procedure pre-selection from chief complaint
 - Voice/text/photo input (reuses dictation infrastructure)
-- AI report generation with read-back (TTS)
+- Source-grounded `BriefReportBuilder` generation with read-back (TTS)
+- Collapsed source-review panel, stale-source checks before finalization/email, manual-edit provenance, and explicit final review after Open Items are resolved
 - Direct text editing and AI-powered regeneration
 - **Read Back play/pause controls (Build 53):** Processing spinner → Play button when audio ready → Pause/Resume during playback, with haptic feedback on audio ready
 - Per-patient report history timeline

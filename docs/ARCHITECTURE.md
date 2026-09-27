@@ -2,9 +2,23 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** September 19, 2026
+**Last Updated:** September 26, 2026
 
 ---
+
+## Source-grounded operative drafting (Build 78)
+
+`BriefReportBuilder` and `dictationService.ts` use `src/services/operativeDrafting.ts` to call the authenticated patient-sync backend, rather than asking the chat gateway to generate operative reports. Chat and downstream coding/RVU workflows are unchanged.
+
+1. Full-frame screenshots normalize to JPEG; `/patients/operative/ocr` extracts text and uncertainty warnings using server-owned credentials. Missing image data or failed OCR stops analysis; retained OCR text can be reused.
+2. `/patients/operative/analyze` extracts quoted facts, procedures, review questions, and technique suggestions. Current notes and corrections are evidence; historical sources (including legacy `-copy` records) are excluded. The generated `server/report-catalog.json` covers 44 entries, including all 16 code-library procedures and named variants/aliases; custom/mixed procedures remain supported.
+3. `/patients/operative/profiles/suggest` proposes reusable technique from a saved example. `/patients/operative/profiles` requires explicit approval and optimistic version matching; profile approval is separate from confirming steps for the current case. `GET /patients/operative/catalog` returns the catalog and approved profiles.
+4. `/patients/operative/draft` creates evidence-linked statements from case facts and explicitly confirmed steps. Quote/numeric checks and a separate semantic audit remove unsupported assertions and restore unambiguous omitted facts from exact source text. Missing clinical negatives remain unknown; narrative generation does not verify billing codes.
+5. Patient-report review retains source fingerprints, facts, confirmed steps, and statement links. Source changes require regeneration or review and manual editing against the latest notes before finalization/email; direct edits mark the report manual and clear generated statement links. Finalization requires resolving Open Items and explicit review; generation never sends or finalizes automatically.
+
+`server/operative-drafting.js` mounts the routes with fail-closed bearer authentication and `Cache-Control: no-store`. Policy `brief-note-v1` defaults to server-selected `gpt-5.4-2026-03-05`, overridable with `OPERATIVE_DRAFT_MODEL`. The client refreshes authentication once on 401/403. Provider bodies/PHI are not logged.
+
+Technique profiles live in `DATA_DIR/operative-technique-profiles.json`; source sessions and generated versions live in `DATA_DIR/operative-drafting/`. Both use existing encrypted clinical preservation and version history. Existing report storage, additive restore, and email receipts remain separate and unchanged; this is not a hosting migration or complete multi-device synchronization. Source checks do not replace surgeon review. See [Build 78 release details](changes/build-78-brief-operative-notes.md).
 
 ## Overview
 
@@ -143,7 +157,7 @@ echo-app/
 │   │   ├── whisper.ts            # Speech-to-text
 │   │   ├── timezone.ts           # Timezone detection & dual-time formatting
 │   │   ├── calendar.ts           # Google Calendar
-│   │   ├── dictationService.ts   # OR report generation via Gateway
+│   │   ├── dictationService.ts   # Source-grounded operative report pipeline
 │   │   ├── dictationSync.ts      # Draft/final dictation backup + durable retry outbox
 │   │   ├── notifications/        # Push notification service
 │   │   │   └── index.ts          # Expo push registration & handling
