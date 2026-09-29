@@ -27,7 +27,7 @@ function installJobs(router, {dataDir, handlers, cacheVersion, maxActive=2}) {
   router.post('/jobs', (req,res) => {
     try {
       const {operation,input,retry=false}=req.body||{};
-      if (!handlers[operation] || !['/ocr','/analyze','/draft','/profiles/suggest'].includes(operation) || !input || typeof input!=='object' || Array.isArray(input))
+      if (!handlers[operation] || !['/ocr','/analyze','/draft','/compose','/profiles/suggest'].includes(operation) || !input || typeof input!=='object' || Array.isArray(input))
         return res.status(400).json({error:'Invalid report operation.'});
       const id=crypto.createHash('sha256').update(JSON.stringify([cacheVersion(),operation,input])).digest('hex');
       const old=read(id);

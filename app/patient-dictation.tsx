@@ -1,5 +1,4 @@
-import { BriefReportBuilder } from '../src/components/BriefReportBuilder';
-import { sourceFingerprint, DraftResult } from '../src/services/operativeDrafting';
+import { sourceFingerprint } from '../src/services/operativeDrafting';
 import { ReportEmailStatus } from '../src/components/ReportEmailStatus';
 import { useEmailReceiptsStore } from '../src/stores/emailReceiptsStore';
 import { emailReceiptStatus } from '../src/utils/emailReceiptStatus';
@@ -127,7 +126,6 @@ export default function PatientDictationScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
-  const [showReportSources, setShowReportSources] = useState(false);
 
   const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
@@ -384,15 +382,6 @@ export default function PatientDictationScreen() {
     const found = current.transcriptParts.some(p => p.id === part.id);
     updateDictation(current.id, { transcriptParts: found ? current.transcriptParts.map(p => p.id === part.id ? part : p) : [...current.transcriptParts, part] });
   };
-  const acceptBriefDraft = (result: DraftResult, procedures: string[], fingerprint: string) => {
-    if (!dictationId) return;
-    const current = usePatientDictationsStore.getState().dictations[dictationId];
-    if (!current || sourceFingerprint(current.transcriptParts) !== fingerprint) throw new Error('The case note changed while drafting. Reanalyze before replacing the report.');
-    updateDictation(current.id, { generatedReport: result.report, selectedProcedures: procedures, status: 'draft',
-      reportReview: { facts:result.facts,sourceFingerprint:fingerprint,sessionId: result.sessionId, policyVersion: result.policyVersion, review: result.review, statements: result.statements, confirmedSteps: result.confirmedSteps } });
-    setScreenState('review');
-  };
-
   // ─── Generate Report ───
   const handleGenerate = async () => {
     if (!activeDictation) return;
@@ -400,7 +389,9 @@ export default function PatientDictationScreen() {
     if (!gw) return;
     setIsGenerating(true);
     try {
-      const report = await generateReport(gw, activeDictation.transcriptParts, activeDictation.selectedProcedures, {caseId:activeDictation.id,onSource:persistCaseSource});
+      const report = await generateReport(gw, activeDictation.transcriptParts, activeDictation.selectedProcedures, {caseId:activeDictation.id,onSource:persistCaseSource,
+        getCurrentParts:()=>usePatientDictationsStore.getState().dictations[activeDictation.id].transcriptParts,
+        onResult:(r,fingerprint)=>{if(usePatientDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while drafting. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,review:[],statements:[],confirmedSteps:[]}});}});
       updateDictation(activeDictation.id, { generatedReport: report, status:'draft' });
     } catch (e: any) {
       console.error('[PatientDictation] Generate failed', e);
@@ -548,7 +539,7 @@ export default function PatientDictationScreen() {
         },
       },
       {
-        text: 'Regenerate with AI',
+        text: 'Edit with AI',
         onPress: () => {
           setEditText('');
           setScreenState('editing');
@@ -580,8 +571,9 @@ export default function PatientDictationScreen() {
         editText.trim(),
         activeDictation.transcriptParts,
         activeDictation.selectedProcedures,
-        { caseId: activeDictation.id, onSource: persistCaseSource, confirmedSteps: activeDictation.reportReview?.confirmedSteps,
-          onResult: r => updateDictation(activeDictation.id, { reportReview: {facts:r.facts,sourceFingerprint:sourceFingerprint(usePatientDictationsStore.getState().dictations[activeDictation.id].transcriptParts),sessionId:r.sessionId,policyVersion:r.policyVersion,review:r.review,statements:r.statements,confirmedSteps:r.confirmedSteps} }) },
+        {caseId:activeDictation.id,onSource:persistCaseSource,
+          getCurrentParts:()=>usePatientDictationsStore.getState().dictations[activeDictation.id].transcriptParts,
+          onResult:(r,fingerprint)=>{if(usePatientDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while applying AI edits. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,review:[],statements:[],confirmedSteps:[]}});}},
       );
       updateDictation(activeDictation.id, { generatedReport: report, status:'draft' });
     } catch (e: any) {
@@ -633,7 +625,7 @@ export default function PatientDictationScreen() {
     const report = activeDictation.generatedReport || '';
     if (activeDictation.reportReview?.sourceFingerprint && activeDictation.reportReview.sourceFingerprint !== sourceFingerprint(activeDictation.transcriptParts)) { Alert.alert('Case notes changed', 'Regenerate or review and edit the report against the latest case notes before finalizing.'); return; }
     if (/\*\*Open Items:\*\*/i.test(report)) {
-      Alert.alert('Review open items first', 'Resolve the grouped questions with Edit → Regenerate with AI, or directly edit the report to document verified facts and remove resolved open items.');
+      Alert.alert('Review open items first', 'Resolve the grouped questions with Edit → Edit with AI, or directly edit the report to document verified facts and remove resolved open items.');
       return;
     }
     Alert.alert('Finalize reviewed report?', 'Confirm the procedure, case details and any routine steps accurately describe this operation.', [
@@ -1161,7 +1153,9 @@ export default function PatientDictationScreen() {
             ))}
 
             {transcriptParts.length > 1 && !isReadOnly && (
-              <BriefReportBuilder caseId={activeDictation.id} parts={transcriptParts} procedures={selectedProcedures} onSource={persistCaseSource} onComplete={acceptBriefDraft} />
+              <TouchableOpacity style={styles.generateButton} onPress={handleGenerate} disabled={isGenerating} accessibilityRole="button">
+                <Text style={styles.generateButtonText}>Generate draft</Text>
+              </TouchableOpacity>
             )}
 
             {renderProcedureTags()}
@@ -1205,7 +1199,7 @@ export default function PatientDictationScreen() {
           <View style={styles.generatingContainer}>
             <Avatar state="thinking" size={80} />
             <Text style={styles.generatingText}>Generating operative report...</Text>
-            <Text style={styles.generatingSubtext}>Using your case sources and checking the draft...</Text>
+            <Text style={styles.generatingSubtext}>Reading your pictures and writing your draft...</Text>
             <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
           </View>
         )}
@@ -1213,16 +1207,6 @@ export default function PatientDictationScreen() {
         {/* ─── REVIEW STATE ─── */}
         {screenState === 'review' && activeDictation.generatedReport && (
           <ScrollView ref={reviewScrollRef} style={styles.flex} contentContainerStyle={styles.scrollContent}>
-            {activeDictation.reportReview && <View style={styles.reportCard}>
-              <Text style={styles.reportText}>Draft for surgeon review · {activeDictation.reportReview.confirmedSteps.length} routine steps confirmed for this case.</Text>
-              <TouchableOpacity style={{paddingVertical:12}} onPress={()=>setShowReportSources(!showReportSources)}><Text style={{color:colors.primary}}> {showReportSources?'Hide source detail':'View source support & confirmed technique'}</Text></TouchableOpacity>
-              {showReportSources && <>
-                {activeDictation.reportReview.manuallyEdited && <Text style={styles.reportText}>Manually edited. Automated statement links apply only to the original generated draft.</Text>}
-                {activeDictation.reportReview.confirmedSteps.map((step,i)=><Text key={`step-${i}`} style={styles.reportText}>Confirmed: {step.text}</Text>)}
-                {(activeDictation.reportReview.facts||[]).map(f=><Text key={f.id} style={styles.reportText}>{f.id} · {f.field}: {f.quote}</Text>)}
-                {activeDictation.reportReview.statements.map((statement,i)=><Text key={`statement-${i}`} style={styles.reportText}>{statement.text} [{statement.evidence.join(', ')}]</Text>)}
-              </>}
-            </View>}
             <View style={styles.reportCard}>
               <Text style={styles.reportText} selectable>{activeDictation.generatedReport}</Text>
             </View>
@@ -1318,10 +1302,10 @@ export default function PatientDictationScreen() {
         {screenState === 'editing' && (
           <View style={styles.flex}>
             <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
-              <Text style={styles.editLabel}>What corrections should be made?</Text>
+              <Text style={styles.editLabel}>What would you like to change?</Text>
               <TextInput
                 style={styles.editInput}
-                placeholder="e.g., Change CPT 34802 to 34812, add drain details..."
+                placeholder="e.g., Shorten the indication, or change the blood loss to 15 mL..."
                 placeholderTextColor={colors.textTertiary}
                 value={editText}
                 onChangeText={setEditText}
@@ -1342,7 +1326,7 @@ export default function PatientDictationScreen() {
                 disabled={!editText.trim()}
               >
                 <Ionicons name="refresh" size={18} color={colors.textInverse} />
-                <Text style={styles.generateButtonText}>Regenerate</Text>
+                <Text style={styles.generateButtonText}>Apply AI edits</Text>
               </TouchableOpacity>
             </View>
           </View>

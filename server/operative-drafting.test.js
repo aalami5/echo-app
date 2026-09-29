@@ -71,3 +71,35 @@ test('OCR line wraps retain the exact source span without allowing changed clini
  assert.equal(validateFacts(one,wrapped).facts[0].quote,wrapped[0].text);
  assert.throws(()=>validateFacts({...one,facts:[{...one.facts[0],quote:'Flow-limiting dissection.'}]},wrapped));
 });
+
+test('draft-first composition bypasses analysis, excludes old cases and persists draft encrypted',async t=>{
+ const f=await fixture(t,[{report:'**Procedure:**\nLeft SFA angioplasty using a 6 mm balloon.'}]);
+ const r=await f.request('/compose',{caseId:'synthetic-compose',sources:[...sources,{id:'old',kind:'historical',text:'OLD PATIENT 8 mm stent'}],stylePreferences:[{section:'Description',preference:'Use paragraphs'}]});
+ assert.equal(r.status,200);assert.equal(f.requests.length,1);assert.equal(r.data.policyVersion,'draft-first-v3');
+ const input=JSON.parse(f.requests[0].messages[1].content);assert.equal(input.sources.length,1);assert.equal(input.stylePreferences[0].preference,'Use paragraphs');
+ assert.ok(!JSON.stringify(f.requests).includes('OLD PATIENT'));assert.deepEqual(r.data.confirmedSteps,[]);
+ const stored=fs.readFileSync(path.join(f.dir,'operative-drafting',r.data.sessionId+'.json'),'utf8');assert.ok(!stored.includes('Left SFA'));assert.ok(stored.includes('echo-clinical-aes256gcm-v1'));
+});
+test('AI editing receives the displayed draft including manual edits, not a reconstruction',async t=>{
+ const f=await fixture(t,[{report:'Retained surgeon addition. EBL 15 mL.'}]);
+ const previousReport='Retained surgeon addition. EBL 10 mL.';
+ const r=await f.request('/compose',{sources,previousReport,editInstructions:'Change EBL to 15 mL only.'});
+ assert.equal(r.status,200);assert.equal(f.requests.length,1);const input=JSON.parse(f.requests[0].messages[1].content);
+ assert.equal(input.previousReport,previousReport);assert.equal(input.editInstructions,'Change EBL to 15 mL only.');
+ assert.match(f.requests[0].messages[0].content,/Preserve its structure, wording and manual additions/);
+});
+test('composer rejects absent current notes, incomplete editing input, empty output and does not leak provider errors',async t=>{
+ const f=await fixture(t,[{report:''},new Error('private diagnostic')]);
+ assert.equal((await f.request('/compose',{sources:[{kind:'historical',text:'Old operation'}]})).status,422);
+ assert.equal((await f.request('/compose',{sources,previousReport:'draft'})).status,400);
+ assert.equal(f.requests.length,0);
+ assert.equal((await f.request('/compose',{sources})).status,422);
+ const r=await f.request('/compose',{sources});assert.equal(r.status,502);assert.ok(!JSON.stringify(r).includes('private diagnostic'));
+});
+test('draft-first jobs can reconnect to the saved result without another model call',async t=>{
+ const f=await fixture(t,[{report:'Synthetic draft'}]);const body={operation:'/compose',input:{sources},retry:true};
+ let r=await f.request('/jobs',body);const id=r.data.id;
+ for(let i=0;i<40&&r.data.status==='running';i++){await new Promise(resolve=>setTimeout(resolve,10));r=await f.request('/jobs/'+id);}
+ assert.equal(r.data.status,'completed');assert.equal(r.data.result.report,'Synthetic draft');
+ const repeat=await f.request('/jobs',body);assert.equal(repeat.data.id,id);assert.equal(f.requests.length,1);
+});

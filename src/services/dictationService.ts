@@ -1,22 +1,25 @@
-/** Shared report pipeline: current case evidence first, never historical defaults. */
+/** Draft first, then edit the displayed report. No historical-case comparison. */
 import type { GatewayService } from './gateway';
 import { useDictationStore, TranscriptPart } from '../stores/dictationStore';
-import { analyzeCase, extractCaseImages, operativeRequest, DraftResult } from './operativeDrafting';
+import { caseSources, extractCaseImages, operativeRequest, DraftResult, sourceFingerprint } from './operativeDrafting';
 
-type Options={caseId?:string;onSource?:(part:TranscriptPart)=>void;confirmedSteps?:DraftResult['confirmedSteps'];onResult?:(result:DraftResult)=>void};
-export async function generateReport(_gateway:GatewayService,parts:TranscriptPart[],selectedProcedures:string[],options:Options={}):Promise<string>{
-  const sources=await extractCaseImages(parts,options.onSource);
-  const analysis=await analyzeCase(options.caseId||'standalone',sources,selectedProcedures,useDictationStore.getState().customProcedures.map(p=>p.name));
-  const result=await operativeRequest<DraftResult>('/draft',{sessionId:analysis.id,confirmedSteps:options.confirmedSteps||[],stylePreferences:useDictationStore.getState().stylePreferences});
-  options.onResult?.(result);
+type Options={caseId?:string;onSource?:(part:TranscriptPart)=>void;onProgress?:(stage:string)=>void;getCurrentParts?:()=>TranscriptPart[];onResult?:(result:DraftResult,fingerprint:string)=>void};
+async function compose(parts:TranscriptPart[],selectedProcedures:string[],options:Options,previousReport?:string,editInstructions?:string):Promise<string>{
+  const sources=await extractCaseImages(parts,options.onSource,options.onProgress);
+  const fingerprint=sourceFingerprint(sources);
+  const result=await operativeRequest<DraftResult>('/compose',{caseId:options.caseId||'standalone',sources:caseSources(sources),selectedProcedures,previousReport,editInstructions,stylePreferences:useDictationStore.getState().stylePreferences},options.onProgress);
+  if(options.getCurrentParts&&sourceFingerprint(options.getCurrentParts())!==fingerprint)throw Error('Your notes changed while drafting. Generate again to include those changes; the existing report is unchanged.');
+  options.onResult?.(result,fingerprint);
   return result.report;
 }
-export async function regenerateWithCorrections(gateway:GatewayService,_previousReport:string,corrections:string,parts:TranscriptPart[],procedures:string[],options:Options={}):Promise<string>{
+export async function generateReport(_gateway:GatewayService,parts:TranscriptPart[],selectedProcedures:string[],options:Options={}):Promise<string>{
+  return compose(parts,selectedProcedures,options);
+}
+export async function regenerateWithCorrections(_gateway:GatewayService,previousReport:string,corrections:string,parts:TranscriptPart[],procedures:string[],options:Options={}):Promise<string>{
   const correction:TranscriptPart={id:`correction-${Date.now()}`,type:'text',sourceKind:'correction',content:corrections,timestamp:new Date().toISOString()};
-  // Persist the correction as evidence before calling the model. Previous generated
-  // prose is never promoted to a source for a subsequent draft.
+  const updatedParts=[...parts,correction];
   options.onSource?.(correction);
-  return generateReport(gateway,[...parts,correction],procedures,options);
+  return compose(updatedParts,procedures,options,previousReport,corrections);
 }
 export function buildEmailMessage(report:string,_procedures:string[]):string{
   return `Please email the following operative report to aalami@gmail.com, Oliver.Aalami@sutterhealth.org, and Rajka.Campbell@sutterhealth.org with subject 'Operative Report - ${new Date().toLocaleDateString('en-US')}':\n\n${report}`;

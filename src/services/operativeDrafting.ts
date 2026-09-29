@@ -36,7 +36,7 @@ async function transport<T>(path:string,body?:unknown):Promise<T>{
   throw Error('Reconnect Echo in Settings and try again.');
 }
 export async function operativeRequest<T>(path:string,body?:unknown,onProgress?:Progress):Promise<T>{
-  if(body===undefined||!['/ocr','/analyze','/draft','/profiles/suggest'].includes(path))return transport<T>(path,body);
+  if(body===undefined||!['/ocr','/analyze','/draft','/compose','/profiles/suggest'].includes(path))return transport<T>(path,body);
   type Job={id:string;status:'running'|'completed'|'failed';stage:string;result?:T;error?:string};
   let job=await transport<Job>('/jobs',{operation:path,input:body,retry:true});
   const started=Date.now();

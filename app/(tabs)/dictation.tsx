@@ -1,4 +1,4 @@
-import { BriefReportBuilder } from '../../src/components/BriefReportBuilder';
+import type { TranscriptPart } from '../../src/stores/dictationStore';
 import { sourceFingerprint } from '../../src/services/operativeDrafting';
 import { ReportEmailStatus } from '../../src/components/ReportEmailStatus';
 import { useEmailReceiptsStore } from '../../src/stores/emailReceiptsStore';
@@ -221,13 +221,23 @@ export default function DictationScreen() {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   };
 
+  const persistCaseSource = (part: TranscriptPart) => useDictationStore.setState(state=>({transcriptParts:state.transcriptParts.some(p=>p.id===part.id)?state.transcriptParts.map(p=>p.id===part.id?part:p):[...state.transcriptParts,part]}));
+  const composeOptions = (previousReport: string | null) => ({
+    caseId:useDictationStore.getState().reportId,onSource:persistCaseSource,
+    getCurrentParts:()=>useDictationStore.getState().transcriptParts,
+    onResult:(r:import('../../src/services/operativeDrafting').DraftResult,fingerprint:string)=>{
+      if(useDictationStore.getState().generatedReport!==previousReport)throw Error('The report changed while drafting. Your changes were preserved; please try again.');
+      useDictationStore.setState({reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,review:[],statements:[],confirmedSteps:[]}});
+    }
+  });
+
   // ─── Generate Report ───
   const handleGenerate = async () => {
     const gw = getGateway();
     if (!gw) return;
     setIsGenerating(true);
     try {
-      const report = await generateReport(gw, transcriptParts, selectedProcedures);
+      const report = await generateReport(gw, transcriptParts, selectedProcedures, composeOptions(generatedReport));
       setGeneratedReport(report);
     } catch (e: any) {
       console.error('[Dictation] Generate failed', e);
@@ -294,7 +304,7 @@ export default function DictationScreen() {
         },
       },
       {
-        text: 'Regenerate with AI',
+        text: 'Edit with AI',
         onPress: () => {
           setEditText('');
           setScreenState('editing');
@@ -319,7 +329,7 @@ export default function DictationScreen() {
     setIsGenerating(true);
     try {
       const report = await regenerateWithCorrections(
-        gw, generatedReport, editText.trim(), transcriptParts, selectedProcedures, {confirmedSteps:useDictationStore.getState().reportReview?.confirmedSteps,onResult:r=>useDictationStore.setState({reportReview:{facts:r.facts,sourceFingerprint:sourceFingerprint(useDictationStore.getState().transcriptParts),sessionId:r.sessionId,policyVersion:r.policyVersion,review:r.review,statements:r.statements,confirmedSteps:r.confirmedSteps}}),onSource:(part)=>useDictationStore.setState(state=>({transcriptParts:state.transcriptParts.some(p=>p.id===part.id)?state.transcriptParts.map(p=>p.id===part.id?part:p):[...state.transcriptParts,part]}))},
+        gw, generatedReport, editText.trim(), transcriptParts, selectedProcedures, composeOptions(generatedReport),
       );
       setGeneratedReport(report);
     } catch (e: any) {
@@ -601,13 +611,9 @@ export default function DictationScreen() {
 
             {/* Generate button — directly after transcript entries */}
             {transcriptParts.length > 0 && (
-              <BriefReportBuilder caseId={useDictationStore.getState().reportId} parts={transcriptParts} procedures={selectedProcedures}
-                onSource={(part) => useDictationStore.setState(state => ({transcriptParts:state.transcriptParts.some(p=>p.id===part.id)?state.transcriptParts.map(p=>p.id===part.id?part:p):[...state.transcriptParts,part]}))}
-                onComplete={(result, procedures, fingerprint) => {
-                  if (sourceFingerprint(useDictationStore.getState().transcriptParts)!==fingerprint) throw new Error('Case notes changed. Please reanalyze.');
-                  useDictationStore.setState({generatedReport:result.report,selectedProcedures:procedures,reportReview:{facts:result.facts,sourceFingerprint:fingerprint,sessionId:result.sessionId,policyVersion:result.policyVersion,review:result.review,statements:result.statements,confirmedSteps:result.confirmedSteps}});
-                  setScreenState('review');
-                }} />
+              <TouchableOpacity style={styles.generateButton} onPress={handleGenerate} disabled={isGenerating} accessibilityRole="button">
+                <Text style={styles.generateButtonText}>Generate draft</Text>
+              </TouchableOpacity>
             )}
 
             {/* Procedure tags */}
@@ -655,7 +661,7 @@ export default function DictationScreen() {
           <View style={styles.generatingContainer}>
             <Avatar state="thinking" size={80} />
             <Text style={styles.generatingText}>Generating operative report...</Text>
-            <Text style={styles.generatingSubtext}>Using your case sources and checking the draft...</Text>
+            <Text style={styles.generatingSubtext}>Reading your pictures and writing your draft...</Text>
             <ActivityIndicator color={colors.primary} style={{ marginTop: spacing.md }} />
           </View>
         )}
@@ -736,10 +742,10 @@ export default function DictationScreen() {
         {screenState === 'editing' && (
           <View style={styles.flex}>
             <ScrollView style={styles.flex} contentContainerStyle={styles.scrollContent}>
-              <Text style={styles.editLabel}>What corrections should be made?</Text>
+              <Text style={styles.editLabel}>What would you like to change?</Text>
               <TextInput
                 style={styles.editInput}
-                placeholder="e.g., Change CPT 34802 to 34812, add drain details..."
+                placeholder="e.g., Shorten the indication, or change the blood loss to 15 mL..."
                 placeholderTextColor={colors.textTertiary}
                 value={editText}
                 onChangeText={setEditText}
@@ -760,7 +766,7 @@ export default function DictationScreen() {
                 disabled={!editText.trim()}
               >
                 <Ionicons name="refresh" size={18} color={colors.textInverse} />
-                <Text style={styles.generateButtonText}>Regenerate</Text>
+                <Text style={styles.generateButtonText}>Apply AI edits</Text>
               </TouchableOpacity>
             </View>
           </View>
