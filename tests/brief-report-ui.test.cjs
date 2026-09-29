@@ -1,13 +1,13 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),ts=require('typescript'),Module=require('node:module'),fs=require('node:fs');
 const React=require('react'),{create,act}=require('react-test-renderer');global.IS_REACT_ACT_ENVIRONMENT=true;
-let requests=[],analysisCalls=[],extracted=[],completions=[],failAnalyze=false,alerts=[];
+let requests=[],analysisCalls=[],extracted=[],completions=[],failAnalyze=false,unapproved=false,alerts=[];
 const store={savedExamples:[],customProcedures:[],stylePreferences:[]};
 const ds=selector=>selector(store);ds.getState=()=>store;
 const fingerprint=parts=>JSON.stringify(parts.map(p=>[p.id,p.type,p.content,p.timestamp,p.sourceKind]));
 const model={
  sourceFingerprint:fingerprint,
  extractCaseImages:async(parts,cb)=>parts.map(p=>{if(p.type==='image'&&!p.ocrText){const v={...p,ocrText:'Left AV fistula. EBL 10 mL.',ocrWarnings:[]};cb(v);extracted.push(v);return v;}return p;}),
- analyzeCase:async(id,parts)=>{analysisCalls.push(parts);if(failAnalyze)throw Error('OCR unreadable');return {id:'session',facts:[{id:'f1',field:'procedure',value:'Left AV fistula',quote:'Left AV fistula.'}],procedures:['AV Fistula Creation'],review:[],suggestions:[{procedure:'AV Fistula Creation',profileId:'p1',version:1,origin:'Your approved technique',steps:['Usual exposure','End-to-side anastomosis']}]}},
+ analyzeCase:async(id,parts)=>{analysisCalls.push(parts);if(failAnalyze)throw Error('OCR unreadable');return {id:'session',facts:[{id:'f1',field:'procedure',value:'Left AV fistula',quote:'Left AV fistula.'}],procedures:['AV Fistula Creation'],review:[],suggestions:[{procedure:'AV Fistula Creation',profileId:unapproved?null:'p1',version:1,origin:'Your approved technique',steps:['Usual exposure','End-to-side anastomosis']}]}},
  operativeRequest:async(path,body)=>{requests.push({path,body});if(path==='/draft')return {report:'Draft',review:[],facts:[],statements:[],confirmedSteps:body.confirmedSteps,sessionId:'session',policyVersion:'test'};if(path==='/profiles/suggest')return {steps:['Proposed reusable step']};if(path==='/profiles')return {id:'p1',version:2};},
 };
 const original=Module._load;Module._load=function(id,...args){
@@ -36,4 +36,9 @@ test('failed extraction cannot generate silently; explicit retry available',asyn
 });
 test('saving a reusable profile requires separate explicit approval and never confirms the current case',async()=>{
  const tree=await mount();await press(tree,'Brief note');await press(tree,'Save as my usual');assert.equal(requests.length,0);await act(async()=>alerts.at(-1)[2].find(a=>a.text==='Approve & save').onPress());assert.equal(requests[0].body.approved,true);assert.equal(requests[0].body.expectedVersion,1);await press(tree,'Generate full draft');assert.deepEqual(requests.at(-1).body.confirmedSteps,[]);await act(async()=>tree.unmount());
+});
+
+test('matching saved examples never add hidden model calls to the analysis critical path',async()=>{
+ unapproved=true;store.savedExamples=[{id:'saved',procedureType:'AV Fistula Creation',report:'old case report',timestamp:'today'}];
+ const tree=await mount();await press(tree,'Brief note');assert.ok(!requests.some(r=>r.path==='/profiles/suggest'));assert.ok(tree.root.findAllByType('TouchableOpacity').some(n=>label(n)==='Generate full draft'));await act(async()=>tree.unmount());unapproved=false;store.savedExamples=[];
 });

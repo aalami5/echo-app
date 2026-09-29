@@ -14,11 +14,22 @@ const cases=[
  {name:'contradictory-side',note:'Synthetic case. Procedure heading: right carotid endarterectomy. Body: the left carotid artery was exposed and endarterectomy performed.',want:/endarterectomy/i,mustReview:true},
 ];
 (async()=>{const server=app.listen(0,'127.0.0.1');await new Promise(r=>server.once('listening',r));
- async function call(p,b){const r=await fetch(`http://127.0.0.1:${server.address().port}/patients/operative${p}`,{method:'POST',headers:{Authorization:'Bearer synthetic-only','Content-Type':'application/json'},body:JSON.stringify(b)});const j=await r.json();if(!r.ok)throw Error(`${p} ${r.status}: ${j.error}`);return j;}
- let failed=0;
+ async function request(p,b){const r=await fetch(`http://127.0.0.1:${server.address().port}/patients/operative${p}`,{method:b===undefined?'GET':'POST',headers:{Authorization:'Bearer synthetic-only','Content-Type':'application/json'},body:b===undefined?undefined:JSON.stringify(b)});const j=await r.json();if(!r.ok)throw Error(`${p} ${r.status}: ${j.error}`);return j;}
+ async function call(p,b){
+  if(!process.env.USE_JOBS)return request(p,b);
+  const input={operation:p,input:b,retry:true};const start=Date.now();
+  let j=await request('/jobs',input);const initialId=j.id;
+  while(j.status==='running'){if(Date.now()-start>110000)throw Error('Job deadline');await new Promise(r=>setTimeout(r,250));j=await request('/jobs/'+j.id);}
+  if(j.status!=='completed')throw Error(j.error||'Incomplete job');
+  const again=await request('/jobs',input);assert.equal(again.id,initialId);assert.deepEqual(again.result,j.result);
+  return j.result;
+ }
+
+ let failed=0;const timings=[];
  try{
   // Two at a time: realistic latency without saturating the provider.
-  for(let start=0;start<cases.length;start+=2){await Promise.all(cases.slice(start,start+2).map(async c=>{const begun=Date.now();try{
+  const selected=process.env.CASE_FILTER?cases.filter(c=>c.name.includes(process.env.CASE_FILTER)):cases;
+  for(let start=0;start<selected.length;start+=2){await Promise.all(selected.slice(start,start+2).map(async c=>{const begun=Date.now();try{
    const a=await call('/analyze',{caseId:`synthetic-${c.name}`,sources:[{id:'note',kind:'text',text:c.note}],customProcedures:['Custom adjunct superficial wound swab for culture']});
    assert.match(a.procedures.join(' '),c.want);
    const d=await call('/draft',{sessionId:a.id,confirmedSteps:c.steps||[]});
@@ -27,16 +38,16 @@ const cases=[
    if(c.forbid)assert.doesNotMatch(narrative,c.forbid);
    if(c.mustReview)assert.ok(d.review.some(r=>/right|left|laterality|side|conflict/i.test(r)));
    fs.writeFileSync(path.join(dir,c.name+'.output.json'),JSON.stringify({analysis:a,draft:d},null,2),{mode:0o600});
-   console.log(JSON.stringify({case:c.name,status:'passed',facts:a.facts.length,statements:d.statements.length,reviewItems:d.review.length,seconds:Math.round((Date.now()-begun)/1000)}));
+   timings.push(Date.now()-begun);console.log(JSON.stringify({case:c.name,status:'passed',facts:a.facts.length,statements:d.statements.length,reviewItems:d.review.length,seconds:Math.round((Date.now()-begun)/1000)}));
   }catch(e){failed++;console.log(JSON.stringify({case:c.name,status:'FAILED',error:e.message}));}}));}
-  if(fs.existsSync('/tmp/echo-brief-note-synthetic.png')) {
+  if(!process.env.CASE_FILTER && fs.existsSync('/tmp/echo-brief-note-synthetic.png')) {
    try {
-    const ocr=await call('/ocr',{imageBase64:fs.readFileSync('/tmp/echo-brief-note-synthetic.png').toString('base64'),mimeType:'image/png'});
+    const begun=Date.now();const ocr=await call('/ocr',{imageBase64:fs.readFileSync('/tmp/echo-brief-note-synthetic.png').toString('base64'),mimeType:'image/png'});
     assert.match(ocr.text,/7 Fr/);assert.match(ocr.text,/0\.018/);assert.match(ocr.text,/5 x 100 mm/);assert.match(ocr.text,/no stent/i);
     const a=await call('/analyze',{caseId:'synthetic-ocr',sources:[{id:'screenshot',kind:'ocr',text:ocr.text,warnings:ocr.warnings}]});
     const d=await call('/draft',{sessionId:a.id,confirmedSteps:[]});assert.match(d.report,/7 Fr/);assert.match(d.report,/0\.018/);assert.match(d.report,/no stent/i);assert.ok(d.statements.length>=5);
-    console.log(JSON.stringify({case:'screenshot-end-to-end',status:'passed',facts:a.facts.length,statements:d.statements.length,reviewItems:d.review.length}));
+    console.log(JSON.stringify({case:'screenshot-end-to-end',status:'passed',seconds:(Date.now()-begun)/1000,facts:a.facts.length,statements:d.statements.length,reviewItems:d.review.length}));
    }catch(e){failed++;console.log(JSON.stringify({case:'screenshot-end-to-end',status:'FAILED',error:e.message}));}
   }
- }finally{server.closeAllConnections();server.close();console.log(JSON.stringify({syntheticArtifactDirectory:dir,failed}));process.exitCode=failed?1:0;}
+ }finally{server.closeAllConnections();server.close();console.log(JSON.stringify({syntheticArtifactDirectory:dir,failed,timingsMs:timings}));process.exitCode=failed?1:0;}
 })();

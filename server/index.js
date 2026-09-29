@@ -515,6 +515,16 @@ const buildCompactPushCard = (card) => {
 
 // Middleware
 app.use(cors());
+// Operational timing only: never log patient identifiers, notes, query strings or credentials.
+app.use('/patients/operative', (req,res,next)=>{
+  const started=Date.now();let finished=false;
+  const route=req.path.startsWith('/jobs/')?'/jobs/:id':
+    ['/jobs','/analyze','/draft','/ocr','/catalog','/profiles','/profiles/suggest'].includes(req.path)?req.path:'/other';
+  const record=outcome=>console.info('[OperativeHTTP]',JSON.stringify({at:new Date().toISOString(),route,method:req.method,outcome,status:res.statusCode,elapsedMs:Date.now()-started}));
+  res.on('finish',()=>{finished=true;record('response');});
+  res.on('close',()=>{if(!finished)record('disconnected');});
+  next();
+});
 require('./clinical-media').installClinicalMedia(app, { apiKey: OPENAI_API_KEY, authToken: AUTH_TOKEN });
 app.use(['/voice/realtime/session', '/patients/voice/realtime/session'], express.text({
   type: ['application/sdp', 'text/plain'],

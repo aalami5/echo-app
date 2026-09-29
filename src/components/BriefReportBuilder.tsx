@@ -12,25 +12,13 @@ export function BriefReportBuilder({caseId,parts,procedures,onSource,onComplete}
  const fingerprint=useRef('');const run=useRef(false);
  const savedExamples=useDictationStore(s=>s.savedExamples);
  const guarded=async(label:string,fn:()=>Promise<void>)=>{if(run.current)return;run.current=true;setBusy(label);setError('');try{await fn();}catch(e:any){setError(e.message||'Unable to continue. Your notes are saved.');}finally{run.current=false;setBusy('');}};
+ const progress=(stage:string)=>setBusy(stage.startsWith('ocr:')?`Reading screenshots — ${stage.slice(4)} completed…`:({starting:'Connecting to report service…',ocr:'Reading screenshot text…',analysis:'Matching procedures and case facts…',writing:'Writing your operative report…',checking:'Checking the report against your note…',technique:'Preparing the selected technique…'} as Record<string,string>)[stage]||'Processing your report…');
  const analyze=async(current:TranscriptPart[])=>{
-   const extracted=await extractCaseImages(current,onSource);setSources(extracted);
-   const result=await analyzeCase(caseId,extracted,procedures,useDictationStore.getState().customProcedures.map(p=>p.name));
-   // Saved examples propose reusable technique only; they never supply case facts.
-   const suggestions=[...result.suggestions];
-   const examples=useDictationStore.getState().savedExamples;
-   for(let i=0;i<suggestions.length;i++) {
-     const t=suggestions[i];
-     if(t.profileId) continue;
-     const words=(v:string)=>v.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>2);
-     const target=words(t.procedure);
-     const match=examples.map(e=>({e,score:target.filter(w=>words(e.procedureType).includes(w)).length/Math.max(1,target.length)})).filter(x=>x.score>=0.75).sort((a,b)=>b.score-a.score||b.e.timestamp.localeCompare(a.e.timestamp))[0];
-     if(match) {
-       try {
-         const proposal=await operativeRequest<{steps:string[]}>('/profiles/suggest',{procedure:t.procedure,report:match.e.report});
-         suggestions[i]={...t,steps:proposal.steps,origin:'Proposed from your saved example — review before using'};
-       } catch { /* Explicit manual example selection remains available for retry. */ }
-     }
-   }
+   setSources(current);
+   const extracted=await extractCaseImages(current,part=>{onSource(part);setSources(saved=>saved.map(p=>p.id===part.id?part:p));},progress);setSources(extracted);
+   const result=await analyzeCase(caseId,extracted,procedures,useDictationStore.getState().customProcedures.map(p=>p.name),progress);
+   // Saved-example proposals remain explicitly available, but never block case analysis.
+   const suggestions=result.suggestions;
    setAnalysis(result);setTechniques(suggestions);setConfirmed({});fingerprint.current=sourceFingerprint(extracted);
  };
  const open=()=>{setVisible(true);setAnalysis(null);setCorrection('');setShowFacts(false);setShowSources(false);setExampleFor(null);guarded('Reading your case note…',()=>analyze(parts));};
@@ -48,14 +36,14 @@ export function BriefReportBuilder({caseId,parts,procedures,onSource,onComplete}
    })}]);
  };
  const useExample=(index:number,report:string)=>guarded('Preparing a reusable technique proposal…',async()=>{
-   const r=await operativeRequest<{steps:string[]}>('/profiles/suggest',{procedure:techniques[index].procedure,report});
+   const r=await operativeRequest<{steps:string[]}>('/profiles/suggest',{procedure:techniques[index].procedure,report},progress);
    setTechniques(ts=>ts.map((t,i)=>i===index?{...t,steps:r.steps}:t));setConfirmed(c=>({...c,[index]:false}));setExampleFor(null);
  });
  const generate=()=>guarded('Writing and checking source support…',async()=>{
    if(!analysis)return;
    if(correction.trim())throw Error('Apply your clarification before generating so it is included.');
    const steps=techniques.flatMap((t,i)=>confirmed[i]?t.steps.filter(s=>s.trim()).map(text=>({text,procedure:t.procedure,profileId:t.profileId,version:t.version})):[]);
-   const result=await operativeRequest<DraftResult>('/draft',{sessionId:analysis.id,confirmedSteps:steps,stylePreferences:useDictationStore.getState().stylePreferences});
+   const result=await operativeRequest<DraftResult>('/draft',{sessionId:analysis.id,confirmedSteps:steps,stylePreferences:useDictationStore.getState().stylePreferences},progress);
    onComplete(result,analysis.procedures,fingerprint.current);setVisible(false);
  });
  const button=(label:string,fn:()=>void,secondary=false)=><TouchableOpacity accessibilityRole="button" disabled={!!busy} onPress={fn} style={[s.button,secondary&&s.secondary,!!busy&&{opacity:.5}]}><Text style={s.buttonText}>{label}</Text></TouchableOpacity>;
@@ -66,7 +54,7 @@ export function BriefReportBuilder({caseId,parts,procedures,onSource,onComplete}
    <SafeAreaView style={s.screen}><View style={s.top}><Text style={s.title}>Build operative report</Text>{button('Close',()=>setVisible(false),true)}</View>
     <ScrollView contentContainerStyle={s.body} keyboardShouldPersistTaps="handled">
      <Text style={s.text}>Your current case note takes precedence over every template. Confirm routine steps only if they applied to this operation.</Text>
-     {!!busy&&<View style={s.card}><ActivityIndicator color="#4cc7c4"/><Text style={s.text}>{busy}</Text><Text style={s.hint}>Your case sources are retained. Keep this screen open.</Text></View>}
+     {!!busy&&<View style={s.card}><ActivityIndicator color="#4cc7c4"/><Text style={s.text}>{busy}</Text><Text style={s.hint}>Your notes are saved. If the connection drops, retry reconnects to the same job.</Text></View>}
      {!!error&&<View style={s.card}><Text accessibilityRole="alert" style={s.error}>{error}</Text>{!analysis&&button('Retry analysis',()=>guarded('Reading your note…',()=>analyze(sources.length?sources:parts)))}</View>}
      {analysis&&<>
       <View style={s.card}><Text style={s.title}>Procedure match</Text><Text style={s.text}>{analysis.procedures.join(' + ')||'Not identified—clarify below'}</Text><Text style={s.hint}>Wrong or missing procedure? Add one clarification below; multiple procedures are supported.</Text></View>
