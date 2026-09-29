@@ -21,3 +21,10 @@ Oliver rejected the mandatory analysis, historical-case comparisons and techniqu
 ## Deployment and rollback
 
 Restart only com.echo.patient-sync with the existing environment/encryption key. Build 80 requires /compose; keep that route when older clients remain. Native update is necessary to remove the old UI. Install TestFlight update in place; do not delete the app (unextracted images are device-local). Phone acceptance remains distinct from automated/synthetic checks.
+
+## Deployed acceptance checks
+
+- Public authenticated job flow: three short synthetic pictures → report 7.606 seconds; subsequent targeted edit 2.428 seconds (total 10.034). Detailed three-picture cold flow with final policy v3.1 → report 17.615 seconds; subsequent targeted edit 6.791 seconds (total 24.406). Full meaningful measurements/negation checked; previous-case values excluded; unrelated manually inserted follow-up retained. Retries returned the same job/result and anonymous access was rejected.
+- Manual narrative review caught undocumented positioning/prep boilerplate in one early synthetic draft. Tightened the direct prompt explicitly (no extra call or checklist) and expanded live checks; all six synthetic cases passed again, including the routine-boilerplate negative check. No claim that a small synthetic suite guarantees clinical correctness.
+- SHA-256 hashes for patients.json, dictations.json and operative-email-receipts.json remained unchanged through final deployment and smoke tests. No report finalized or emailed. Auth, encryption keys and unrelated services unchanged.
+- Initial Build 80 attempt a6de6fe7-d4fa-4bd7-b71d-55246fc456c3 canceled before upload to include a legacy standalone-screen error-return fix. Replacement native build: 2b13a6b8-2919-4982-bbd4-e3523ecf537f (source 05f8a4a); submission fea7a60e-ec9d-4385-a523-663c04974056. Final artifact/upload verification pending.
