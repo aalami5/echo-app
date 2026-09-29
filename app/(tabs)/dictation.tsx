@@ -1,5 +1,4 @@
 import type { TranscriptPart } from '../../src/stores/dictationStore';
-import { sourceFingerprint } from '../../src/services/operativeDrafting';
 import { ReportEmailStatus } from '../../src/components/ReportEmailStatus';
 import { useEmailReceiptsStore } from '../../src/stores/emailReceiptsStore';
 import { emailReceiptStatus } from '../../src/utils/emailReceiptStatus';
@@ -111,6 +110,8 @@ export default function DictationScreen() {
       setScreenState('review');
       // Scroll to top when report loads
       setTimeout(() => reviewScrollRef.current?.scrollTo({ y: 0, animated: true }), 100);
+    } else {
+      setScreenState(current => current === 'generating' ? 'input' : current);
     }
   }, [isGenerating, generatedReport]);
 
