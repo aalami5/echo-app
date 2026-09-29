@@ -15,12 +15,21 @@ const COMMON_POLICY = `You draft operative reports for surgeon review, not clini
 Today's brief operative note (typed, dictated or OCR) is definitive case evidence, NOT merely a style example. ALL clear facts in that note are already confirmed and need NO additional confirmation. For example 'EBL 10 mL; no complications' directly supports both statements without any technique confirmation. An explicit current-case correction supersedes earlier source text on that point. Conflicts not explicitly corrected must be flagged, not guessed. Omitted facts stay unknown. Prior reports are NEVER evidence for this case.
 For details ABSENT from the case note, use routine technique ONLY from the exact step text explicitly confirmed for this case. This limitation never disqualifies facts directly in the note. Current case details and exceptions override any routine technique. Never infer laterality, implants, dimensions, doses, outcomes, ultrasound/image retention, assistant, specimens, drains, Foley, complications or blood loss from silence. Do not convert unconfirmed steps into generic assertions either. No codes unless independently verified; this pipeline does not do coding. No patient data from previous examples. Return JSON only.`;
 
+function sourceQuote(source,quote){
+  if(source.includes(quote))return quote;
+  // OCR line wrapping is formatting, not a fact change. Return the original
+  // source span; never accept changed words, punctuation, numbers or negation.
+  const pattern=quote.split(/\s+/).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&').replace(/-(?=[A-Za-z])/g,'-\\s*')).join('\\s+');
+  return source.match(new RegExp(pattern))?.[0]||null;
+}
+
 function validateFacts(result,sources){
   if(!Array.isArray(result.facts)||!Array.isArray(result.procedures)||!Array.isArray(result.review))throw fail('Case extraction was incomplete. Please try again.');
   const facts=result.facts.map((f,i)=>{
     const source=sources.find(s=>s.id===f.sourceId);
-    const quote=text(f.quote,8000);
-    if(!source||!quote||!source.text.includes(quote))throw fail('A case detail could not be traced to your note. Please review the source and retry.');
+    const proposed=text(f.quote,8000);
+    const quote=source&&proposed?sourceQuote(source.text,proposed):null;
+    if(!quote)throw fail('A case detail could not be traced to your note. Please review the source and retry.');
     return {id:`f${i+1}`,field:text(f.field,100),value:text(f.value,8000),sourceId:source.id,quote};
   });
   return {facts,procedures:[...new Set(result.procedures.map(p=>text(p,160)).filter(Boolean))],review:result.review.map(v=>text(v,2000)).filter(Boolean)};
@@ -107,7 +116,7 @@ function installOperativeDrafting(app,{apiKey,authToken,dataDir,fetchImpl=fetch,
     if(!sources.some(s=>s.kind!=='header'&&s.text))throw fail('Add today’s brief operative note. A previous report alone is not current-case evidence.');
     if(sources.reduce((n,s)=>n+s.text.length,0)>90000)throw fail('Case notes are too long. Please separate unrelated cases.',413);
     const custom=Array.isArray(input.customProcedures)?input.customProcedures.slice(0,200).map(p=>text(p,160)):[];
-    const result=await jsonModel(COMMON_POLICY+`\nExtract ALL operative facts and classify all procedures and adjuncts, including mixed cases, not just one. Every fact must have a verbatim contiguous quote from a supplied source and that sourceId. Do not summarize away technical details. Recognize explicit corrections and exclude superseded facts. Catalog and selected procedure tags are hints, NOT evidence. Prefer exact catalog names, but support procedures absent from catalog. Ignore header-derived operation date when contradicted by the note and flag mismatch. Flag conflicting patient identifiers, dates, sides, dimensions; unreadable or uncertain data; essential missing procedure/target, indication, completion result, or complications as ONE concise grouped question if needed. Do not request optional routine details (assistant, Foley, drains, imaging retention, procedure duration, brand) simply because omitted; omit those fields. Never include observations about what IS documented in review. Do not ask for anything already documented. Do not ask for laterality of inherently midline anatomy such as an IVC filter; use the documented access side. Return {procedures:string[],facts:[{field,value,sourceId,quote}],review:string[]}.`,{sources,catalog:catalog.map(p=>p.name),customProcedures:custom,selectedProcedures:input.selectedProcedures||[]});
+    const result=await jsonModel(COMMON_POLICY+`\nExtract ALL operative facts and classify all procedures and adjuncts, including mixed cases, not just one. Every fact must have a verbatim contiguous quote from a supplied source and that sourceId. Use the shortest source span that supports the full fact with its negation and context; avoid quoting entire paragraphs or repeating a long sentence for multiple independent facts. Do not summarize away technical details. Recognize explicit corrections and exclude superseded facts. Catalog and selected procedure tags are hints, NOT evidence. Prefer exact catalog names, but support procedures absent from catalog. Ignore header-derived operation date when contradicted by the note and flag mismatch. Flag conflicting patient identifiers, dates, sides, dimensions; unreadable or uncertain data; essential missing procedure/target, indication, completion result, or complications as ONE concise grouped question if needed. Do not request optional routine details (assistant, Foley, drains, imaging retention, procedure duration, brand) simply because omitted; omit those fields. Never include observations about what IS documented in review. Do not ask for anything already documented. Do not ask for laterality of inherently midline anatomy such as an IVC filter; use the documented access side. Return {procedures:string[],facts:[{field,value,sourceId,quote}],review:string[]}.`,{sources,catalog:catalog.map(p=>p.name),customProcedures:custom,selectedProcedures:input.selectedProcedures||[]});
     const parsed=validateFacts(result,sources);
     parsed.procedures=[...new Set(parsed.procedures.map(name=>catalog.find(p=>normalize(p.name)===normalize(name))?.canonicalName||name))];
     // Complications are never silently defaulted. Ask once if extraction lacks it.

@@ -60,3 +60,14 @@ test('OCR failure never disappears silently; source warnings remain reviewable; 
 test('rendering omits unknown optional sections instead of asserting default negatives',()=>{
  const r=renderReport('',[{section:'Procedure',text:'AV fistula creation',evidence:['f1']}],['Confirm completion findings.']);assert.ok(!r.includes('None'));assert.ok(!r.includes('No Foley'));assert.ok(r.includes('Open Items'));
 });
+test('OCR line wraps retain the exact source span without allowing changed clinical facts',()=>{
+ const source=[{id:'note',text:'Left SFA angioplasty\nusing a 6 mm balloon.\nNo complications.'}];
+ const data={...extract,facts:extract.facts.slice(0,1)};
+ const parsed=validateFacts(data,source);assert.equal(parsed.facts[0].quote,'Left SFA angioplasty\nusing a 6 mm balloon.');
+ assert.throws(()=>validateFacts({...data,facts:[{...data.facts[0],quote:'Left SFA angioplasty using a 7 mm balloon.'}]},source));
+ assert.throws(()=>validateFacts({...data,facts:[{...data.facts[0],quote:'Right SFA angioplasty using a 6 mm balloon.'}]},source));
+ const wrapped=[{id:'note',text:'No flow-\nlimiting dissection.'}];
+ const one={...data,facts:[{field:'completion',value:'No dissection',sourceId:'note',quote:'No flow-limiting dissection.'}]};
+ assert.equal(validateFacts(one,wrapped).facts[0].quote,wrapped[0].text);
+ assert.throws(()=>validateFacts({...one,facts:[{...one.facts[0],quote:'Flow-limiting dissection.'}]},wrapped));
+});
