@@ -16,3 +16,8 @@ Oliver requested removal of inline `Suggested` labels because they disrupt opera
 - TypeScript and iOS production export passed.
 - 52 focused automated tests passed, including metadata separation, source uncertainty preservation, legacy formatting, manual-edit protection, AI-edit provenance, review-only component rendering, encrypted jobs and recovery.
 - Native build/submission and phone acceptance recorded below when complete. Update in place; never uninstall while device-local source images may be present.
+
+## Release progress
+
+- Additional restoration/email-receipt checks passed (11): routine-default metadata survives restore alongside report text; existing send history/deduplication remains intact. These were local synthetic tests, with a fake mail command—no emails sent.
+- Build 81: `4440b28b-99da-4b64-8b1f-4bf08ce7ca55`, source `412671b`, with auto-submission `2846a174-d1f4-4d07-8841-1af44bc2f7d0`. Build queued; artifact/Apple delivery not yet verified at this checkpoint.

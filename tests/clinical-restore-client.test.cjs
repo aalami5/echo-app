@@ -15,12 +15,12 @@ const {usePatientsStore:patients}=require('../src/stores/patientsStore.ts');
 const {usePatientDictationsStore:reports}=require('../src/stores/patientDictationsStore.ts');
 const {restoreClinicalData,useClinicalRestoreStatus}=require('../src/services/clinicalRestore.ts');
 const remote={patients:{remote:{id:'remote',name:'Synthetic Remote',mrn:'TEST',callDayId:'day',hospital:'OTHER',dob:'',room:'',chiefComplaint:'',timeSeen:'2026-09-19T12:00:00Z'}},callDays:{day:{id:'day',date:'2026-09-19',displayDate:'Sep 19, 2026',dayOfWeek:'Saturday',patientIds:['remote']}},callDayOrder:['day']};
-const remoteReports={dictations:{report:{id:'report',patientId:'remote',status:'draft',transcriptParts:[],generatedReport:'Synthetic draft',createdAt:'2026-09-19',updatedAt:'2026-09-19',selectedProcedures:[],dateOfOperation:'2026-09-19'}}};
+const remoteReports={dictations:{report:{id:'report',patientId:'remote',status:'draft',transcriptParts:[],generatedReport:'Synthetic draft',reportReview:{sessionId:'synthetic',policyVersion:'draft-first-v3.2',routineDefaults:[{section:'Complications',text:'None.'}],review:[],statements:[],confirmedSteps:[]},createdAt:'2026-09-19',updatedAt:'2026-09-19',selectedProcedures:[],dateOfOperation:'2026-09-19'}}};
 
 test('fresh install restores patients and draft/final history, persists locally, no upload needed',async()=>{
  await patients.persist.rehydrate();await reports.persist.rehydrate();
  const calls=[];global.fetch=async(url,options)=>{calls.push(options.method||'GET');return {ok:true,json:async()=>url.includes('dictations')?remoteReports:remote};};
- await restoreClinicalData();assert.equal(patients.getState().patients.remote.name,'Synthetic Remote');assert.equal(reports.getState().dictations.report.status,'draft');
+ await restoreClinicalData();assert.equal(patients.getState().patients.remote.name,'Synthetic Remote');assert.equal(reports.getState().dictations.report.status,'draft');assert.deepEqual(reports.getState().dictations.report.reportReview.routineDefaults,[{section:'Complications',text:'None.'}]);
  await new Promise(r=>setImmediate(r));
  assert.match(values.get('echo-patients'),/Synthetic Remote/);assert.match(values.get('patient-dictations-store'),/Synthetic draft/);assert.deepEqual(calls,['GET','GET']);
 });
