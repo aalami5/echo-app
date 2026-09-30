@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** September 26, 2026
+**Last Updated:** September 29, 2026
 
 ---
 
@@ -126,7 +126,7 @@ function ChatMessage({ message }) {
 
 **File:** `src/components/BriefReportBuilder.tsx`
 
-Shared source-first modal launched by “Brief note → Full report” in standalone and patient-linked dictation.
+Legacy source-first modal, retained in source but removed from both live dictation screens in Build 80. Those screens now use direct `/compose` generation. OCR work in this component retains successful pages and processes up to two screenshots concurrently.
 
 | Prop | Type | Purpose |
 |------|------|---------|
@@ -137,6 +137,16 @@ Shared source-first modal launched by “Brief note → Full report” in standa
 | `onComplete` | `(result: DraftResult, procedures: string[], fingerprint: string) => void` | Returns reviewed pipeline output and source snapshot |
 
 Shows procedure matches, quoted facts, source text, and grouped clarification items. Offers editable routine-technique suggestions from approved profiles, reference outlines, or saved examples. Confirming steps for this case is separate from approving a reusable profile; editing steps clears case confirmation. Unapplied clarifications block generation. Busy/error/retry states preserve sources, and completion produces a draft only—nothing is automatically finalized or emailed.
+
+---
+
+### ReportDraftNote
+
+**File:** `src/components/ReportDraftNote.tsx` (Build 81)
+
+Review-only drafting provenance above the report in both dictation screens. Accepts `report: string` and optional `defaults: RoutineDefault[]` (section/text pairs). Combines stored metadata with legacy inline suggestions, deduplicates entries, and renders nothing if there are no defaults. Reminds the reviewer that edits take precedence; it is never concatenated into readback, clipboard, export, or email text.
+
+`src/utils/reportPresentation.ts` provides `separateRoutineDefaults()` for clean presentation and metadata extraction, plus `reportForAIEditing()` for section-scoped model input. Verification/unreadable markers remain visible.
 
 ---
 
@@ -369,9 +379,9 @@ OR dictation for generating structured operative reports:
 - Tag-based procedure picker (pill/chip UI) with categories: Aortic, Carotid, Peripheral Arterial, Venous, Dialysis Access, Other
 - Custom procedure tags (add, edit via long-press, delete, persisted via AsyncStorage)
 - Multi-modal transcript input: voice recording, text, photo
-- Source-first `BriefReportBuilder` uses authenticated patient-sync OCR, analysis, and drafting; narrative generation does not verify or insert bundled CPT/ICD hints
+- Draft-first generation uses authenticated OCR and resumable `/compose`, without a mandatory analysis/technique questionnaire; `ReportDraftNote` keeps routine provenance outside report text
 - Report actions: email, copy, TTS read-back, save as example
-- **Two edit modes** (Build 43): direct text editing for quick fixes, AI-powered regeneration for structural changes
+- **Two edit modes:** Edit Text Directly and Edit with AI; AI receives the displayed draft and preserves unrelated manual changes
 - "New Dictation" button in review state to start fresh without navigating away
 - Save reports as examples for future reusable-technique proposals, subject to explicit review
 
@@ -407,9 +417,9 @@ Patient-linked operative report dictation with full workflow:
 - Date of operation picker
 - Smart procedure pre-selection from chief complaint
 - Voice/text/photo input (reuses dictation infrastructure)
-- Source-grounded `BriefReportBuilder` generation with read-back (TTS)
-- Collapsed source-review panel, stale-source checks before finalization/email, manual-edit provenance, and explicit final review after Open Items are resolved
-- Direct text editing and AI-powered regeneration
+- Draft-first `/compose` generation with clean read-back (TTS) and separate `ReportDraftNote`
+- No mandatory source-review/technique panel; retain stale-source checks, manual-edit provenance, and explicit finalization/email
+- Direct text editing and targeted AI edits of the displayed report
 - **Read Back play/pause controls (Build 53):** Processing spinner → Play button when audio ready → Pause/Resume during playback, with haptic feedback on audio ready
 - Per-patient report history timeline
 - Draft auto-save (10s debounce)

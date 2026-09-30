@@ -2,11 +2,26 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** September 26, 2026
+**Last Updated:** September 29, 2026
 
 ---
 
-## Source-grounded operative drafting (Build 78)
+## Current operative drafting (Builds 79–81)
+
+Both dictation screens use `dictationService.ts` and `operativeDrafting.ts` for notes/photos → Generate draft → Edit with AI or Edit Text Directly. The older analysis/technique-confirmation UI is no longer in their live paths.
+
+1. Screenshot OCR runs up to two pages at a time, retains successful extraction immediately, and preserves page order. Failed pages stop composition without discarding successful OCR.
+2. Authenticated `/patients/operative/compose` generates a complete draft in one model call after OCR, without separate analysis or semantic-audit passes. Current notes/corrections are authoritative; historical sources are excluded. AI editing receives the displayed draft, including manual edits, and applies targeted instructions. Source/report changes prevent stale replacement.
+3. Server policy `draft-first-v3.2` restores the dictated preamble and section order, ending with Description of Procedure and recovery. Limited routine suggestions are allowed only under the policy's missing-information rules; documented exceptions and uncertainty win. See [format policy](changes/draft-format-v3.2.md).
+4. `reportPresentation.ts` separates suggestion markers into clean text and section-specific `reportReview.routineDefaults`. `ReportDraftNote` shows provenance outside the report; readback/copy/export/email exclude that note, while uncertainty markers remain. AI-edit input reattaches provenance only to matching text in its original section. Existing records are not automatically migrated; patient-report metadata uses existing backup/restore.
+
+`server/operative-jobs.js` provides `POST /patients/operative/jobs` and `GET /patients/operative/jobs/:id` for OCR, analysis, draft, compose, and profile-suggestion operations. Job IDs hash the cache version, operation, and input. Identical submissions reuse running/completed jobs; failed jobs require explicit retry. Encrypted job records under `DATA_DIR/operative-jobs/` retain completed results across restarts; interrupted running jobs become failed when recovered. The default two-job cap returns 429 when saturated. Authentication and no-store apply to submission and polling.
+
+The client uses bounded requests/reconnect retries and progress polling. The pinned model remains `gpt-5.4-2026-03-05`, with default reasoning effort `none` and 45-second provider bounds. Explicit profile writes are not automatically retried. Draft generation never finalizes or emails a report. See [Build 79](changes/build-79-operative-latency.md), [Build 80](changes/build-80-draft-first.md), and [Build 81](changes/build-81-clean-dictation.md).
+
+## Legacy source-grounded operative drafting (Build 78)
+
+Retained for older clients and optional legacy tooling; the current screens use `/compose` above. The following describes the original analysis/draft path.
 
 `BriefReportBuilder` and `dictationService.ts` use `src/services/operativeDrafting.ts` to call the authenticated patient-sync backend, rather than asking the chat gateway to generate operative reports. Chat and downstream coding/RVU workflows are unchanged.
 

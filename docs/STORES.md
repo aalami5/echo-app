@@ -2,7 +2,7 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** September 26, 2026
+**Last Updated:** September 29, 2026
 
 ---
 
@@ -403,6 +403,9 @@ Caches calendar events fetched from Google Calendar.
 ---
 
 ### dictationStore
+
+**Build 81 shared review metadata:** `ReportReview` now optionally carries `routineDefaults: { section: string; text: string }[]`, defined through `RoutineDefault` in `src/utils/reportPresentation.ts`. No store implementation or persistence key changed. Standalone review remains session-only; patient-linked `reportReview` persists and survives existing backup/restore. Manual edits retain provenance; display/readback/export/email keep the drafting note separate from report text.
+
 
 **Build 78 source metadata:** `TranscriptPart` adds optional `sourceKind` (`current`, `historical`, or `correction`), `ocrText`, and `ocrWarnings`. Retained OCR is reused when regenerating; historical sources and legacy `-copy` IDs are excluded from case evidence. Standalone session state adds optional `reportReview: ReportReview`, reset by `clearSession()` and not persisted with learning preferences.
 

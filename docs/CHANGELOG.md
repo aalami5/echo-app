@@ -1,6 +1,26 @@
 # Changelog
 
-**Last Updated:** September 26, 2026
+**Last Updated:** September 29, 2026
+
+## Build 81 — Clean reports and separate drafting provenance (2026-09-29)
+
+- Moved inline suggested routine wording into a review-only `ReportDraftNote`, backed by section-specific `reportReview.routineDefaults`. Display, Read Back, copy, export, and email use clean report text; genuine uncertainty markers remain visible.
+- AI edits use the displayed draft and retain provenance without restoring deleted or changed manual wording. Patient-report metadata survives backup/restore; existing reports are not migrated on launch.
+- Verified native artifact and successful Apple upload; tester availability and real-phone acceptance remain unverified. See [Build 81 details](changes/build-81-clean-dictation.md).
+
+## Build 80 — Draft-first operative reports (2026-09-29)
+
+- Restored notes/photos → Generate draft → Edit with AI or Edit Text Directly, removing mandatory analysis/technique confirmation from both live dictation screens.
+- Added authenticated, resumable `/compose`: one model call after OCR, using current sources and corrections. Targeted AI edits preserve unrelated manual changes; stale results cannot replace newer edits. Draft failures return to saved notes.
+- Server policy v3.2 restores the dictated preamble and original section order, ending with Description of Procedure/recovery. Limited suggested routine wording is separate from documented facts; exceptions and uncertainty take precedence.
+- Verified native artifact and successful Apple upload. See [Build 80 details](changes/build-80-draft-first.md) and [format policy](changes/draft-format-v3.2.md); Build 81 supersedes inline suggestion presentation.
+
+## Build 79 — Faster, resumable drafting (2026-09-29)
+
+- Added authenticated content-addressed jobs with encrypted result persistence, retry deduplication, bounded concurrency, progress polling, and reconnect recovery.
+- Process up to two screenshots concurrently, preserving each successful OCR result and original page order; incomplete OCR stops composition without discarding extracted pages.
+- Bounded provider calls and disabled reasoning effort on the existing pinned model. Fixed whitespace-wrapped OCR evidence matching without accepting changed words, numbers, laterality, or negation.
+- Verified native artifact and successful Apple upload; physical-phone acceptance remains separate. See [Build 79 details](changes/build-79-operative-latency.md).
 
 ## Build 78 — Source-grounded brief operative notes (2026-09-26)
 
