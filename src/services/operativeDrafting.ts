@@ -5,8 +5,8 @@ import type { TranscriptPart } from '../stores/dictationStore';
 export interface TechniqueSuggestion { procedure:string; profileId:string|null; version:number; origin:string; steps:string[] }
 export interface CaseFact { id:string; field:string; value:string; sourceId:string; quote:string }
 export interface CaseAnalysis { id:string; caseId:string; procedures:string[]; facts:CaseFact[]; review:string[]; suggestions:TechniqueSuggestion[]; policyVersion:string }
-export interface DraftResult { facts:CaseFact[]; report:string; review:string[]; statements:{section:string;text:string;evidence:string[]}[]; confirmedSteps:{id:string;text:string;procedure:string;profileId?:string;version:number}[]; sessionId:string; policyVersion:string; createdAt:string }
-export interface ReportReview { facts?:CaseFact[]; sourceFingerprint?:string; manuallyEdited?:boolean; sessionId:string; policyVersion:string; review:string[]; statements:DraftResult['statements']; confirmedSteps:DraftResult['confirmedSteps']; reviewedAt?:string }
+export interface DraftResult { routineDefaults?: import('../utils/reportPresentation').RoutineDefault[]; facts:CaseFact[]; report:string; review:string[]; statements:{section:string;text:string;evidence:string[]}[]; confirmedSteps:{id:string;text:string;procedure:string;profileId?:string;version:number}[]; sessionId:string; policyVersion:string; createdAt:string }
+export interface ReportReview { routineDefaults?: import('../utils/reportPresentation').RoutineDefault[]; facts?:CaseFact[]; sourceFingerprint?:string; manuallyEdited?:boolean; sessionId:string; policyVersion:string; review:string[]; statements:DraftResult['statements']; confirmedSteps:DraftResult['confirmedSteps']; reviewedAt?:string }
 
 type Progress = (stage:string)=>void;
 const wait=(ms:number)=>new Promise<void>(resolve=>setTimeout(resolve,ms));

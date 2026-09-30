@@ -42,6 +42,8 @@ import { GatewayService } from '../../src/services/gateway';
 import { ElevenLabsService, OLIVER_VOICE_ID } from '../../src/services/elevenlabs';
 import { transcribeAudio } from '../../src/services/whisper';
 import { generateReport, regenerateWithCorrections } from '../../src/services/dictationService';
+import { ReportDraftNote } from '../../src/components/ReportDraftNote';
+import { separateRoutineDefaults } from '../../src/utils/reportPresentation';
 import { Avatar } from '../../src/components/Avatar';
 import { ImagePickerModal } from '../../src/components/ImagePicker';
 import {
@@ -77,6 +79,7 @@ export default function DictationScreen() {
 
   const {
     reportId,
+    reportReview,
     transcriptParts,
     generatedReport,
     isGenerating,
@@ -98,7 +101,7 @@ export default function DictationScreen() {
   const { gatewayUrl, gatewayToken, openaiApiKey, elevenlabsApiKey } = useSettingsStore();
 
   const receipts = useEmailReceiptsStore((s) => s.receipts);
-  const emailStatus = emailReceiptStatus(receipts, reportId, generatedReport, true);
+  const emailStatus = emailReceiptStatus(receipts, reportId, generatedReport?separateRoutineDefaults(generatedReport).report:null, true);
   const emailSent = emailStatus.sent;
 
   const reviewScrollRef = useRef<ScrollView>(null);
@@ -224,11 +227,11 @@ export default function DictationScreen() {
 
   const persistCaseSource = (part: TranscriptPart) => useDictationStore.setState(state=>({transcriptParts:state.transcriptParts.some(p=>p.id===part.id)?state.transcriptParts.map(p=>p.id===part.id?part:p):[...state.transcriptParts,part]}));
   const composeOptions = (previousReport: string | null) => ({
-    caseId:useDictationStore.getState().reportId,onSource:persistCaseSource,
+    caseId:useDictationStore.getState().reportId,onSource:persistCaseSource,previousRoutineDefaults:useDictationStore.getState().reportReview?.routineDefaults,
     getCurrentParts:()=>useDictationStore.getState().transcriptParts,
     onResult:(r:import('../../src/services/operativeDrafting').DraftResult,fingerprint:string)=>{
       if(useDictationStore.getState().generatedReport!==previousReport)throw Error('The report changed while drafting. Your changes were preserved; please try again.');
-      useDictationStore.setState({reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,review:[],statements:[],confirmedSteps:[]}});
+      useDictationStore.setState({reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,routineDefaults:r.routineDefaults,review:[],statements:[],confirmedSteps:[]}});
     }
   });
 
@@ -254,7 +257,7 @@ export default function DictationScreen() {
     if (!gw || !generatedReport || (emailSent && !resend) || isSendingEmail) return;
     setIsSendingEmail(true);
     try {
-      await sendReportWithReceipt(gw, generatedReport, reportId, resend);
+      await sendReportWithReceipt(gw, separateRoutineDefaults(generatedReport).report, reportId, resend);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     } catch (e: any) {
@@ -279,7 +282,7 @@ export default function DictationScreen() {
     try {
       const ttsService = new ElevenLabsService({ apiKey: elevenlabsApiKey, voiceId: OLIVER_VOICE_ID });
       ttsServiceRef.current = ttsService;
-      await ttsService.speak({ text: generatedReport, voiceId: OLIVER_VOICE_ID });
+      await ttsService.speak({ text: separateRoutineDefaults(generatedReport).report, voiceId: OLIVER_VOICE_ID });
     } catch (e: any) {
       Alert.alert('Error', e.message || 'Failed to read back report.');
     } finally {
@@ -290,7 +293,7 @@ export default function DictationScreen() {
 
   const handleCopy = async () => {
     if (!generatedReport) return;
-    await Clipboard.setStringAsync(generatedReport);
+    await Clipboard.setStringAsync(separateRoutineDefaults(generatedReport).report);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert('Copied', 'Report copied to clipboard.');
   };
@@ -300,7 +303,7 @@ export default function DictationScreen() {
       {
         text: 'Edit Text Directly',
         onPress: () => {
-          setEditText(generatedReport || '');
+          setEditText(separateRoutineDefaults(generatedReport || '').report);
           setScreenState('direct-editing');
         },
       },
@@ -317,7 +320,7 @@ export default function DictationScreen() {
 
   const handleSaveDirectEdit = () => {
     if (editText.trim()) {
-      setGeneratedReport(editText.trim());
+      useDictationStore.setState(state=>({generatedReport:editText.trim(),reportReview:state.reportReview?{...state.reportReview,manuallyEdited:true,routineDefaults:[...(state.reportReview.routineDefaults||[]),...separateRoutineDefaults(state.generatedReport||'').routineDefaults]}:undefined}));
     }
     setScreenState('review');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -343,7 +346,7 @@ export default function DictationScreen() {
   const handleSaveExample = () => {
     if (!generatedReport) return;
     const procType = selectedProcedures.length > 0 ? selectedProcedures.join(', ') : 'General';
-    saveAsExample(generatedReport, procType);
+    saveAsExample(separateRoutineDefaults(generatedReport).report, procType);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert('Saved', `Report saved as "${procType}" example.`);
   };
@@ -670,11 +673,12 @@ export default function DictationScreen() {
         {/* ─── REVIEW STATE ─── */}
         {screenState === 'review' && generatedReport && (
           <ScrollView ref={reviewScrollRef} style={styles.flex} contentContainerStyle={styles.scrollContent}>
+            <ReportDraftNote report={generatedReport} defaults={reportReview?.routineDefaults} />
             <View style={styles.reportCard}>
-              <Text style={styles.reportText}>{generatedReport}</Text>
+              <Text style={styles.reportText}>{separateRoutineDefaults(generatedReport).report}</Text>
             </View>
 
-            <ReportEmailStatus reportId={reportId} report={generatedReport} tracked details />
+            <ReportEmailStatus reportId={reportId} report={separateRoutineDefaults(generatedReport).report} tracked details />
             {emailSent && <TouchableOpacity disabled={isSendingEmail} style={{ paddingVertical: 14 }} onPress={() => Alert.alert(
               emailStatus.updated ? 'Email revised report?' : 'Resend report?',
               'This sends another email to the configured operative-report recipients. Existing send history will be preserved.',

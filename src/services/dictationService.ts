@@ -1,16 +1,18 @@
 /** Draft first, then edit the displayed report. No historical-case comparison. */
+import { separateRoutineDefaults, reportForAIEditing, type RoutineDefault } from '../utils/reportPresentation';
 import type { GatewayService } from './gateway';
 import { useDictationStore, TranscriptPart } from '../stores/dictationStore';
 import { caseSources, extractCaseImages, operativeRequest, DraftResult, sourceFingerprint } from './operativeDrafting';
 
-type Options={caseId?:string;onSource?:(part:TranscriptPart)=>void;onProgress?:(stage:string)=>void;getCurrentParts?:()=>TranscriptPart[];onResult?:(result:DraftResult,fingerprint:string)=>void};
+type Options={previousRoutineDefaults?:RoutineDefault[];caseId?:string;onSource?:(part:TranscriptPart)=>void;onProgress?:(stage:string)=>void;getCurrentParts?:()=>TranscriptPart[];onResult?:(result:DraftResult,fingerprint:string)=>void};
 async function compose(parts:TranscriptPart[],selectedProcedures:string[],options:Options,previousReport?:string,editInstructions?:string):Promise<string>{
   const sources=await extractCaseImages(parts,options.onSource,options.onProgress);
   const fingerprint=sourceFingerprint(sources);
-  const result=await operativeRequest<DraftResult>('/compose',{caseId:options.caseId||'standalone',sources:caseSources(sources),selectedProcedures,previousReport,editInstructions,stylePreferences:useDictationStore.getState().stylePreferences},options.onProgress);
+  const result=await operativeRequest<DraftResult>('/compose',{caseId:options.caseId||'standalone',sources:caseSources(sources),selectedProcedures,previousReport:previousReport?reportForAIEditing(previousReport,options.previousRoutineDefaults):undefined,editInstructions,stylePreferences:useDictationStore.getState().stylePreferences},options.onProgress);
   if(options.getCurrentParts&&sourceFingerprint(options.getCurrentParts())!==fingerprint)throw Error('Your notes changed while drafting. Generate again to include those changes; the existing report is unchanged.');
-  options.onResult?.(result,fingerprint);
-  return result.report;
+  const presentation=separateRoutineDefaults(result.report);
+  options.onResult?.({...result,...presentation},fingerprint);
+  return presentation.report;
 }
 export async function generateReport(_gateway:GatewayService,parts:TranscriptPart[],selectedProcedures:string[],options:Options={}):Promise<string>{
   return compose(parts,selectedProcedures,options);

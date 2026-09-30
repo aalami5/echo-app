@@ -23,3 +23,16 @@ test('concurrent source changes preserve previous report by rejecting replacemen
  parts=[{id:'note',type:'text',content:'Original'}];let accepted=false;duringRequest=()=>parts.push({id:'added',type:'text',content:'New fact'});
  await assert.rejects(generateReport({},[...parts],[],{getCurrentParts:()=>parts,onResult:()=>accepted=true}),/notes changed/);assert.equal(accepted,false);
 });
+test('draft result hands default metadata to storage separately from clean report',async()=>{
+ parts=[{id:'note',type:'text',content:'Current case'}];calls=[];duringRequest=()=>{};
+ result={report:'**Complications:**\n[Suggested: None.]\n\n**Description of Procedure:**\nProcedure performed.'};let saved;
+ const report=await generateReport({},parts,[],{onResult:r=>saved=r});
+ assert.doesNotMatch(report,/Suggested/);assert.equal(saved.report,report);assert.deepEqual(saved.routineDefaults,[{section:'Complications',text:'None.'}]);
+});
+test('AI edit receives provenance while user-facing result stays clean and notes separate',async()=>{
+ parts=[{id:'note',type:'text',content:'Current case'}];calls=[];duringRequest=()=>{};let saved;
+ const report='**Complications:**\nNone.\n\n**Description of Procedure:**\nProcedure performed.';
+ result={report:'**Complications:**\n[Suggested: None.]\n\n**Description of Procedure:**\nProcedure performed. Retained manual text.'};
+ const edited=await regenerateWithCorrections({},report,'Shorten the indication only',parts,[],{previousRoutineDefaults:[{section:'Complications',text:'None.'}],onResult:r=>saved=r});
+ assert.match(calls[0].body.previousReport,/\[Suggested: None\.\]/);assert.doesNotMatch(edited,/Suggested/);assert.match(edited,/Retained manual text/);assert.equal(saved.routineDefaults.length,1);
+});

@@ -43,6 +43,8 @@ import { GatewayService } from '../src/services/gateway';
 import { ElevenLabsService, OLIVER_VOICE_ID } from '../src/services/elevenlabs';
 import { transcribeAudio } from '../src/services/whisper';
 import { generateReport, regenerateWithCorrections } from '../src/services/dictationService';
+import { ReportDraftNote } from '../src/components/ReportDraftNote';
+import { separateRoutineDefaults } from '../src/utils/reportPresentation';
 import { Avatar } from '../src/components/Avatar';
 import { ImagePickerModal } from '../src/components/ImagePicker';
 import {
@@ -115,7 +117,7 @@ export default function PatientDictationScreen() {
   const [newProcCategory, setNewProcCategory] = useState<ProcedureCategory>('other');
   const [editingCustomProc, setEditingCustomProc] = useState<CustomProcedure | null>(null);
   const receipts = useEmailReceiptsStore((s) => s.receipts);
-  const emailStatus = useMemo(() => emailReceiptStatus(receipts, activeDictation?.id, activeDictation?.generatedReport || null, activeDictation?.emailTrackingEnabled), [receipts, activeDictation?.id, activeDictation?.generatedReport, activeDictation?.emailTrackingEnabled]);
+  const emailStatus = useMemo(() => emailReceiptStatus(receipts, activeDictation?.id, activeDictation?.generatedReport ? separateRoutineDefaults(activeDictation.generatedReport).report : null, activeDictation?.emailTrackingEnabled), [receipts, activeDictation?.id, activeDictation?.generatedReport, activeDictation?.emailTrackingEnabled]);
   const emailSent = emailStatus.sent;
   useEffect(() => { refreshEmailReceipts().catch(() => {}); }, [dictationId]);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
@@ -389,9 +391,9 @@ export default function PatientDictationScreen() {
     if (!gw) return;
     setIsGenerating(true);
     try {
-      const report = await generateReport(gw, activeDictation.transcriptParts, activeDictation.selectedProcedures, {caseId:activeDictation.id,onSource:persistCaseSource,
+      const report = await generateReport(gw, activeDictation.transcriptParts, activeDictation.selectedProcedures, {caseId:activeDictation.id,onSource:persistCaseSource,previousRoutineDefaults:activeDictation.reportReview?.routineDefaults,
         getCurrentParts:()=>usePatientDictationsStore.getState().dictations[activeDictation.id].transcriptParts,
-        onResult:(r,fingerprint)=>{if(usePatientDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while drafting. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,review:[],statements:[],confirmedSteps:[]}});}});
+        onResult:(r,fingerprint)=>{if(usePatientDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while drafting. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,routineDefaults:r.routineDefaults,review:[],statements:[],confirmedSteps:[]}});}});
       updateDictation(activeDictation.id, { generatedReport: report, status:'draft' });
     } catch (e: any) {
       console.error('[PatientDictation] Generate failed', e);
@@ -410,7 +412,7 @@ export default function PatientDictationScreen() {
     if (!gw || (emailSent && !resend) || isSendingEmail) return;
     setIsSendingEmail(true);
     try {
-      await sendReportWithReceipt(gw, activeDictation.generatedReport, activeDictation.id, resend);
+      await sendReportWithReceipt(gw, separateRoutineDefaults(activeDictation.generatedReport).report, activeDictation.id, resend);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     } catch (e: any) {
@@ -436,7 +438,7 @@ export default function PatientDictationScreen() {
           const ttsService = new ElevenLabsService({ apiKey: elevenlabsApiKey, voiceId: OLIVER_VOICE_ID });
           ttsServiceRef.current = ttsService;
           const audioUri = await ttsService.generateAudio({
-            text: activeDictation.generatedReport,
+            text: separateRoutineDefaults(activeDictation.generatedReport).report,
             voiceId: OLIVER_VOICE_ID,
           });
           setReadBackAudioUri(audioUri);
@@ -503,7 +505,7 @@ export default function PatientDictationScreen() {
 
   const handleCopy = async () => {
     if (!activeDictation?.generatedReport) return;
-    await Clipboard.setStringAsync(activeDictation.generatedReport);
+    await Clipboard.setStringAsync(separateRoutineDefaults(activeDictation.generatedReport).report);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert('Copied', 'Report copied to clipboard.');
   };
@@ -518,7 +520,7 @@ export default function PatientDictationScreen() {
       `Date of Operation: ${formatPatientDictationDate(activeDictation.dateOfOperation)}`,
       `Hospital: ${HOSPITAL_NAMES[patient.hospital] || 'Unknown'}`,
       '',
-      activeDictation.generatedReport,
+      separateRoutineDefaults(activeDictation.generatedReport).report,
       '',
       `CPT Codes: ${cptCodes.length > 0 ? cptCodes.join(', ') : 'None found'}`,
     ].join('\n');
@@ -534,7 +536,7 @@ export default function PatientDictationScreen() {
       {
         text: 'Edit Text Directly',
         onPress: () => {
-          setEditText(activeDictation.generatedReport || '');
+          setEditText(separateRoutineDefaults(activeDictation.generatedReport || '').report);
           setScreenState('direct-editing');
         },
       },
@@ -552,7 +554,7 @@ export default function PatientDictationScreen() {
   const handleSaveDirectEdit = () => {
     if (!activeDictation) return;
     if (editText.trim()) {
-      updateDictation(activeDictation.id, { generatedReport: editText.trim(), status:'draft', reportReview:activeDictation.reportReview ? {...activeDictation.reportReview,manuallyEdited:true,statements:[],reviewedAt:undefined,sourceFingerprint:sourceFingerprint(activeDictation.transcriptParts)} : undefined });
+      updateDictation(activeDictation.id, { generatedReport: editText.trim(), status:'draft', reportReview:activeDictation.reportReview ? {...activeDictation.reportReview,manuallyEdited:true,routineDefaults:[...(activeDictation.reportReview.routineDefaults||[]),...separateRoutineDefaults(activeDictation.generatedReport||'').routineDefaults],statements:[],reviewedAt:undefined,sourceFingerprint:sourceFingerprint(activeDictation.transcriptParts)} : undefined });
     }
     setScreenState('review');
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -571,9 +573,9 @@ export default function PatientDictationScreen() {
         editText.trim(),
         activeDictation.transcriptParts,
         activeDictation.selectedProcedures,
-        {caseId:activeDictation.id,onSource:persistCaseSource,
+        {caseId:activeDictation.id,onSource:persistCaseSource,previousRoutineDefaults:activeDictation.reportReview?.routineDefaults,
           getCurrentParts:()=>usePatientDictationsStore.getState().dictations[activeDictation.id].transcriptParts,
-          onResult:(r,fingerprint)=>{if(usePatientDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while applying AI edits. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,review:[],statements:[],confirmedSteps:[]}});}},
+          onResult:(r,fingerprint)=>{if(usePatientDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while applying AI edits. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,routineDefaults:r.routineDefaults,review:[],statements:[],confirmedSteps:[]}});}},
       );
       updateDictation(activeDictation.id, { generatedReport: report, status:'draft' });
     } catch (e: any) {
@@ -586,7 +588,7 @@ export default function PatientDictationScreen() {
   const handleSaveExample = () => {
     if (!activeDictation?.generatedReport) return;
     const procType = activeDictation.selectedProcedures.length > 0 ? activeDictation.selectedProcedures.join(', ') : 'General';
-    saveAsExample(activeDictation.generatedReport, procType);
+    saveAsExample(separateRoutineDefaults(activeDictation.generatedReport).report, procType);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert('Saved', `Report saved as "${procType}" example.`);
   };
@@ -631,7 +633,7 @@ export default function PatientDictationScreen() {
     Alert.alert('Finalize reviewed report?', 'Confirm the procedure, case details and any routine steps accurately describe this operation.', [
       {text:'Keep reviewing',style:'cancel'},
       {text:'Confirm & finalize',onPress:()=>{
-        if (activeDictation.reportReview) updateDictation(activeDictation.id,{reportReview:{...activeDictation.reportReview,reviewedAt:new Date().toISOString()}});
+        if (activeDictation.reportReview) updateDictation(activeDictation.id,{generatedReport:separateRoutineDefaults(report).report,reportReview:{...activeDictation.reportReview,routineDefaults:[...(activeDictation.reportReview.routineDefaults||[]),...separateRoutineDefaults(report).routineDefaults],reviewedAt:new Date().toISOString()}});
         finalizeDictation(activeDictation.id);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
@@ -1207,11 +1209,12 @@ export default function PatientDictationScreen() {
         {/* ─── REVIEW STATE ─── */}
         {screenState === 'review' && activeDictation.generatedReport && (
           <ScrollView ref={reviewScrollRef} style={styles.flex} contentContainerStyle={styles.scrollContent}>
+            <ReportDraftNote report={activeDictation.generatedReport} defaults={activeDictation.reportReview?.routineDefaults} />
             <View style={styles.reportCard}>
-              <Text style={styles.reportText} selectable>{activeDictation.generatedReport}</Text>
+              <Text style={styles.reportText} selectable>{separateRoutineDefaults(activeDictation.generatedReport).report}</Text>
             </View>
 
-            <ReportEmailStatus reportId={activeDictation.id} report={activeDictation.generatedReport} tracked={activeDictation.emailTrackingEnabled} details />
+            <ReportEmailStatus reportId={activeDictation.id} report={separateRoutineDefaults(activeDictation.generatedReport).report} tracked={activeDictation.emailTrackingEnabled} details />
             {emailSent && <TouchableOpacity disabled={isSendingEmail} style={{ paddingVertical: 14 }} onPress={() => Alert.alert(
               emailStatus.updated ? 'Email revised report?' : 'Resend report?',
               'This sends another email to the configured operative-report recipients. Existing send history will be preserved.',
