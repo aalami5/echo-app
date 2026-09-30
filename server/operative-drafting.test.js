@@ -75,7 +75,7 @@ test('OCR line wraps retain the exact source span without allowing changed clini
 test('draft-first composition bypasses analysis, excludes old cases and persists draft encrypted',async t=>{
  const f=await fixture(t,[{report:'**Procedure:**\nLeft SFA angioplasty using a 6 mm balloon.'}]);
  const r=await f.request('/compose',{caseId:'synthetic-compose',sources:[...sources,{id:'old',kind:'historical',text:'OLD PATIENT 8 mm stent'}],stylePreferences:[{section:'Description',preference:'Use paragraphs'}]});
- assert.equal(r.status,200);assert.equal(f.requests.length,1);assert.equal(r.data.policyVersion,'draft-first-v3.4');
+ assert.equal(r.status,200);assert.equal(f.requests.length,1);assert.equal(r.data.policyVersion,'draft-first-v3.5');
  const input=JSON.parse(f.requests[0].messages[1].content);assert.equal(input.sources.length,1);assert.equal(input.stylePreferences[0].preference,'Use paragraphs');
  assert.ok(!JSON.stringify(f.requests).includes('OLD PATIENT'));assert.deepEqual(r.data.confirmedSteps,[]);
  const stored=fs.readFileSync(path.join(f.dir,'operative-drafting',r.data.sessionId+'.json'),'utf8');assert.ok(!stored.includes('Left SFA'));assert.ok(stored.includes('echo-clinical-aes256gcm-v1'));
