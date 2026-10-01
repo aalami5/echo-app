@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** September 29, 2026
+**Last Updated:** September 30, 2026
 
 ---
 
@@ -12,7 +12,7 @@ Both dictation screens use `dictationService.ts` and `operativeDrafting.ts` for 
 
 1. Screenshot OCR runs up to two pages at a time, retains successful extraction immediately, and preserves page order. Failed pages stop composition without discarding successful OCR.
 2. Authenticated `/patients/operative/compose` generates a complete draft in one model call after OCR, without separate analysis or semantic-audit passes. Current notes/corrections are authoritative; historical sources are excluded. AI editing receives the displayed draft, including manual edits, and applies targeted instructions. Source/report changes prevent stale replacement.
-3. Server policy `draft-first-v3.2` restores the dictated preamble and section order, ending with Description of Procedure and recovery. Limited routine suggestions are allowed only under the policy's missing-information rules; documented exceptions and uncertainty win. See [format policy](changes/draft-format-v3.2.md).
+3. Server policy/cache version `draft-first-v3.5` retains the dictated preamble and section order, using Dr. Oliver Aalami (or the explicitly identified different surgeon) and numbered diagnosis/Procedure(s) lists. Description of Procedure remains last as unnumbered chronological prose ending with recovery/disposition. Findings summarizes key documented observations; procedural actions from any source field move into the narrative or appropriate existing sections without losing detail. Actions alone do not imply normal anatomy or successful results. Targeted format/Findings edits preserve unrelated sections and manual additions; saved reports are not automatically rewritten. Limited routine suggestions remain governed by missing-information rules, with documented exceptions and uncertainty taking precedence and suggestion provenance preserved through cosmetic edits. See [names and numbering](changes/draft-format-v3.3.md), [paragraph narrative](changes/draft-format-v3.4.md), and [focused Findings](changes/draft-format-v3.5.md).
 4. `reportPresentation.ts` separates suggestion markers into clean text and section-specific `reportReview.routineDefaults`. `ReportDraftNote` shows provenance outside the report; readback/copy/export/email exclude that note, while uncertainty markers remain. AI-edit input reattaches provenance only to matching text in its original section. Existing records are not automatically migrated; patient-report metadata uses existing backup/restore.
 
 `server/operative-jobs.js` provides `POST /patients/operative/jobs` and `GET /patients/operative/jobs/:id` for OCR, analysis, draft, compose, and profile-suggestion operations. Job IDs hash the cache version, operation, and input. Identical submissions reuse running/completed jobs; failed jobs require explicit retry. Encrypted job records under `DATA_DIR/operative-jobs/` retain completed results across restarts; interrupted running jobs become failed when recovered. The default two-job cap returns 429 when saturated. Authentication and no-store apply to submission and polling.

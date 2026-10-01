@@ -1,6 +1,15 @@
 # Changelog
 
-**Last Updated:** September 29, 2026
+**Last Updated:** September 30, 2026
+
+## Server drafting policies v3.3–v3.5 — Operative report formatting and focused Findings (2026-09-30)
+
+- Use **Dr. Oliver Aalami** in the dictated preamble and Surgeon section, expanding the abbreviated default while preserving an explicitly supplied different surgeon. Number preoperative diagnoses, postoperative diagnoses, and Procedure(s), including single-item lists.
+- Keep Description of Procedure last as chronological prose paragraphs. Policy v3.4 supersedes v3.3's numbered narrative steps; section-only legacy-format edits preserve wording and unrelated sections.
+- Active policy/cache version `draft-first-v3.5` separates key documented observations in Findings from technical actions recorded in brief-op notes. Relocate procedural details into the narrative or appropriate existing fields without dropping information; actions alone do not establish normal anatomy or success.
+- Focused AI edits preserve manual additions, unrelated sections, and suggestion provenance. Draft-first generation, clean Read Back, and separate routine-default review metadata remain unchanged; saved reports are not automatically rewritten.
+- Expanded synthetic coverage for full names, numbered lists, paragraph-only descriptions, narrow edits, and Findings classification, with optional public-endpoint testing. Release notes record all 18 provider-backed cases and four public Findings cases passing for v3.5; phone acceptance remains unverified. These were server-only updates, with no new native build.
+- Details: [v3.3 names and numbering](changes/draft-format-v3.3.md), [v3.4 paragraph narrative](changes/draft-format-v3.4.md), and [v3.5 focused Findings](changes/draft-format-v3.5.md).
 
 ## Build 81 — Clean reports and separate drafting provenance (2026-09-29)
 
