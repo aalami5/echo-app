@@ -21,7 +21,7 @@ function publicText(message) {
   if (typeof message.content === 'string') return message.content;
   return (message.content || []).filter(p => (p.type === 'text' || p.type === 'output_text') && typeof p.text === 'string').map(p => p.text).join('\n');
 }
-function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, workspace, rpc: injectedRpc }) {
+function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, workspace, rpc: injectedRpc, fetchArtifact = fetch }) {
   // This deployment is the existing single-operator Echo install. Do not derive
   // authority from supplied user IDs, session keys, filenames or channel names.
   const rpc = injectedRpc || new AssistantGateway({ url: gatewayUrl, token: authToken });
@@ -181,7 +181,28 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
   });
   route('get', '/conversations/:id/artifacts/:artifactId', async (req, res) => {
     const c = await ensure(req.params.id);
-    res.json(await rpc.call('artifacts.download', { sessionKey: c.key, artifactId: req.params.artifactId }));
+    const result = await rpc.call('artifacts.download', { sessionKey: c.key, artifactId: req.params.artifactId });
+    // Native managed-media URLs are gateway-relative, not usable by an iPhone.
+    // Relay only the scoped, signed native route; never fetch arbitrary URLs.
+    if (typeof result.url === 'string' && result.url.startsWith('/api/chat/media/outgoing/')) {
+      const base = new URL(gatewayUrl); const url = new URL(result.url, base);
+      if (url.origin !== base.origin || !url.pathname.startsWith('/api/chat/media/outgoing/')) bad('Invalid managed attachment URL');
+      const response = await fetchArtifact(url, { redirect: 'error', signal: AbortSignal.timeout(30000) });
+      if (!response.ok || !response.body) bad('Attachment download failed');
+      const limit = 12 * 1024 * 1024;
+      if (Number(response.headers.get('content-length')) > limit) bad('Attachment exceeds the 12 MB mobile download limit', 413);
+      const reader = response.body.getReader(); const parts = []; let size = 0;
+      try {
+        while (true) {
+          const { value, done } = await reader.read(); if (done) break;
+          size += value.byteLength;
+          if (size > limit) { await reader.cancel(); bad('Attachment exceeds the 12 MB mobile download limit', 413); }
+          parts.push(Buffer.from(value));
+        }
+      } finally { reader.releaseLock(); }
+      return res.json({ artifact: result.artifact, encoding: 'base64', data: Buffer.concat(parts).toString('base64') });
+    }
+    res.json(result);
   });
   route('post', '/conversations/:id/voice', async (req, res) => {
     const c = await ensure(req.params.id);

@@ -116,3 +116,31 @@ test('voice status events stay with their call and never expose raw tool argumen
   assert.equal(home.data.events.length,1);assert.equal(home.data.events[0].state,'tool.call');
   assert.equal(JSON.stringify(home).includes('sensitive-arguments'),false);assert.equal(project.data.events.length,0);
 });
+
+test('managed result links are downloaded through the authenticated adapter, not opened on the phone as relative URLs', async t => {
+  const rpc = new FakeGateway(); const original = rpc.call.bind(rpc);
+  rpc.call = async (method, params) => method === 'artifacts.download'
+    ? { artifact: { id: 'result-1' }, url: '/api/chat/media/outgoing/test/file/full?signature=synthetic' }
+    : original(method, params);
+  let fetched;
+  const { request } = await fixture(t, rpc, { fetchArtifact: async (url, options) => {
+    fetched = { url, options }; return new Response('COPPER MAPLE 731');
+  } });
+  const r = await request('/conversations/home/artifacts/result-1');
+  assert.equal(r.status, 200); assert.equal(r.data.encoding, 'base64');
+  assert.equal(Buffer.from(r.data.data, 'base64').toString(), 'COPPER MAPLE 731');
+  assert.equal(r.data.url, undefined); assert.equal(fetched.url.origin, 'http://127.0.0.1:1');
+  assert.equal(fetched.options.redirect, 'error');
+});
+
+test('external artifact URLs are not fetched with gateway authority; oversized native files are rejected', async t => {
+  const rpc = new FakeGateway(); const original = rpc.call.bind(rpc); let url = 'https://example.invalid/file'; let fetches = 0;
+  rpc.call = async (method, params) => method === 'artifacts.download' ? { url } : original(method, params);
+  const { request } = await fixture(t, rpc, { fetchArtifact: async () => {
+    fetches++; return new Response('too large', { headers: { 'content-length': String(13 * 1024 * 1024) } });
+  } });
+  const external = await request('/conversations/home/artifacts/result-2');
+  assert.equal(external.data.url, url); assert.equal(fetches, 0);
+  url = '/api/chat/media/outgoing/test/file/full?signature=synthetic';
+  assert.equal((await request('/conversations/home/artifacts/result-2')).status, 413);
+});
