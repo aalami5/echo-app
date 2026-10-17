@@ -554,6 +554,11 @@ const authenticate = (req, res, next) => {
 };
 
 app.use(authenticate);
+// Personal chat is separate from clinical persistence and uses native sessions.
+require('./assistant-continuity').installAssistantContinuity(app, {
+  authToken: AUTH_TOKEN, dataDir: DATA_DIR, gatewayUrl: OPENCLAW_GATEWAY_URL,
+  workspace: process.env.OPENCLAW_WORKSPACE || path.join(process.env.HOME, '.openclaw/workspace'),
+});
 require('./operative-drafting').installOperativeDrafting(app, { apiKey: OPENAI_API_KEY, authToken: AUTH_TOKEN, dataDir: DATA_DIR });
 app.use((req,res,next) => { res.set("Cache-Control", "no-store"); next(); });
 
