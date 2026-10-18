@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** September 29, 2026
+**Last Updated:** October 17, 2026
 
 ---
 
@@ -357,17 +357,21 @@ Modal for selecting photos from camera or library. Includes a caption input fiel
 
 ## Screen Components
 
-### Chat Screen
+### AssistantScreen / Chat tab (Build 82)
 
-**File:** `app/(tabs)/index.tsx`
+**File:** `src/screens/AssistantScreen.tsx`, rendered by `app/(tabs)/index.tsx`.
 
-Main conversation interface with:
-- Animated Avatar (tap to record)
-- Message list with auto-scroll
-- Text input toggle
-- Photo attachment button
-- Live Voice control for native OpenAI Realtime/WebRTC sessions
-- Next meeting card
+- Home/project selector and new-conversation sheet; typed messages and Live Voice use the selected native conversation.
+- Paginated message list, incremental responses, copy/share actions, tappable web links, and Jump to latest without forcing readers away from older messages.
+- Live Voice start/end and mute/unmute controls via `useRealtimeVoice(conversationId)`; ending a call does not cancel accepted work.
+- Document attachments via `expo-document-picker` and authenticated artifact download/share via `expo-file-system` and `expo-sharing`.
+- Activity sheet shows native run/task state and submission receipts, with confirmation for exact-run stop. Uncertain delivery offers same-request reconciliation rather than a new action.
+- Memory sheet displays curated sources and sends remember/correct/forget requests to Echo; changes are confirmed in Home, not treated as transactional local edits.
+- Inbox & earlier chats preserves `chatStore` content without replaying historical requests. The old avatar recorder, photo-only composer, and next-meeting card are no longer the main Chat tab interface.
+
+Screen-local `Button` supplies labeled touch controls; `MessageText` renders selectable text and HTTP(S) links. Local result files use authenticated artifact cards instead of arbitrary file URLs. `src/services/assistant.ts` owns API calls, public-history normalization, persistent submissions, and abandoned-call cleanup; no new Zustand store was introduced.
+
+Release status and physical-phone acceptance limitations: [Build 82](changes/build-82-live-voice-continuity.md).
 
 ---
 

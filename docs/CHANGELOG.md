@@ -1,6 +1,15 @@
 # Changelog
 
-**Last Updated:** September 30, 2026
+**Last Updated:** October 17, 2026
+
+## Build 82 — Durable voice/text conversations (2026-10-17)
+
+- Replaced the Chat tab with `AssistantScreen`: Home/project conversations share native Echo history across typed messages and gateway-controlled Live Voice. Added paginated history, incremental responses, Activity, exact-run stop, and persistent submission IDs for uncertain-send reconciliation.
+- Added authenticated `/patients/assistant` adapter and native gateway RPC client. OpenClaw owns transcripts, tools, tasks, and artifacts; the phone retains a recoverable outbox and legacy inbox without replaying old requests.
+- Added document attachments, artifact download/share, and a curated Memory panel with agent-mediated remember/correct/forget requests. Forgetting derived memory does not promise deletion of original chats or backups.
+- Fixed mobile artifact downloads by relaying managed gateway-relative media as bounded base64, rejecting redirects and results over 12 MB; arbitrary external URLs are not fetched by the adapter.
+- Bumped iOS build to 82 and added document-picker/sharing dependencies. Clinical storage, report/email workflows, and store implementations are unchanged.
+- Release notes record backend deployment and successful native compilation, but TestFlight upload is blocked by an Apple account agreement. Original private-chat transcript recall remains defective; physical-iPhone acceptance is unverified. See [Build 82 verification and blockers](changes/build-82-live-voice-continuity.md) and [continuity requirements](live-voice-continuity.md).
 
 ## Server drafting policies v3.3–v3.5 — Operative report formatting and focused Findings (2026-09-30)
 

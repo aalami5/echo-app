@@ -2,9 +2,22 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** September 30, 2026
+**Last Updated:** October 17, 2026
 
 ---
+
+## Current assistant continuity (Build 82)
+
+`app/(tabs)/index.tsx` now renders `src/screens/AssistantScreen.tsx`. Typed chat and Live Voice share a server-selected native OpenClaw session for Home or the selected project. OpenClaw owns canonical history, tools, accepted runs, tasks, and artifacts; `chatStore` supplies only the preserved legacy inbox in this screen.
+
+- `src/services/assistant.ts` calls authenticated, no-store `/patients/assistant` endpoints. `server/assistant-continuity.js` maps conversation IDs to server-owned session keys; `server/assistant-gateway.js` provides the native protocol-v4 RPC connection. No arbitrary RPC proxy or client-selected session key is exposed.
+- The adapter stores its conversation index, upload provenance, and submission receipts in `DATA_DIR/assistant/index.json`, attachments in `assistant/uploads/`, and archived device history in `assistant/legacy/`. These are permission-restricted files, separate from encrypted clinical persistence. Legacy history is archived, not replayed as new instructions.
+- Native history is paginated; bounded in-memory events carry an epoch/cursor so clients can reset after reconnect/restart. Stable submission IDs and a persistent phone outbox distinguish accepted requests from uncertain acknowledgements; Activity reconciles native input receipts instead of blindly repeating actions.
+- Uploads are conversation-scoped (6 MB each, up to five per submission). Artifact downloads use native artifact identity; managed gateway-relative media is relayed as base64 with a 12 MB bound, timeout, and no redirects. Arbitrary external URLs are not fetched by the adapter.
+- `useRealtimeVoice(conversationId)` creates an audio-only WebRTC offer. The adapter creates `talk.client.create` with `gateway-control-v1`, exchanges SDP through the gateway, and keeps provider credentials server-side. The phone opens no provider data channel; gateway sideband owns tools and finalized transcripts. Ending audio closes the voice session, not accepted work; stopping work separately checks the exact active run. Persisted call identity supports abandoned-call cleanup on reconnect.
+- The Memory panel reads curated workspace sources and submits changes as Home conversation requests. Cross-private recall requires protected native recall plus active-memory configuration; original private-transcript recall remains an unresolved integration defect, not a verified capability. This feature retains text, not raw call audio.
+
+No Zustand store implementations or clinical/report endpoints changed. The older chat/voice flows below describe retained legacy paths, not the Build 82 Chat tab. See [continuity requirements](live-voice-continuity.md) and [release blockers and acceptance](changes/build-82-live-voice-continuity.md); native compilation does not establish TestFlight availability or physical-phone acceptance.
 
 ## Current operative drafting (Builds 79–81)
 
@@ -209,7 +222,7 @@ echo-app/
 
 ## Data Flow
 
-### Sending a Message
+### Legacy Sending a Message
 
 ```
 1. User taps avatar (voice) or types message
@@ -268,7 +281,7 @@ echo-app/
    Avatar state → "idle"
 ```
 
-### Native Live Voice Flow
+### Legacy Native Live Voice Flow (before Build 82)
 
 ```
 1. User taps Live on the chat screen
@@ -465,7 +478,7 @@ const chatStorage = {
 
 | Data Type | Protection |
 |-----------|------------|
-| Chat messages | AsyncStorage (local only, non-secret transcript storage) |
+| Chat messages | Native OpenClaw canonical history for Build 82; legacy inbox and recoverable outbox in device AsyncStorage |
 | Patient PHI | SecureStore (Keychain encryption) |
 | API keys | SecureStore (Keychain encryption) |
 | Gateway token | SecureStore (Keychain encryption) |
@@ -478,7 +491,7 @@ const chatStorage = {
 - Bearer token authentication for API calls
 - OpenAI Realtime WebRTC sessions prefer authenticated token endpoints (`/voice/realtime/token` and `/patients/voice/realtime/token`) that return ephemeral client secrets, keeping the OpenAI API key on the sync server while allowing direct SDP exchange with OpenAI
 - Authenticated SDP proxy endpoints (`/voice/realtime/session` and `/patients/voice/realtime/session`) remain available as fallback
-- Live Voice tool requests go through authenticated bridge endpoints (`/voice/bridge/ask` and `/patients/voice/bridge/ask`) rather than exposing OpenClaw gateway credentials beyond the app's existing bearer token
+- Legacy Live Voice tool requests go through authenticated bridge endpoints (`/voice/bridge/ask` and `/patients/voice/bridge/ask`) rather than exposing OpenClaw gateway credentials beyond the app's existing bearer token
 - **Gateway Bootstrap (Build 55):** No secrets in binary — gateway config and API keys fetched from Supabase RPC after authentication
   - `get_gateway_config()` RPC with SECURITY DEFINER + RLS
   - Replaces baked-in obfuscated credentials (Level 1 bridge removed)
