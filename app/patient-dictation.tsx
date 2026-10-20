@@ -299,12 +299,7 @@ export default function PatientDictationScreen() {
         Alert.alert('Permission needed', 'Microphone access is required for dictation.');
         return;
       }
-      if (recordingRef.current) {
-        try {
-          await recordingRef.current.stopAndUnloadAsync();
-        } catch {}
-        recordingRef.current = null;
-      }
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,

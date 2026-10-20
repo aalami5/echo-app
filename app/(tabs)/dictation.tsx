@@ -150,12 +150,7 @@ export default function DictationScreen() {
         return;
       }
       // Unload any existing recording first
-      if (recordingRef.current) {
-        try {
-          await recordingRef.current.stopAndUnloadAsync();
-        } catch {}
-        recordingRef.current = null;
-      }
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,

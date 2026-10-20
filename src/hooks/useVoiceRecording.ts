@@ -34,14 +34,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
     try {
       if (!await beginClinicalAudio(recording)) return;
       // Clean up any existing recording first
-      if (recording.current) {
-        try {
-          await recording.current.stopAndUnloadAsync();
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-        recording.current = null;
-      }
+
 
       // Clear any existing intervals
       if (durationInterval.current) {

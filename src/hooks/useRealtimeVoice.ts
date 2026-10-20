@@ -150,7 +150,7 @@ const stop = async () => {
       const timer = setTimeout(() => { if (active() && pc.connectionState !== 'connected') { void stop(); setError('Voice connection timed out. Your history is safe; try again.'); } }, 20000);
       call.timers!.push(timer);
       // Timer only observes this call; an old call cannot stop its replacement.
-      if (pc.connectionState === 'connected') { clearTimeout(timer); if (snapshot.status !== 'paused') setStatus('connected'); }
+      if (pc.connectionState === 'connected') { clearTimeout(timer); if ((snapshot.status as LiveVoiceStatus) !== 'paused') setStatus('connected'); }
     } catch (e: any) {
       if (active()) { await stop(); setError(e.message || 'Could not connect Live Voice.'); setStatus('error'); }
     }
