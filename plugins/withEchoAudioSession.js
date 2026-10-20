@@ -8,6 +8,7 @@ const BRIDGING_IMPORT = '#import <React/RCTBridgeModule.h>\n#import <React/RCTEv
 
 const swiftSource = `import AVFoundation
 import Foundation
+import React
 
 @objc(EchoAudioSession)
 class EchoAudioSession: RCTEventEmitter {
