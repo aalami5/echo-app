@@ -1,5 +1,6 @@
+import { VoiceCallView, VoiceIconButton, voicePresentation } from '../components/VoiceCallView';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
@@ -8,7 +9,7 @@ import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
 import { colors } from '../constants/theme';
 import { useChatStore } from '../stores/chatStore';
-import { useRealtimeVoice } from '../hooks/useRealtimeVoice';
+import { useRealtimeVoice, liveVoiceSession } from '../hooks/useRealtimeVoice';
 import { ChatViewport } from '../components/ChatViewport';
 import { assistantApi, AssistantMessage, Conversation, loadSubmissions, newSubmissionId, Submission, submit, visibleHistory, saveSubmission } from '../services/assistant';
 
@@ -38,12 +39,18 @@ export default function AssistantScreen() {
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
-  const [sheet, setSheet] = useState<'projects' | 'activity' | 'memory' | 'legacy' | null>(null);
+  const [sheet, setSheet] = useState<'projects' | 'activity' | 'memory' | 'legacy' | 'more' | null>(null);
   const [memory, setMemory] = useState<any>(null);
   const [memoryText, setMemoryText] = useState('');
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newMessages, setNewMessages] = useState(false);
+  const [voiceView, setVoiceView] = useState(true);
+  const [voiceCaption, setVoiceCaption] = useState('');
+  const pendingMore = useRef(false);
+  const pendingVoice = useRef(false);
+  const dismissVoice = () => { if (pendingMore.current) { pendingMore.current = false; setSheet('more'); } };
+  const dismissSheet = () => { if (pendingVoice.current) { pendingVoice.current = false; setVoiceView(true); } };
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const list = useRef<FlatList<AssistantMessage>>(null);
   const atBottom = useRef(true);
@@ -87,10 +94,11 @@ export default function AssistantScreen() {
       void AsyncStorage.setItem(`echo-assistant-tail-${id}`, JSON.stringify(tail)).catch(() => {});
       cursor.current = { epoch: e.epoch, after: e.cursor };
       for (const event of e.events || []) {
-        if (!event.voice) continue;
+        if (!event.voice || event.at < liveVoiceSession.getSnapshot().startedAt) continue;
+        if (event.state === 'output.text.done' && event.text) setVoiceCaption(event.text);
         if (event.state === 'error') setVoiceNotice(event.error);
         if (event.state === 'tool.call') setVoiceNotice('Echo is working on your request.');
-        if (event.state === 'output.text.done') setVoiceNotice(null);
+        if (['tool.result', 'tool.error', 'output.text.done', 'session.closed'].includes(event.state)) setVoiceNotice(null);
       }
       setStream(old => {
         const next = e.reset ? {} : { ...old };
@@ -144,7 +152,7 @@ export default function AssistantScreen() {
   }, [ready, legacyHydrated, legacy]);
   const selectConversation = async (id: string) => {
     if (id === conversationId) { setSheet(null); return; }
-    if (voice.status === 'connected' || voice.status === 'connecting' || sending || uploading) { Alert.alert('End the call first', 'Each Live Voice call stays with its selected conversation.'); return; }
+    if (voice.isActive || sending || uploading) { Alert.alert('End the call first', 'Each Live Voice call stays with its selected conversation.'); return; }
     if (attachments.length || text.trim()) { Alert.alert('Keep your draft', 'Send your draft or clear it before switching conversations.'); return; }
     await AsyncStorage.setItem(SELECTED, id); selected.current = id; setConversationId(id); setSheet(null);
   };
@@ -213,18 +221,21 @@ export default function AssistantScreen() {
     } catch (e: any) { setError(e.message); } finally { setMemoryBusy(false); }
   };
   const active = activity.session?.hasActiveRun;
-  const callActive = voice.isConnected || voice.status === 'connecting';
+  const callActive = voice.isActive;
+  const voiceState = voicePresentation(voice, !!active || !!voiceNotice);
+  useEffect(() => { setVoiceCaption(''); }, [voice.startedAt]);
+  const caption = callActive ? voiceCaption : undefined;
   return <ChatViewport>
     <ScrollView style={s.conversationControls} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
     <View style={s.header}>
-      <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button"><Text style={s.heading}>Echo · {title} ▾</Text><Text style={s.subtle}>One conversation, voice or text</Text></TouchableOpacity>
-      <Button title="Inbox" onPress={() => setSheet('legacy')} /><Button title={active ? 'Activity •' : 'Activity'} onPress={() => setSheet('activity')} />
+      <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button" accessibilityLabel="Select conversation" style={{ flex: 1 }}><Text style={s.heading}>Echo · {title} ▾</Text></TouchableOpacity>
+      <VoiceIconButton icon="ellipsis-horizontal" label="More options" onPress={() => setSheet('more')}/>
     </View>
-    <View style={s.voiceCard}>
-      <View style={{ flex: 1 }}><Text style={s.voiceTitle}>{voice.isConnected ? (voice.muted ? 'Live Voice · muted' : 'Live Voice · connected') : voice.status === 'connecting' ? 'Connecting your conversation…' : 'Talk with Echo'}</Text><Text style={s.subtle}>{callActive ? 'Transcript saved as you talk. Interrupt naturally.' : 'Recent chats, memory and project context—together.'}</Text></View>
-      {voice.isConnected && <Button title={voice.muted ? 'Unmute' : 'Mute'} onPress={voice.toggleMute} />}
-      <Button primary title={callActive ? 'End call' : 'Live Voice'} disabled={!ready || voice.status === 'stopping' || !voice.isSupported} onPress={() => { void (callActive ? voice.stop() : voice.start()); }} />
-    </View>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={callActive ? 'Return to voice call' : 'Open Live Voice'} onPress={() => setVoiceView(true)} style={s.voiceCard}>
+      <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: voiceState.color }}/>
+      <Text style={[s.voiceTitle, { flex: 1, marginBottom: 0 }]}>{callActive ? voiceState.label : 'Talk with Echo'}</Text>
+      <Text style={s.subtle}>{callActive ? 'Open call' : 'Live Voice'} ›</Text>
+    </TouchableOpacity>
     {(error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || error || voiceNotice}</Text>}
     {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={() => { void assistantApi('/bootstrap').then(b => { setConversations(b.conversations); setReady(true); setError(null); }).catch(e => setError(e.message)); }} /></View>}
     </ScrollView>
@@ -233,7 +244,7 @@ export default function AssistantScreen() {
       onContentSizeChange={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); else setNewMessages(true); }}
       ListHeaderComponent={historyMore ? <Button title="Load earlier messages" onPress={() => { void loadEarlier(); }} /> : null}
       ListEmptyComponent={ready ? <View style={s.empty}><Text style={s.body}>Start a conversation here or tap Live Voice. You can continue it later without starting over.</Text><Button title="Earlier chats on this phone" onPress={() => setSheet('legacy')} /></View> : null}
-      renderItem={({ item }) => <View style={[s.message, item.role === 'user' && s.userMessage]}><Text style={s.role}>{item.role === 'user' ? 'You' : 'Echo'}</Text><MessageText text={item.content}/><View style={s.row}><Button title="Copy" onPress={() => { void Clipboard.setStringAsync(item.content); }} /><Button title="Share" onPress={() => { void Share.share({ message: item.content }); }} /></View></View>}
+      renderItem={({ item }) => <TouchableOpacity activeOpacity={0.9} accessibilityHint="Long press for copy and share" onLongPress={() => Alert.alert('Message options', undefined, [{ text: 'Copy', onPress: () => { void Clipboard.setStringAsync(item.content); } }, { text: 'Share', onPress: () => { void Share.share({ message: item.content }); } }, { text: 'Cancel', style: 'cancel' }])} style={[s.message, item.role === 'user' && s.userMessage]}><Text style={s.role}>{item.role === 'user' ? 'You' : 'Echo'}</Text><MessageText text={item.content}/></TouchableOpacity>}
       ListFooterComponent={<View>
         {Object.entries(stream).map(([id, content]) => <View key={id} style={s.message}><Text style={s.role}>Echo · responding</Text><MessageText text={content}/></View>)}
         {outbox.map(item => <View key={item.id} style={s.message}><Text style={s.error}>Delivery not confirmed—check Activity before retrying.</Text><Text selectable style={s.body}>{item.message}</Text><Button disabled={sending} title="Check / retry same request" onPress={() => { void send(item); }}/></View>)}
@@ -245,11 +256,19 @@ export default function AssistantScreen() {
     <View testID="chat-composer" style={s.composer}>
       {attachments.length > 0 && <ScrollView style={{ maxHeight: 72 }} keyboardShouldPersistTaps="handled">{attachments.map(a => <TouchableOpacity key={a.id} onPress={() => setAttachments(old => old.filter(x => x.id !== a.id))}><Text style={s.subtle}>{a.fileName} · uploaded, not yet reviewed · remove ×</Text></TouchableOpacity>)}</ScrollView>}
       <TextInput accessibilityLabel="Message Echo" style={[s.input, { minHeight: 44, maxHeight: 120 }]} multiline placeholder={active ? 'Add instructions to this work…' : 'Message Echo…'} placeholderTextColor={colors.textTertiary} value={text} onChangeText={setText} />
-      <View style={s.row}><Button title={uploading ? 'Uploading…' : 'Attach'} disabled={!ready || uploading} onPress={() => { void pickFile(); }} /><Button title="Memory" onPress={() => { void openMemory(); }} /><View style={{ flex: 1 }}/><Button primary disabled={!ready || sending || uploading || (!text.trim() && !attachments.length)} title={sending ? 'Sending…' : active ? 'Add instructions' : 'Send'} onPress={() => { void send(); }} /></View>
+      <View style={s.row}><VoiceIconButton icon="add" label={uploading ? 'Uploading attachment' : 'Attach file'} disabled={!ready || uploading} onPress={() => { void pickFile(); }} /><View style={{ flex: 1 }}/><Button primary disabled={!ready || sending || uploading || (!text.trim() && !attachments.length)} title={sending ? 'Sending…' : active ? 'Add instructions' : 'Send'} onPress={() => { void send(); }} /></View>
     </View>
-    <Modal visible={sheet !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
-      <View style={[s.root, { padding: 20, paddingTop: 24, paddingBottom: Math.max(20, insets.bottom) }]}><View style={s.row}><Text style={[s.heading, { flex: 1 }]}>{sheet === 'projects' ? 'Conversations' : sheet === 'memory' ? 'What Echo remembers' : sheet === 'legacy' ? 'Inbox & earlier chats' : 'Activity'}</Text><Button title="Done" onPress={() => setSheet(null)}/></View>
+    <VoiceCallView visible={voiceView} title={title} voice={voice} working={!!active || !!voiceNotice} ready={ready} caption={caption} onText={() => setVoiceView(false)} onMore={() => { pendingMore.current = true; setVoiceView(false); if (Platform.OS !== 'ios') dismissVoice(); }} onDismiss={dismissVoice}/>
+    <Modal visible={sheet !== null} animationType="slide" presentationStyle="pageSheet" onDismiss={dismissSheet} onRequestClose={() => setSheet(null)}>
+      <View style={[s.root, { padding: 20, paddingTop: 24, paddingBottom: Math.max(20, insets.bottom) }]}><View style={s.row}><Text style={[s.heading, { flex: 1 }]}>{sheet === 'more' ? 'More' : sheet === 'projects' ? 'Conversations' : sheet === 'memory' ? 'What Echo remembers' : sheet === 'legacy' ? 'Inbox & earlier chats' : 'Activity'}</Text><Button title="Done" onPress={() => setSheet(null)}/></View>
         <ScrollView keyboardShouldPersistTaps="handled">
+          {sheet === 'more' && <>
+            <Button title={callActive ? 'Return to voice call' : 'Live Voice'} onPress={() => { pendingVoice.current = true; setSheet(null); if (Platform.OS !== 'ios') dismissSheet(); }}/>
+            <Button title="Conversations" onPress={() => setSheet('projects')}/>
+            <Button title={active ? 'Activity · working' : 'Activity'} onPress={() => setSheet('activity')}/>
+            <Button title="Memory" onPress={() => { void openMemory(); }}/>
+            <Button title="Inbox & earlier chats" onPress={() => setSheet('legacy')}/>
+          </>}
           {sheet === 'projects' && <>
             {conversations.map(c => <Button key={c.id} title={c.title} onPress={() => { void selectConversation(c.id); }} />)}
             <TextInput style={s.input} value={newTitle} onChangeText={setNewTitle} placeholder="New conversation name" placeholderTextColor={colors.textTertiary}/>

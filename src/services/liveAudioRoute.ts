@@ -11,6 +11,7 @@ const EchoAudioSession = NativeModules.EchoAudioSession as EchoAudioSessionModul
 export async function prepareLiveVoiceAudioRoute(): Promise<void> {
   await Audio.setAudioModeAsync({
     allowsRecordingIOS: true,
+    staysActiveInBackground: true,
     playsInSilentModeIOS: true,
     playThroughEarpieceAndroid: false,
   });
@@ -21,13 +22,16 @@ export async function prepareLiveVoiceAudioRoute(): Promise<void> {
 }
 
 export async function releaseLiveVoiceAudioRoute(): Promise<void> {
-  if (Platform.OS === 'ios' && EchoAudioSession?.clearSpeakerOverride) {
-    await EchoAudioSession.clearSpeakerOverride();
+  try {
+    if (Platform.OS === 'ios' && EchoAudioSession?.clearSpeakerOverride) {
+      await EchoAudioSession.clearSpeakerOverride();
+    }
+  } finally {
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: false,
+      staysActiveInBackground: false,
+      playsInSilentModeIOS: true,
+      playThroughEarpieceAndroid: false,
+    });
   }
-
-  await Audio.setAudioModeAsync({
-    allowsRecordingIOS: false,
-    playsInSilentModeIOS: true,
-    playThroughEarpieceAndroid: false,
-  });
 }

@@ -4,13 +4,40 @@ const path = require('path');
 
 const SWIFT_FILE = 'EchoAudioSession.swift';
 const BRIDGE_FILE = 'EchoAudioSessionBridge.m';
-const BRIDGING_IMPORT = '#import <React/RCTBridgeModule.h>';
+const BRIDGING_IMPORT = '#import <React/RCTBridgeModule.h>\n#import <React/RCTEventEmitter.h>';
 
 const swiftSource = `import AVFoundation
 import Foundation
 
 @objc(EchoAudioSession)
-class EchoAudioSession: NSObject {
+class EchoAudioSession: RCTEventEmitter {
+  private var observing = false
+  private var callActive = false
+  override static func requiresMainQueueSetup() -> Bool { return true }
+  override func supportedEvents() -> [String]! { return ["EchoAudioSessionEvent"] }
+  override func startObserving() {
+    observing = true
+    NotificationCenter.default.addObserver(self, selector: #selector(interrupted(_:)), name: AVAudioSession.interruptionNotification, object: nil)
+    NotificationCenter.default.addObserver(self, selector: #selector(routeChanged(_:)), name: AVAudioSession.routeChangeNotification, object: nil)
+    NotificationCenter.default.addObserver(self, selector: #selector(reset(_:)), name: AVAudioSession.mediaServicesWereResetNotification, object: nil)
+  }
+  override func stopObserving() { observing = false; NotificationCenter.default.removeObserver(self) }
+  private func pause(_ type: String) {
+    guard callActive else { return }
+    // Silence immediately in native code, even if JS is suspended.
+    try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    if observing { sendEvent(withName: "EchoAudioSessionEvent", body: ["type": type]) }
+  }
+  @objc private func interrupted(_ note: Notification) {
+    if let value = note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt,
+       value == AVAudioSession.InterruptionType.began.rawValue { pause("interruption") }
+  }
+  @objc private func routeChanged(_ note: Notification) {
+    if let value = note.userInfo?[AVAudioSessionRouteChangeReasonKey] as? UInt,
+       value == AVAudioSession.RouteChangeReason.oldDeviceUnavailable.rawValue { pause("routeLost") }
+  }
+  @objc private func reset(_ note: Notification) { pause("reset") }
+
   @objc(forceSpeaker:rejecter:)
   func forceSpeaker(
     resolve: @escaping RCTPromiseResolveBlock,
@@ -25,7 +52,9 @@ class EchoAudioSession: NSObject {
           options: [.allowBluetooth, .allowBluetoothA2DP, .defaultToSpeaker]
         )
         try session.setActive(true)
-        try session.overrideOutputAudioPort(.speaker)
+        // Default to speaker only when no headset route is selected.
+        try session.overrideOutputAudioPort(.none)
+        self.callActive = true
         resolve(true)
       } catch {
         reject("audio_session_force_speaker_failed", error.localizedDescription, error)
@@ -41,7 +70,9 @@ class EchoAudioSession: NSObject {
     DispatchQueue.main.async {
       do {
         let session = AVAudioSession.sharedInstance()
+        self.callActive = false
         try session.overrideOutputAudioPort(.none)
+        try session.setActive(false, options: .notifyOthersOnDeactivation)
         resolve(true)
       } catch {
         reject("audio_session_clear_speaker_failed", error.localizedDescription, error)
@@ -52,8 +83,9 @@ class EchoAudioSession: NSObject {
 `;
 
 const bridgeSource = `#import <React/RCTBridgeModule.h>
+#import <React/RCTEventEmitter.h>
 
-@interface RCT_EXTERN_MODULE(EchoAudioSession, NSObject)
+@interface RCT_EXTERN_MODULE(EchoAudioSession, RCTEventEmitter)
 
 RCT_EXTERN_METHOD(forceSpeaker:(RCTPromiseResolveBlock)resolve
                   rejecter:(RCTPromiseRejectBlock)reject)

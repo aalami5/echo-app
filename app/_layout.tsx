@@ -1,3 +1,4 @@
+import { liveVoiceSession } from '../src/hooks/useRealtimeVoice';
 import { AppState } from 'react-native';
 import { restoreClinicalData, backupClinicalData } from '../src/services/clinicalRestore';
 import { refreshEmailReceipts } from '../src/services/emailReceipts';
@@ -87,6 +88,9 @@ export default function RootLayout() {
 }
 
 function RootLayoutNav() {
+  useEffect(() => useAuthStore.subscribe((state, previous) => {
+    if (previous.isAuthenticated && !state.isAuthenticated) void liveVoiceSession.stop();
+  }), []);
   const router = useRouter();
   const segments = useSegments();
   const { isAuthenticated, isLoading, loadStoredAuth, setUser, setTokens, logout } = useAuthStore();

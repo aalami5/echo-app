@@ -1,3 +1,5 @@
+import { beginClinicalAudio } from '../src/services/clinicalAudioHandoff';
+import { releaseClinicalAudio } from '../src/services/audioOwnership';
 import { sourceFingerprint } from '../src/services/operativeDrafting';
 import { ReportEmailStatus } from '../src/components/ReportEmailStatus';
 import { useEmailReceiptsStore } from '../src/stores/emailReceiptsStore';
@@ -129,6 +131,7 @@ export default function PatientDictationScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
+  const recordingStarting = useRef(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const reviewScrollRef = useRef<ScrollView>(null);
@@ -277,12 +280,22 @@ export default function PatientDictationScreen() {
     }, 10000);
   }, [isReadOnly, updateDictation]);
 
+  useEffect(() => () => {
+    const r = recordingRef.current;
+    if (r) void r.stopAndUnloadAsync().then(() => releaseClinicalAudio(recordingRef)).catch(() => {});
+    else releaseClinicalAudio(recordingRef);
+  }, []);
+
   // ─── Voice Recording ───
   const startRecording = async () => {
     if (isReadOnly) return;
+    if (recordingStarting.current || recordingRef.current) return;
+    recordingStarting.current = true;
     try {
+      if (!await beginClinicalAudio(recordingRef)) return;
       const perm = await Audio.requestPermissionsAsync();
       if (!perm.granted) {
+        releaseClinicalAudio(recordingRef);
         Alert.alert('Permission needed', 'Microphone access is required for dictation.');
         return;
       }
@@ -306,9 +319,10 @@ export default function PatientDictationScreen() {
       setIsRecording(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e: any) {
+      if (!recordingRef.current) releaseClinicalAudio(recordingRef);
       console.error('[PatientDictation] Failed to start recording', e);
       Alert.alert('Error', `Failed to start recording: ${e.message}`);
-    }
+    } finally { recordingStarting.current = false; }
   };
 
   const stopRecording = async () => {
@@ -319,6 +333,7 @@ export default function PatientDictationScreen() {
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
+      releaseClinicalAudio(recordingRef);
       if (!uri) return;
       setIsTranscribing(true);
       const result = await transcribeAudio(uri);

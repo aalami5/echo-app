@@ -16,13 +16,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.oppersmedical.echo",
-      "buildNumber": "85",
+      "buildNumber": "86",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "Echo needs microphone access for voice conversations",
         "UIBackgroundModes": [
           "remote-notification",
-          "fetch"
+          "fetch",
+          "audio"
         ]
       }
     },

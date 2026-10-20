@@ -1,3 +1,5 @@
+import { beginClinicalAudio } from '../../src/services/clinicalAudioHandoff';
+import { releaseClinicalAudio } from '../../src/services/audioOwnership';
 import type { TranscriptPart } from '../../src/stores/dictationStore';
 import { ReportEmailStatus } from '../../src/components/ReportEmailStatus';
 import { useEmailReceiptsStore } from '../../src/stores/emailReceiptsStore';
@@ -73,6 +75,7 @@ export default function DictationScreen() {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isReadingBack, setIsReadingBack] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
+  const recordingStarting = useRef(false);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const ttsServiceRef = useRef<ElevenLabsService | null>(null);
@@ -128,11 +131,21 @@ export default function DictationScreen() {
     return new GatewayService({ baseUrl: gatewayUrl, token: gatewayToken } as any);
   }, [gatewayUrl, gatewayToken]);
 
+  useEffect(() => () => {
+    const r = recordingRef.current;
+    if (r) void r.stopAndUnloadAsync().then(() => releaseClinicalAudio(recordingRef)).catch(() => {});
+    else releaseClinicalAudio(recordingRef);
+  }, []);
+
   // ─── Voice Recording ───
   const startRecording = async () => {
+    if (recordingStarting.current || recordingRef.current) return;
+    recordingStarting.current = true;
     try {
+      if (!await beginClinicalAudio(recordingRef)) return;
       const perm = await Audio.requestPermissionsAsync();
       if (!perm.granted) {
+        releaseClinicalAudio(recordingRef);
         Alert.alert('Permission needed', 'Microphone access is required for dictation.');
         return;
       }
@@ -158,9 +171,10 @@ export default function DictationScreen() {
       setIsRecording(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e: any) {
+      if (!recordingRef.current) releaseClinicalAudio(recordingRef);
       console.error('[Dictation] Failed to start recording', e);
       Alert.alert('Error', `Failed to start recording: ${e.message}`);
-    }
+    } finally { recordingStarting.current = false; }
   };
 
   const stopRecording = async () => {
@@ -171,6 +185,7 @@ export default function DictationScreen() {
       await Audio.setAudioModeAsync({ allowsRecordingIOS: false });
       const uri = recordingRef.current.getURI();
       recordingRef.current = null;
+      releaseClinicalAudio(recordingRef);
       if (!uri) return;
       setIsTranscribing(true);
       const result = await transcribeAudio(uri);
