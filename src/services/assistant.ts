@@ -7,18 +7,31 @@ export async function assistantApi<T = any>(route: string, body?: unknown): Prom
   if (!useSettingsStore.persist.hasHydrated()) await useSettingsStore.persist.rehydrate();
   const { gatewayUrl, gatewayToken } = useSettingsStore.getState();
   if (!gatewayUrl || !gatewayToken) throw new Error('Sign in and connect Echo in Settings first.');
-  const endpoint = new URL(gatewayUrl);
+  let endpoint = new URL(gatewayUrl).toString();
   // Direct local gateway connections serve the app adapter on its sibling port.
-  if (endpoint.port === '18789') endpoint.port = '18790';
-  const response = await fetch(`${endpoint.toString().replace(/\/+$/, '')}/patients/assistant${route}`, {
-    method: body === undefined ? 'GET' : 'POST',
-    headers: { Authorization: `Bearer ${gatewayToken}`, 'Content-Type': 'application/json' },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    signal: AbortSignal.timeout(55000),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Echo is unavailable (${response.status}).`);
-  return data as T;
+  // React Native's URL has no port setter; only replace the authority's port.
+  endpoint = endpoint.replace(/^(https?:\/\/[^/?#]+):18789(?=[/?#]|$)/, '$1:18790');
+  // RN 0.81's AbortSignal has no static timeout(). Keep cancellation portable.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 55000);
+  try {
+    const response = await fetch(`${endpoint.replace(/\/+$/, '')}/patients/assistant${route}`, {
+      method: body === undefined ? 'GET' : 'POST',
+      headers: { Authorization: `Bearer ${gatewayToken}`, 'Content-Type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+      signal: controller.signal,
+    });
+    const data = await response.json().catch(() => null);
+    if (controller.signal.aborted) throw new Error('Request timed out.');
+    if (!response.ok) throw new Error(data?.error || `Echo is unavailable (${response.status}).`);
+    if (data === null) throw new Error('Echo returned an unreadable response. Please reconnect.');
+    return data as T;
+  } catch (error) {
+    if (controller.signal.aborted) throw new Error('Echo took too long to respond. Please reconnect; your saved conversation is unchanged.');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 export function visibleHistory(rows: any[]): AssistantMessage[] {
   return rows.flatMap((row, index) => {
