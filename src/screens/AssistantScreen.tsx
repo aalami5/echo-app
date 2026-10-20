@@ -215,6 +215,7 @@ export default function AssistantScreen() {
   const active = activity.session?.hasActiveRun;
   const callActive = voice.isConnected || voice.status === 'connecting';
   return <ChatViewport>
+    <ScrollView style={s.conversationControls} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
     <View style={s.header}>
       <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button"><Text style={s.heading}>Echo · {title} ▾</Text><Text style={s.subtle}>One conversation, voice or text</Text></TouchableOpacity>
       <Button title="Inbox" onPress={() => setSheet('legacy')} /><Button title={active ? 'Activity •' : 'Activity'} onPress={() => setSheet('activity')} />
@@ -226,6 +227,7 @@ export default function AssistantScreen() {
     </View>
     {(error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || error || voiceNotice}</Text>}
     {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={() => { void assistantApi('/bootstrap').then(b => { setConversations(b.conversations); setReady(true); setError(null); }).catch(e => setError(e.message)); }} /></View>}
+    </ScrollView>
     <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
       onScroll={e => { const n = e.nativeEvent; atBottom.current = n.contentOffset.y + n.layoutMeasurement.height >= n.contentSize.height - 100; }} scrollEventThrottle={100}
       onContentSizeChange={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); else setNewMessages(true); }}
@@ -276,6 +278,7 @@ export default function AssistantScreen() {
   </ChatViewport>;
 }
 const s = StyleSheet.create({
+  conversationControls: { flexGrow: 0, flexShrink: 1, maxHeight: '45%' },
   root: { flex: 1, backgroundColor: colors.background }, header: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 },
   heading: { color: colors.textPrimary, fontSize: 21, fontWeight: '600' }, subtle: { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
   voiceCard: { marginHorizontal: 12, padding: 14, borderRadius: 18, backgroundColor: colors.surfaceElevated, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }, voiceTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '600', marginBottom: 5 },
