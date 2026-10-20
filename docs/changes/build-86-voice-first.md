@@ -1,6 +1,6 @@
 # Build 86 — voice-first interface and call continuity
 
-Approved by Oliver on October 20, 2026. Native source commit: `26daed2`.
+Approved by Oliver on October 20, 2026. Native source commit: `16bdbdd`.
 
 ## User-facing changes
 
@@ -22,7 +22,7 @@ Approved by Oliver on October 20, 2026. Native source commit: `26daed2`.
 ## Verification and limits
 
 - TypeScript passed; iOS Metro export passed before native build.
-- 29 targeted controller, clinical audio lifecycle, native client, keyboard layout, adapter and clinical-preservation tests passed.
+- 31 targeted controller, clinical audio lifecycle, native client, keyboard layout, adapter and clinical-preservation tests passed.
 - Browser rendering of actual components checked bottom controls at 320×568, 375×667 and 393×852; text composer checked with compact keyboard. This is not a native-device interaction test.
 - Existing service health checks passed. No server restart/deployment, stored clinical-data mutation or conversation migration.
 - Physical acceptance still required: Mail/Safari background conversation with quiet interval and tool response; lock/unlock; AirPods; phone interruption; network switching; microphone-off indicator after End; small-screen large-text/VoiceOver.
@@ -30,8 +30,14 @@ Approved by Oliver on October 20, 2026. Native source commit: `26daed2`.
 
 ## Release tracking
 
-Final candidate: https://expo.dev/accounts/aalami/projects/echo-app/builds/e4875c65-0023-4839-bef6-a3b24316b3d3
+Final candidate: https://expo.dev/accounts/aalami/projects/echo-app/builds/e3730100-a913-4bce-9580-4583fbc4a720
 
-Submission: https://expo.dev/accounts/aalami/projects/echo-app/submissions/08a2e2cc-6f4f-4819-a77e-ef73afc33cd5
+Submission: https://expo.dev/accounts/aalami/projects/echo-app/submissions/47fcd3bf-90cd-4c7d-9c4d-ebf2eb9d2724
 
 The earlier candidate `0015d0ec-5724-4661-a94f-f87396c83292` was canceled before delivery to include pending-recording cleanup. Native build and Apple processing status are tracked in the workspace release wiki, separately from physical acceptance.
+
+Native archive succeeded on the final candidate. An intermediate candidate failed because the Swift event emitter needed an explicit React import; corrected before delivery. Another candidate was canceled to include the startup Retry UI. No failed/canceled candidate was uploaded to Apple.
+
+Native bridge reference: [React Native 0.81 iOS modules](https://reactnative.dev/docs/0.81/legacy/native-modules-ios).
+
+Downloaded final IPA verified: bundle `com.oppersmedical.echo`, version86; `audio`, `fetch`, `remote-notification` background modes; native event emitter and microphone/Retry UI present. SHA-256 `8e5a530bb497951194d94ef9ac7782c199cce3fddbb742dbdab322ecdd408e01`.
