@@ -33,7 +33,7 @@ const stop = async () => {
           await assistantApi(`/conversations/${call.conversationId}/voice/${call.voiceId}/close`, {});
           await AsyncStorage.removeItem(ACTIVE_VOICE_KEY);
         }
-      } catch { setError('Audio stopped. Server call cleanup will retry on reconnect; accepted work may continue.'); }
+      } catch { setError('Audio stopped. Server connection cleanup will retry on reconnect; accepted work may continue.'); }
       finally {
         await releaseLiveVoiceAudioRoute().catch(() => {});
         setMuted(false); setStatus(hasWebRtcRuntime() ? 'idle' : 'unsupported'); stopping.current = null;
@@ -121,13 +121,13 @@ const stop = async () => {
           disconnectTimer = setTimeout(() => {
             disconnectTimer = undefined;
             if (active() && pc.connectionState !== 'connected') {
-              void stop().then(() => setError('Connection lost. Tap Start call to reconnect; your conversation is saved.'));
+              void stop().then(() => setError('Connection lost. Tap Connect to reconnect; your conversation is saved.'));
             }
           }, 20000);
           call.timers!.push(disconnectTimer);
         }
         if (['failed', 'closed'].includes(pc.connectionState)) {
-          void stop().then(() => setError('Connection ended. Tap Start call to reconnect.'));
+          void stop().then(() => setError('Connection ended. Tap Connect to reconnect.'));
         }
       };
       const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
@@ -167,10 +167,10 @@ const resume = async () => {
   try {
     await prepareLiveVoiceAudioRoute();
     if (current.current !== call) return;
-    if (call.pc?.connectionState !== 'connected') { await stop(); setError('Tap Start call to reconnect.'); return; }
+    if (call.pc?.connectionState !== 'connected') { await stop(); setError('Tap Connect to reconnect.'); return; }
     // Resume receiving audio, but keep the microphone muted until explicitly unmuted.
     setStatus('connected'); setError(null);
-  } catch { setError('Audio is unavailable. End this call and try again.'); }
+  } catch { setError('Audio is unavailable. Disconnect and try again.'); }
 };
 export const liveVoiceSession = { stop, getSnapshot: () => snapshot };
 export function useRealtimeVoice(conversationId = 'home') {

@@ -44,7 +44,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: voice.isActive ? 'Live call' : 'Chat',
+          title: voice.isActive ? 'Live Voice' : 'Chat',
           tabBarBadge: voice.isActive ? '•' : undefined,
           tabBarHideOnKeyboard: true,
           tabBarIcon: ({ color, focused }) => (

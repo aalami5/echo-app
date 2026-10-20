@@ -17,8 +17,8 @@ export function VoiceIconButton({ icon, label, onPress, disabled, selected, dang
 export function voicePresentation(voice: Pick<Voice, 'status' | 'muted' | 'speaking'>, working: boolean) {
   if (voice.status === 'connecting') return { label: 'Connecting', color: '#F5B95E' };
   if (voice.status === 'reconnecting') return { label: 'Reconnecting', color: '#F5B95E' };
-  if (voice.status === 'paused') return { label: 'Call paused', color: '#94A3B8' };
-  if (voice.status === 'stopping') return { label: 'Ending call', color: '#94A3B8' };
+  if (voice.status === 'paused') return { label: 'Audio paused', color: '#94A3B8' };
+  if (voice.status === 'stopping') return { label: 'Disconnecting', color: '#94A3B8' };
   if (voice.status !== 'connected') return { label: 'Ready when you are', color: '#68DAD4' };
   if (voice.speaking) return { label: voice.muted ? 'Echo speaking · mic muted' : 'Echo speaking', color: '#B8DBFF' };
   if (working) return { label: voice.muted ? 'Working · mic muted' : 'Working', color: '#B69CFF' };
@@ -59,24 +59,22 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
       <View style={styles.header}><Text numberOfLines={2} style={styles.title}>Echo · {title}</Text><VoiceIconButton icon="ellipsis-horizontal" label="More options" onPress={onMore}/></View>
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.center}>
         <View accessible accessibilityLabel={state.label} style={styles.orbArea}>
-          {[232, 202, 174].map((size, index) => <Animated.View key={size} style={[styles.ring, { width: size, height: size, borderRadius: size / 2, borderColor: state.color, opacity: glow, transform: [{ scale }] }]}/>)}
-          <Animated.View style={[styles.core, { backgroundColor: state.color, transform: [{ scale }] }]}>
-            <Ionicons name={voice.muted || voice.status === 'paused' ? 'mic-off' : 'pulse'} size={58} color="#0B2336"/>
-          </Animated.View>
+          {[232, 202, 172, 142, 112, 82].map((size) => <Animated.View key={size} style={[styles.ring, { width: size, height: size, borderRadius: size / 2, borderColor: state.color, opacity: glow, transform: [{ scale }] }]}/>)}
+          <Animated.View style={[styles.core, { backgroundColor: state.color, transform: [{ scale }] }]}/>
         </View>
         <Text accessibilityLiveRegion="polite" style={[styles.state, { color: state.color }]}>{state.label}</Text>
         {(voice.error || (!ready && connectionError)) && <Text accessibilityRole="alert" style={styles.error}>{voice.error || connectionError}</Text>}
         {!ready && connectionError && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry connection" onPress={onRetry} style={styles.start}><Text style={styles.startText}>Try again</Text></TouchableOpacity>}
         {voice.status === 'paused' && <TouchableOpacity accessibilityRole="button" onPress={() => { void voice.resume(); }} style={styles.start}><Text style={styles.startText}>Resume audio</Text></TouchableOpacity>}
-        {ready && !voice.isActive && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Start voice call" disabled={!ready || !voice.isSupported} onPress={() => { void voice.start(); }} style={[styles.start, (!ready || !voice.isSupported) && { opacity: 0.4 }]}><Text style={styles.startText}>{ready ? 'Start call' : 'Connecting to Echo…'}</Text></TouchableOpacity>}
+        {ready && !voice.isActive && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Connect to Echo" disabled={!ready || !voice.isSupported} onPress={() => { void voice.start(); }} style={[styles.start, (!ready || !voice.isSupported) && { opacity: 0.4 }]}><Text style={styles.startText}>{ready ? 'Connect' : 'Connecting to Echo…'}</Text></TouchableOpacity>}
         {captions && <Text style={styles.caption}>{caption ? caption.slice(-400) : 'Spoken replies appear here.'}</Text>}
       </ScrollView>
       <View style={styles.footer}>
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={captions ? 'Hide captions' : 'Show captions'} onPress={() => setCaptions(value => !value)} style={styles.captionButton}><Ionicons name="chatbox-ellipses-outline" size={20} color={captions ? colors.primary : colors.textSecondary}/><Text style={styles.small}>Captions</Text></TouchableOpacity>
         <View style={styles.controls}>
           <View style={styles.control}><VoiceIconButton icon={voice.muted ? 'mic-off' : 'mic'} label={voice.muted ? 'Unmute microphone' : 'Mute microphone'} selected={voice.muted} disabled={!voice.isConnected} onPress={voice.toggleMute}/></View>
-          <View style={styles.control}><VoiceIconButton icon="chatbubble-outline" label="Switch to text; keep call connected" onPress={onText}/><Text style={styles.small}>Text</Text></View>
-          <View style={styles.control}><VoiceIconButton icon="call" label="End voice call" danger disabled={!voice.isActive || voice.status === 'stopping'} onPress={() => { void voice.stop(); }}/><Text style={styles.small}>End call</Text></View>
+          <View style={styles.control}><VoiceIconButton icon="chatbubble-outline" label="Switch to text; keep connection active" onPress={onText}/><Text style={styles.small}>Text</Text></View>
+          <View style={styles.control}><VoiceIconButton icon="power-outline" label="Disconnect from Echo" danger disabled={!voice.isActive || voice.status === 'stopping'} onPress={() => { void voice.stop(); }}/><Text style={styles.small}>Disconnect</Text></View>
         </View>
       </View>
     </View>
@@ -87,7 +85,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 }, title: { flex: 1, color: colors.textSecondary, fontSize: 18, fontWeight: '500' },
   center: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 20 },
   orbArea: { height: 250, width: 250, alignItems: 'center', justifyContent: 'center' }, ring: { position: 'absolute', borderWidth: 1.5 },
-  core: { width: 146, height: 146, borderRadius: 73, alignItems: 'center', justifyContent: 'center' },
+  core: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   state: { fontSize: 20, fontWeight: '500', textAlign: 'center', marginTop: 12 },
   error: { color: colors.warning, fontSize: 15, textAlign: 'center', marginTop: 16, lineHeight: 22 },
   start: { backgroundColor: '#68DAD4', borderRadius: 26, paddingHorizontal: 32, paddingVertical: 15, marginTop: 24, minHeight: 50 }, startText: { color: colors.textInverse, fontSize: 17, fontWeight: '600' },

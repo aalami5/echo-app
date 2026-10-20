@@ -6,10 +6,10 @@ export async function beginClinicalAudio(owner: object): Promise<boolean> {
   claimClinicalAudio(owner);
   const state = liveVoiceSession.getSnapshot().status;
   if (['idle', 'unsupported', 'error'].includes(state)) return true;
-  const confirmed = await new Promise<boolean>(resolve => Alert.alert('End Live Voice to dictate?',
+  const confirmed = await new Promise<boolean>(resolve => Alert.alert('Disconnect Live Voice to dictate?',
     'Patient dictation stays separate from your personal conversation.',
     [{ text: 'Cancel', style: 'cancel', onPress: () => resolve(false) },
-     { text: 'End call and dictate', onPress: () => resolve(true) }], { cancelable: false }));
+     { text: 'Disconnect and dictate', onPress: () => resolve(true) }], { cancelable: false }));
   if (!confirmed) { releaseClinicalAudio(owner); return false; }
   await liveVoiceSession.stop();
   return true;

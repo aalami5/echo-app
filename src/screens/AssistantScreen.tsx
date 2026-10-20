@@ -152,7 +152,7 @@ export default function AssistantScreen() {
   }, [ready, legacyHydrated, legacy]);
   const selectConversation = async (id: string) => {
     if (id === conversationId) { setSheet(null); return; }
-    if (voice.isActive || sending || uploading) { Alert.alert('End the call first', 'Each Live Voice call stays with its selected conversation.'); return; }
+    if (voice.isActive || sending || uploading) { Alert.alert('Disconnect first', 'Each Live Voice connection stays with its selected conversation.'); return; }
     if (attachments.length || text.trim()) { Alert.alert('Keep your draft', 'Send your draft or clear it before switching conversations.'); return; }
     await AsyncStorage.setItem(SELECTED, id); selected.current = id; setConversationId(id); setSheet(null);
   };
@@ -232,10 +232,10 @@ export default function AssistantScreen() {
       <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button" accessibilityLabel="Select conversation" style={{ flex: 1 }}><Text style={s.heading}>Echo · {title} ▾</Text></TouchableOpacity>
       <VoiceIconButton icon="ellipsis-horizontal" label="More options" onPress={() => setSheet('more')}/>
     </View>
-    <TouchableOpacity accessibilityRole="button" accessibilityLabel={callActive ? 'Return to voice call' : 'Open Live Voice'} onPress={() => setVoiceView(true)} style={s.voiceCard}>
+    <TouchableOpacity accessibilityRole="button" accessibilityLabel={callActive ? 'Return to Live Voice' : 'Open Live Voice'} onPress={() => setVoiceView(true)} style={s.voiceCard}>
       <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: voiceState.color }}/>
       <Text style={[s.voiceTitle, { flex: 1, marginBottom: 0 }]}>{callActive ? voiceState.label : 'Talk with Echo'}</Text>
-      <Text style={s.subtle}>{callActive ? 'Open call' : 'Live Voice'} ›</Text>
+      <Text style={s.subtle}>{callActive ? 'Live Voice' : 'Live Voice'} ›</Text>
     </TouchableOpacity>
     {(error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || error || voiceNotice}</Text>}
     {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={reconnect} /></View>}
@@ -250,7 +250,7 @@ export default function AssistantScreen() {
         {Object.entries(stream).map(([id, content]) => <View key={id} style={s.message}><Text style={s.role}>Echo · responding</Text><MessageText text={content}/></View>)}
         {outbox.map(item => <View key={item.id} style={s.message}><Text style={s.error}>Delivery not confirmed—check Activity before retrying.</Text><Text selectable style={s.body}>{item.message}</Text><Button disabled={sending} title="Check / retry same request" onPress={() => { void send(item); }}/></View>)}
         {(activity.artifacts || []).map((a: any) => <View key={a.id} style={s.message}><Text style={s.role}>File</Text><Button title={a.title} onPress={() => { void openArtifact(a); }}/></View>)}
-        {active && <Text style={s.subtle}>Echo is working. You can add instructions, end the call, or leave the app.</Text>}
+        {active && <Text style={s.subtle}>Echo is working. You can add instructions, disconnect, or leave the app.</Text>}
       </View>}
     />
     {newMessages && <Button title="Jump to latest" onPress={() => { atBottom.current = true; setNewMessages(false); list.current?.scrollToEnd({ animated: true }); }} />}
@@ -264,7 +264,7 @@ export default function AssistantScreen() {
       <View style={[s.root, { padding: 20, paddingTop: 24, paddingBottom: Math.max(20, insets.bottom) }]}><View style={s.row}><Text style={[s.heading, { flex: 1 }]}>{sheet === 'more' ? 'More' : sheet === 'projects' ? 'Conversations' : sheet === 'memory' ? 'What Echo remembers' : sheet === 'legacy' ? 'Inbox & earlier chats' : 'Activity'}</Text><Button title="Done" onPress={() => setSheet(null)}/></View>
         <ScrollView keyboardShouldPersistTaps="handled">
           {sheet === 'more' && <>
-            <Button title={callActive ? 'Return to voice call' : 'Live Voice'} onPress={() => { pendingVoice.current = true; setSheet(null); if (Platform.OS !== 'ios') dismissSheet(); }}/>
+            <Button title={callActive ? 'Return to Live Voice' : 'Live Voice'} onPress={() => { pendingVoice.current = true; setSheet(null); if (Platform.OS !== 'ios') dismissSheet(); }}/>
             <Button title="Conversations" onPress={() => setSheet('projects')}/>
             <Button title={active ? 'Activity · working' : 'Activity'} onPress={() => setSheet('activity')}/>
             <Button title="Memory" onPress={() => { void openMemory(); }}/>
@@ -283,9 +283,9 @@ export default function AssistantScreen() {
             {(activity.submissions || []).map((r: any) => <View key={r.id} style={s.message}><Text style={s.subtle}>Request {r.id.slice(-8)} · {r.state === 'accepted' ? 'Accepted by Echo (not proof of completion)' : 'Acknowledgement uncertain; do not send a duplicate action'}</Text></View>)}
             <Text style={s.subtle}>This view uses actual session and task status. Accepted work can continue while the app is closed. Scheduled responsibilities remain managed by Echo; ask to review or change them.</Text>
           </>}
-          {sheet === 'legacy' && <><Text style={s.subtle}>Notifications and earlier chats are preserved here. They are not replayed as new requests. Previously unsaved voice calls cannot be recovered.</Text>{legacy.map(m => <View key={m.id} style={s.message}><Text style={s.role}>{m.role === 'user' ? 'You' : 'Echo'}</Text><MessageText text={m.content}/></View>)}</>}
+          {sheet === 'legacy' && <><Text style={s.subtle}>Notifications and earlier chats are preserved here. They are not replayed as new requests. Previously unsaved voice conversations cannot be recovered.</Text>{legacy.map(m => <View key={m.id} style={s.message}><Text style={s.role}>{m.role === 'user' ? 'You' : 'Echo'}</Text><MessageText text={m.content}/></View>)}</>}
           {sheet === 'memory' && <>
-            <Text style={s.body}>Relevant private conversations can inform your replies automatically. Group conversations and patient/report storage are separate. Calls save text, not raw audio.</Text>
+            <Text style={s.body}>Relevant private conversations can inform your replies automatically. Group conversations and patient/report storage are separate. Voice conversations save text, not raw audio.</Text>
             <TextInput style={[s.input, { minHeight: 90 }]} multiline value={memoryText} onChangeText={setMemoryText} placeholder="A fact to remember, correct, or forget…" placeholderTextColor={colors.textTertiary}/>
             <View style={s.row}>{(['remember', 'correct', 'forget'] as const).map(action => <Button key={action} title={action.charAt(0).toUpperCase() + action.slice(1)} disabled={memoryBusy || !memoryText.trim()} onPress={() => { void requestMemory(action); }} />)}</View>
             <Text style={s.subtle}>Echo confirms changes in Home. Forgetting a saved fact is different from deleting original conversations and backups. These are curated sources, not every searchable chat.</Text>

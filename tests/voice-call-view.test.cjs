@@ -13,13 +13,13 @@ const base={status:'connected',isActive:true,isConnected:true,isSupported:true,m
 test('voice-first connection failure exposes Retry rather than trapping user behind disabled Start',async()=>{
  let ui,retried=0;await act(async()=>{ui=create(React.createElement(VoiceCallView,{visible:true,title:'Home',voice:{...base,status:'idle',isActive:false,isConnected:false},ready:false,connectionError:'Server unavailable',onRetry:()=>retried++,onText(){},onMore(){}}));});
  const retry=ui.root.findAllByType('Button').find(b=>b.props.accessibilityLabel==='Retry connection');assert.ok(retry);retry.props.onPress();assert.equal(retried,1);
- assert.equal(ui.root.findAllByType('Button').some(b=>b.props.accessibilityLabel==='Start voice call'),false);
+ assert.equal(ui.root.findAllByType('Button').some(b=>b.props.accessibilityLabel==='Connect to Echo'),false);
  await act(async()=>ui.unmount());
 });
 test('muted control uses mic-slash and accessible action; view switch does not call End',async()=>{
  let ui,toggled=0,text=0,stopped=0;await act(async()=>{ui=create(React.createElement(VoiceCallView,{visible:true,title:'Home',voice:{...base,muted:true,toggleMute:()=>toggled++,stop:()=>stopped++},ready:true,onRetry(){},onText:()=>text++,onMore(){}}));});
  const buttons=ui.root.findAllByType('Button'),mic=buttons.find(b=>b.props.accessibilityLabel==='Unmute microphone');assert.ok(mic);assert.equal(mic.findByType('Icon').props.name,'mic-off');assert.equal(mic.props.accessibilityState.selected,true);mic.props.onPress();assert.equal(toggled,1);
- buttons.find(b=>b.props.accessibilityLabel==='Switch to text; keep call connected').props.onPress();assert.equal(text,1);assert.equal(stopped,0);
+ buttons.find(b=>b.props.accessibilityLabel==='Switch to text; keep connection active').props.onPress();assert.equal(text,1);assert.equal(stopped,0);
  assert.match(voicePresentation({...base,speaking:true,muted:true},false).label,/mic muted/);
  await act(async()=>ui.unmount());
 });
