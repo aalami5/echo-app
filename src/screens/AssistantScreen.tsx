@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, FlatList, KeyboardAvoidingView, Linking, Modal, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as DocumentPicker from 'expo-document-picker';
@@ -9,6 +9,7 @@ import * as Clipboard from 'expo-clipboard';
 import { colors } from '../constants/theme';
 import { useChatStore } from '../stores/chatStore';
 import { useRealtimeVoice } from '../hooks/useRealtimeVoice';
+import { ChatViewport } from '../components/ChatViewport';
 import { assistantApi, AssistantMessage, Conversation, loadSubmissions, newSubmissionId, Submission, submit, visibleHistory, saveSubmission } from '../services/assistant';
 
 const SELECTED = 'echo-assistant-conversation-v1';
@@ -213,7 +214,7 @@ export default function AssistantScreen() {
   };
   const active = activity.session?.hasActiveRun;
   const callActive = voice.isConnected || voice.status === 'connecting';
-  return <KeyboardAvoidingView style={[s.root, { paddingTop: insets.top }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={0}>
+  return <ChatViewport>
     <View style={s.header}>
       <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button"><Text style={s.heading}>Echo · {title} ▾</Text><Text style={s.subtle}>One conversation, voice or text</Text></TouchableOpacity>
       <Button title="Inbox" onPress={() => setSheet('legacy')} /><Button title={active ? 'Activity •' : 'Activity'} onPress={() => setSheet('activity')} />
@@ -224,8 +225,8 @@ export default function AssistantScreen() {
       <Button primary title={callActive ? 'End call' : 'Live Voice'} disabled={!ready || voice.status === 'stopping' || !voice.isSupported} onPress={() => { void (callActive ? voice.stop() : voice.start()); }} />
     </View>
     {(error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || error || voiceNotice}</Text>}
-    {!ready && <View style={s.empty}><ActivityIndicator color={colors.primary}/><Button title="Reconnect" onPress={() => { void assistantApi('/bootstrap').then(b => { setConversations(b.conversations); setReady(true); setError(null); }).catch(e => setError(e.message)); }} /></View>}
-    <FlatList ref={list} style={{ flex: 1 }} contentContainerStyle={s.messages} data={messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled"
+    {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={() => { void assistantApi('/bootstrap').then(b => { setConversations(b.conversations); setReady(true); setError(null); }).catch(e => setError(e.message)); }} /></View>}
+    <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
       onScroll={e => { const n = e.nativeEvent; atBottom.current = n.contentOffset.y + n.layoutMeasurement.height >= n.contentSize.height - 100; }} scrollEventThrottle={100}
       onContentSizeChange={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); else setNewMessages(true); }}
       ListHeaderComponent={historyMore ? <Button title="Load earlier messages" onPress={() => { void loadEarlier(); }} /> : null}
@@ -239,13 +240,13 @@ export default function AssistantScreen() {
       </View>}
     />
     {newMessages && <Button title="Jump to latest" onPress={() => { atBottom.current = true; setNewMessages(false); list.current?.scrollToEnd({ animated: true }); }} />}
-    <View style={s.composer}>
-      {attachments.map(a => <TouchableOpacity key={a.id} onPress={() => setAttachments(old => old.filter(x => x.id !== a.id))}><Text style={s.subtle}>{a.fileName} · uploaded, not yet reviewed · remove ×</Text></TouchableOpacity>)}
-      <TextInput accessibilityLabel="Message Echo" style={s.input} multiline placeholder={active ? 'Add instructions to this work…' : 'Message Echo…'} placeholderTextColor={colors.textTertiary} value={text} onChangeText={setText} />
+    <View testID="chat-composer" style={s.composer}>
+      {attachments.length > 0 && <ScrollView style={{ maxHeight: 72 }} keyboardShouldPersistTaps="handled">{attachments.map(a => <TouchableOpacity key={a.id} onPress={() => setAttachments(old => old.filter(x => x.id !== a.id))}><Text style={s.subtle}>{a.fileName} · uploaded, not yet reviewed · remove ×</Text></TouchableOpacity>)}</ScrollView>}
+      <TextInput accessibilityLabel="Message Echo" style={[s.input, { minHeight: 44, maxHeight: 120 }]} multiline placeholder={active ? 'Add instructions to this work…' : 'Message Echo…'} placeholderTextColor={colors.textTertiary} value={text} onChangeText={setText} />
       <View style={s.row}><Button title={uploading ? 'Uploading…' : 'Attach'} disabled={!ready || uploading} onPress={() => { void pickFile(); }} /><Button title="Memory" onPress={() => { void openMemory(); }} /><View style={{ flex: 1 }}/><Button primary disabled={!ready || sending || uploading || (!text.trim() && !attachments.length)} title={sending ? 'Sending…' : active ? 'Add instructions' : 'Send'} onPress={() => { void send(); }} /></View>
     </View>
     <Modal visible={sheet !== null} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSheet(null)}>
-      <View style={[s.root, { padding: 20, paddingTop: 24 }]}><View style={s.row}><Text style={[s.heading, { flex: 1 }]}>{sheet === 'projects' ? 'Conversations' : sheet === 'memory' ? 'What Echo remembers' : sheet === 'legacy' ? 'Inbox & earlier chats' : 'Activity'}</Text><Button title="Done" onPress={() => setSheet(null)}/></View>
+      <View style={[s.root, { padding: 20, paddingTop: 24, paddingBottom: Math.max(20, insets.bottom) }]}><View style={s.row}><Text style={[s.heading, { flex: 1 }]}>{sheet === 'projects' ? 'Conversations' : sheet === 'memory' ? 'What Echo remembers' : sheet === 'legacy' ? 'Inbox & earlier chats' : 'Activity'}</Text><Button title="Done" onPress={() => setSheet(null)}/></View>
         <ScrollView keyboardShouldPersistTaps="handled">
           {sheet === 'projects' && <>
             {conversations.map(c => <Button key={c.id} title={c.title} onPress={() => { void selectConversation(c.id); }} />)}
@@ -272,7 +273,7 @@ export default function AssistantScreen() {
         </ScrollView>
       </View>
     </Modal>
-  </KeyboardAvoidingView>;
+  </ChatViewport>;
 }
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background }, header: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 },
@@ -280,5 +281,5 @@ const s = StyleSheet.create({
   voiceCard: { marginHorizontal: 12, padding: 14, borderRadius: 18, backgroundColor: colors.surfaceElevated, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }, voiceTitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '600', marginBottom: 5 },
   button: { paddingHorizontal: 12, paddingVertical: 10, minHeight: 44, justifyContent: 'center', borderRadius: 12, backgroundColor: colors.surfaceElevated, marginVertical: 4 }, primary: { backgroundColor: colors.primary }, buttonText: { color: colors.primary, fontSize: 14, fontWeight: '600' },
   messages: { padding: 14, paddingBottom: 25 }, message: { padding: 14, backgroundColor: colors.bubbleEcho, borderRadius: 14, marginVertical: 7 }, userMessage: { backgroundColor: colors.bubbleUser, marginLeft: 28 }, role: { fontSize: 12, color: colors.textSecondary, marginBottom: 8 }, body: { fontSize: 16, lineHeight: 25, color: colors.textPrimary }, link: { color: colors.primary, textDecorationLine: 'underline' },
-  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }, composer: { padding: 12, borderTopWidth: 1, borderTopColor: colors.border }, input: { color: colors.textPrimary, fontSize: 16, backgroundColor: colors.surface, padding: 12, borderRadius: 12, maxHeight: 160, marginVertical: 8 }, error: { color: colors.warning, padding: 12, fontSize: 14 }, empty: { padding: 25, gap: 20 },
+  row: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 }, composer: { flexShrink: 0, padding: 12, borderTopWidth: 1, borderTopColor: colors.border }, input: { color: colors.textPrimary, fontSize: 16, backgroundColor: colors.surface, padding: 12, borderRadius: 12, maxHeight: 160, marginVertical: 8 }, error: { color: colors.warning, padding: 12, fontSize: 14 }, empty: { padding: 25, gap: 20 }, connection: { paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', gap: 12 },
 });

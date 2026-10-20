@@ -43,6 +43,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'Chat',
+          tabBarHideOnKeyboard: true,
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon 
               name={focused ? 'chatbubble' : 'chatbubble-outline'} 
