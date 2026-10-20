@@ -1,6 +1,15 @@
 # Changelog
 
-**Last Updated:** October 17, 2026
+**Last Updated:** October 19, 2026
+
+## Builds 83–85 — Native connection and chat composer fixes (2026-10-19)
+
+- **Build 83:** Replaced unsupported native `AbortSignal.timeout()` with an `AbortController` and a cleared 55-second timer. Timeouts now explain how to reconnect without changing the saved conversation; unreadable JSON responses fail explicitly.
+- Direct local gateway URLs map authority port `18789` to adapter port `18790` without relying on React Native's unsupported URL port setter; matching text in paths is preserved.
+- **Build 84:** Added `ChatViewport` to reserve the measured absolute tab-bar height while the keyboard is hidden, remove that reservation when it opens, and apply top safe-area padding and iOS keyboard avoidance. The Chat tab hides its tab bar while typing.
+- Bounded attachment previews and multiline input height, added interactive keyboard dismissal and bottom safe-area spacing in sheets, and made the reconnect indicator compact with no spinner after an error.
+- **Build 85:** Made conversation controls scrollable and limited to 45% of the viewport, allowed the message list to shrink, and prevented the composer from shrinking on compact keyboard layouts.
+- Added native-client and viewport regression tests; iOS build number is now 85. These commits do not establish TestFlight availability or physical-device acceptance. Store implementations and backend architecture are unchanged.
 
 ## Build 82 — Durable voice/text conversations (2026-10-17)
 

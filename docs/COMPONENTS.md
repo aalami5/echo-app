@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** October 17, 2026
+**Last Updated:** October 19, 2026
 
 ---
 
@@ -357,7 +357,17 @@ Modal for selecting photos from camera or library. Includes a caption input fiel
 
 ## Screen Components
 
-### AssistantScreen / Chat tab (Build 82)
+### ChatViewport (Build 84)
+
+**File:** `src/components/ChatViewport.tsx`
+
+**Props:** `children: React.ReactNode`.
+
+Layout wrapper for `AssistantScreen`, used within the bottom-tab navigator and safe-area provider. It reserves the measured `useBottomTabBarHeight()` while the keyboard is hidden, then removes that bottom padding while the keyboard is visible. The Chat tab enables `tabBarHideOnKeyboard` in `app/(tabs)/_layout.tsx`.
+
+The inner `KeyboardAvoidingView` applies top safe-area padding, iOS `padding` behavior, zero keyboard offset, and `minHeight: 0`. Keyboard visibility initializes from `Keyboard.isVisible()` where available; listeners use will-show/hide events on iOS and did-show/hide elsewhere, with cleanup on unmount. Test IDs are `chat-viewport` and `chat-keyboard-area`.
+
+### AssistantScreen / Chat tab (Builds 82–85)
 
 **File:** `src/screens/AssistantScreen.tsx`, rendered by `app/(tabs)/index.tsx`.
 
@@ -368,6 +378,8 @@ Modal for selecting photos from camera or library. Includes a caption input fiel
 - Activity sheet shows native run/task state and submission receipts, with confirmation for exact-run stop. Uncertain delivery offers same-request reconciliation rather than a new action.
 - Memory sheet displays curated sources and sends remember/correct/forget requests to Echo; changes are confirmed in Home, not treated as transactional local edits.
 - Inbox & earlier chats preserves `chatStore` content without replaying historical requests. The old avatar recorder, photo-only composer, and next-meeting card are no longer the main Chat tab interface.
+
+Builds 84–85 wrap the screen in `ChatViewport`. Conversation controls scroll within a maximum 45% viewport height; the message list can shrink and supports interactive keyboard dismissal. The non-shrinking composer (`chat-composer`) bounds attachment previews to 72 points and multiline input to 44–120 points. Connection controls stay compact, hide the spinner after an error, and offer Reconnect. Modal sheets respect the bottom safe area.
 
 Screen-local `Button` supplies labeled touch controls; `MessageText` renders selectable text and HTTP(S) links. Local result files use authenticated artifact cards instead of arbitrary file URLs. `src/services/assistant.ts` owns API calls, public-history normalization, persistent submissions, and abandoned-call cleanup; no new Zustand store was introduced.
 
