@@ -18,6 +18,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
   const [duration, setDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
   const recordingStarting = useRef(false);
+  const recordingMounted = useRef(true);
   const recording = useRef<Audio.Recording | null>(null);
   const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const meteringInterval = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -54,6 +55,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
         return;
       }
 
+      if (!recordingMounted.current) { releaseClinicalAudio(recording); return; }
       // Configure audio mode
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -72,6 +74,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       );
       
       recording.current = newRecording;
+      if (!recordingMounted.current) { await newRecording.stopAndUnloadAsync(); recording.current = null; releaseClinicalAudio(recording); return; }
       setIsRecording(true);
       setDuration(0);
       setAudioLevel(0);
@@ -184,10 +187,12 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
 
   // Cleanup on unmount
   useEffect(() => {
+    recordingMounted.current = true;
     return () => {
+      recordingMounted.current = false;
       const r = recording.current;
       if (r) void r.stopAndUnloadAsync().then(() => releaseClinicalAudio(recording)).catch(() => {});
-      else releaseClinicalAudio(recording);
+      else if (!recordingStarting.current) releaseClinicalAudio(recording);
       if (durationInterval.current) clearInterval(durationInterval.current);
       if (meteringInterval.current) clearInterval(meteringInterval.current);
     };

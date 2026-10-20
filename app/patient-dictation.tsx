@@ -132,6 +132,7 @@ export default function PatientDictationScreen() {
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
   const recordingStarting = useRef(false);
+  const recordingMounted = useRef(true);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const reviewScrollRef = useRef<ScrollView>(null);
@@ -280,11 +281,12 @@ export default function PatientDictationScreen() {
     }, 10000);
   }, [isReadOnly, updateDictation]);
 
-  useEffect(() => () => {
+  useEffect(() => { recordingMounted.current = true; return () => {
+    recordingMounted.current = false;
     const r = recordingRef.current;
     if (r) void r.stopAndUnloadAsync().then(() => releaseClinicalAudio(recordingRef)).catch(() => {});
-    else releaseClinicalAudio(recordingRef);
-  }, []);
+    else if (!recordingStarting.current) releaseClinicalAudio(recordingRef);
+  }; }, []);
 
   // ─── Voice Recording ───
   const startRecording = async () => {
@@ -300,6 +302,7 @@ export default function PatientDictationScreen() {
         return;
       }
 
+      if (!recordingMounted.current) { releaseClinicalAudio(recordingRef); return; }
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -311,6 +314,7 @@ export default function PatientDictationScreen() {
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
       recordingRef.current = recording;
+      if (!recordingMounted.current) { await recording.stopAndUnloadAsync(); recordingRef.current = null; releaseClinicalAudio(recordingRef); return; }
       setIsRecording(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e: any) {

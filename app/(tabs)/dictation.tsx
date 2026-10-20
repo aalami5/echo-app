@@ -76,6 +76,7 @@ export default function DictationScreen() {
   const [isReadingBack, setIsReadingBack] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
   const recordingStarting = useRef(false);
+  const recordingMounted = useRef(true);
   const recordingRef = useRef<Audio.Recording | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   const ttsServiceRef = useRef<ElevenLabsService | null>(null);
@@ -131,11 +132,12 @@ export default function DictationScreen() {
     return new GatewayService({ baseUrl: gatewayUrl, token: gatewayToken } as any);
   }, [gatewayUrl, gatewayToken]);
 
-  useEffect(() => () => {
+  useEffect(() => { recordingMounted.current = true; return () => {
+    recordingMounted.current = false;
     const r = recordingRef.current;
     if (r) void r.stopAndUnloadAsync().then(() => releaseClinicalAudio(recordingRef)).catch(() => {});
-    else releaseClinicalAudio(recordingRef);
-  }, []);
+    else if (!recordingStarting.current) releaseClinicalAudio(recordingRef);
+  }; }, []);
 
   // ─── Voice Recording ───
   const startRecording = async () => {
@@ -151,6 +153,7 @@ export default function DictationScreen() {
       }
       // Unload any existing recording first
 
+      if (!recordingMounted.current) { releaseClinicalAudio(recordingRef); return; }
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -163,6 +166,7 @@ export default function DictationScreen() {
         Audio.RecordingOptionsPresets.HIGH_QUALITY,
       );
       recordingRef.current = recording;
+      if (!recordingMounted.current) { await recording.stopAndUnloadAsync(); recordingRef.current = null; releaseClinicalAudio(recordingRef); return; }
       setIsRecording(true);
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     } catch (e: any) {
