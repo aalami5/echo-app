@@ -220,6 +220,7 @@ export default function AssistantScreen() {
       Alert.alert('Request accepted', 'Echo will confirm the actual memory change in Home. Forgetting memory does not automatically delete original chats or backups.');
     } catch (e: any) { setError(e.message); } finally { setMemoryBusy(false); }
   };
+  const reconnect = () => { setError(null); void assistantApi('/bootstrap').then(b => { setConversations(b.conversations); setReady(true); setError(null); }).catch(e => setError(e.message)); };
   const active = activity.session?.hasActiveRun;
   const callActive = voice.isActive;
   const voiceState = voicePresentation(voice, !!active || voiceNotice === 'Echo is working on your request.');
@@ -237,7 +238,7 @@ export default function AssistantScreen() {
       <Text style={s.subtle}>{callActive ? 'Open call' : 'Live Voice'} ›</Text>
     </TouchableOpacity>
     {(error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || error || voiceNotice}</Text>}
-    {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={() => { void assistantApi('/bootstrap').then(b => { setConversations(b.conversations); setReady(true); setError(null); }).catch(e => setError(e.message)); }} /></View>}
+    {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={reconnect} /></View>}
     </ScrollView>
     <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
       onScroll={e => { const n = e.nativeEvent; atBottom.current = n.contentOffset.y + n.layoutMeasurement.height >= n.contentSize.height - 100; }} scrollEventThrottle={100}
@@ -258,7 +259,7 @@ export default function AssistantScreen() {
       <TextInput accessibilityLabel="Message Echo" style={[s.input, { minHeight: 44, maxHeight: 120 }]} multiline placeholder={active ? 'Add instructions to this work…' : 'Message Echo…'} placeholderTextColor={colors.textTertiary} value={text} onChangeText={setText} />
       <View style={s.row}><VoiceIconButton icon="add" label={uploading ? 'Uploading attachment' : 'Attach file'} disabled={!ready || uploading} onPress={() => { void pickFile(); }} /><View style={{ flex: 1 }}/><Button primary disabled={!ready || sending || uploading || (!text.trim() && !attachments.length)} title={sending ? 'Sending…' : active ? 'Add instructions' : 'Send'} onPress={() => { void send(); }} /></View>
     </View>
-    <VoiceCallView visible={voiceView} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} caption={caption} onText={() => setVoiceView(false)} onMore={() => { pendingMore.current = true; setVoiceView(false); if (Platform.OS !== 'ios') dismissVoice(); }} onDismiss={dismissVoice}/>
+    <VoiceCallView visible={voiceView} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => setVoiceView(false)} onMore={() => { pendingMore.current = true; setVoiceView(false); if (Platform.OS !== 'ios') dismissVoice(); }} onDismiss={dismissVoice}/>
     <Modal visible={sheet !== null} animationType="slide" presentationStyle="pageSheet" onDismiss={dismissSheet} onRequestClose={() => setSheet(null)}>
       <View style={[s.root, { padding: 20, paddingTop: 24, paddingBottom: Math.max(20, insets.bottom) }]}><View style={s.row}><Text style={[s.heading, { flex: 1 }]}>{sheet === 'more' ? 'More' : sheet === 'projects' ? 'Conversations' : sheet === 'memory' ? 'What Echo remembers' : sheet === 'legacy' ? 'Inbox & earlier chats' : 'Activity'}</Text><Button title="Done" onPress={() => setSheet(null)}/></View>
         <ScrollView keyboardShouldPersistTaps="handled">

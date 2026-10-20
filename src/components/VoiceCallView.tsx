@@ -25,8 +25,8 @@ export function voicePresentation(voice: Pick<Voice, 'status' | 'muted' | 'speak
   if (voice.muted) return { label: 'Microphone muted', color: '#94A3B8' };
   return { label: 'Listening', color: '#68E1D4' };
 }
-export function VoiceCallView({ visible, title, voice, working, ready, caption, onText, onMore, onDismiss }: {
-  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; onText: () => void; onMore: () => void; onDismiss?: () => void;
+export function VoiceCallView({ visible, title, voice, working, ready, caption, connectionError, onRetry, onText, onMore, onDismiss }: {
+  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; connectionError?: string | null; onRetry: () => void; onText: () => void; onMore: () => void; onDismiss?: () => void;
 }) {
   const insets = useSafeAreaInsets();
   const [reduceMotion, setReduceMotion] = useState(true);
@@ -34,7 +34,7 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
   const [captions, setCaptions] = useState(false);
   const glow = useRef(new Animated.Value(0.3)).current;
   const scale = useRef(new Animated.Value(1)).current;
-  const state = voicePresentation(voice, working);
+  const state = !ready ? { label: connectionError ? 'Connection unavailable' : 'Connecting to Echo', color: '#F5B95E' } : voicePresentation(voice, working);
   useEffect(() => {
     let alive = true;
     void AccessibilityInfo.isReduceMotionEnabled().then(value => { if (alive) setReduceMotion(value); });
@@ -65,9 +65,10 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
           </Animated.View>
         </View>
         <Text accessibilityLiveRegion="polite" style={[styles.state, { color: state.color }]}>{state.label}</Text>
-        {voice.error && <Text accessibilityRole="alert" style={styles.error}>{voice.error}</Text>}
+        {(voice.error || (!ready && connectionError)) && <Text accessibilityRole="alert" style={styles.error}>{voice.error || connectionError}</Text>}
+        {!ready && connectionError && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry connection" onPress={onRetry} style={styles.start}><Text style={styles.startText}>Try again</Text></TouchableOpacity>}
         {voice.status === 'paused' && <TouchableOpacity accessibilityRole="button" onPress={() => { void voice.resume(); }} style={styles.start}><Text style={styles.startText}>Resume audio</Text></TouchableOpacity>}
-        {!voice.isActive && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Start voice call" disabled={!ready || !voice.isSupported} onPress={() => { void voice.start(); }} style={[styles.start, (!ready || !voice.isSupported) && { opacity: 0.4 }]}><Text style={styles.startText}>{ready ? 'Start call' : 'Connecting to Echo…'}</Text></TouchableOpacity>}
+        {ready && !voice.isActive && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Start voice call" disabled={!ready || !voice.isSupported} onPress={() => { void voice.start(); }} style={[styles.start, (!ready || !voice.isSupported) && { opacity: 0.4 }]}><Text style={styles.startText}>{ready ? 'Start call' : 'Connecting to Echo…'}</Text></TouchableOpacity>}
         {captions && <Text style={styles.caption}>{caption ? caption.slice(-400) : 'Spoken replies appear here.'}</Text>}
       </ScrollView>
       <View style={styles.footer}>
