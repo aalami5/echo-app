@@ -41,3 +41,7 @@ Native archive succeeded on the final candidate. An intermediate candidate faile
 Native bridge reference: [React Native 0.81 iOS modules](https://reactnative.dev/docs/0.81/legacy/native-modules-ios).
 
 Downloaded final IPA verified: bundle `com.oppersmedical.echo`, version86; `audio`, `fetch`, `remote-notification` background modes; native event emitter and microphone/Retry UI present. SHA-256 `8e5a530bb497951194d94ef9ac7782c199cce3fddbb742dbdab322ecdd408e01`.
+
+## Delivery confirmation
+
+October20, 2026, 12:13 Pacific: EAS build/submission FINISHED. Apple build `4e5d1f33-502f-45d6-817f-87948ff94370` is VALID / IN_BETA_TESTING internally; external state READY_FOR_BETA_SUBMISSION (no external review requested). The agreement blocker did not recur. Update in place; physical background/audio-route acceptance remains pending.
