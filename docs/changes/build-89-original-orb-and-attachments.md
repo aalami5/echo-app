@@ -1,6 +1,6 @@
 # Build 89 — original Echo rings and attachment menu
 
-Status: user authorized build and TestFlight deployment on October 21, 2026. Release candidate prepared; Apple availability not yet confirmed.
+Status: available in internal TestFlight. Verified October 21, 2026, 14:37 UTC: native build/submission FINISHED; Apple VALID / IN_BETA_TESTING.
 
 ## Approved scope
 
@@ -18,3 +18,9 @@ Status: user authorized build and TestFlight deployment on October 21, 2026. Rel
 - Preview: workspace `artifacts/echo-next-build-original-rings/preview-393.png`. This is a browser render, not an iPhone screenshot. Native animation appearance and device attachment pickers still need physical-phone verification.
 
 Reference: Oliver's original-ring image supplied October 21, 2026. No release or availability claim until a native build/upload and Apple processing are verified.
+
+## Release tracking
+
+Source `815b9ce`. EAS build `448a732a-04e3-40f4-a9ad-6ace0abee184`; automatic submission `d311598a-d7a0-4ae6-9e93-4d69718d8383`. Both FINISHED October 21, 2026. Apple build `e4c9d7e1-8499-4ba5-b089-faf1c4ea3e7e` is VALID; direct buildBetaDetail confirms IN_BETA_TESTING internally and autoNotifyEnabled true. External state READY_FOR_BETA_SUBMISSION; external review was not requested. No agreement blocker. Update in place; do not uninstall.
+
+Downloaded IPA verified Build89, source `815b9cefecaca37ef44aad423b0a38a427ef3bba`, original ring component, + attachment controls and preserved audio/fetch/remote-notification background modes. SHA-256 `1255f279eafe512d25384a4f4e650e8d6ce627e09195144368f6a5b49ff4462f`. Evidence: workspace `artifacts/echo-build89/package-verification.json`.

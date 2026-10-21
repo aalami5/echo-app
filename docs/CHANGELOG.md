@@ -1,6 +1,13 @@
 # Changelog
 
-**Last Updated:** October 20, 2026
+**Last Updated:** October 21, 2026
+
+## Build 89 — Original ring animation and unified attachments (2026-10-21)
+
+- Restored three graduated rings and solid center, gentle staggered breathing and audio-level response; preserved mode colors and accessibility/foreground animation controls.
+- Replaced separate voice Photos/Camera buttons with a shared + menu: Camera, Photo Library, Files. Explicit preview/send and conversation-local drafts remain intact.
+- Native build and submission finished; Apple VALID / IN_BETA_TESTING internally. Downloaded package verified. No audio transport, background configuration, clinical workflow or backend changes.
+- [Verification and release details](changes/build-89-original-orb-and-attachments.md). Physical-iPhone animation and attachment checks remain pending.
 
 ## Builds 86–88 — Voice continuity, camera and photo input (2026-10-20)
 
