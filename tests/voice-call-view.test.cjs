@@ -2,7 +2,7 @@ const {test}=require('node:test'),assert=require('node:assert/strict'),fs=requir
 const React=require('react'),{create,act}=require('react-test-renderer');global.IS_REACT_ACT_ENVIRONMENT=true;
 const load=Module._load, animation=()=>({start(){},stop(){}});
 Module._load=function(id,...args){
- if(id==='react-native')return {AccessibilityInfo:{isReduceMotionEnabled:async()=>true,addEventListener:()=>({remove(){}})},AppState:{currentState:'active',addEventListener:()=>({remove(){}})},Animated:{Value:class{setValue(){}},View:'AnimatedView',timing:animation,sequence:animation,loop:animation},Modal:'Modal',ScrollView:'ScrollView',StyleSheet:{create:x=>x},Text:'Text',TouchableOpacity:'Button',View:'View'};
+ if(id==='react-native')return {AccessibilityInfo:{isReduceMotionEnabled:async()=>true,addEventListener:()=>({remove(){}})},AppState:{currentState:'active',addEventListener:()=>({remove(){}})},Animated:{Value:class{setValue(){} interpolate(config){return config.outputRange[0]}},View:'AnimatedView',timing:animation,sequence:animation,loop:animation},Modal:'Modal',ScrollView:'ScrollView',StyleSheet:{create:x=>x},Text:'Text',TouchableOpacity:'Button',View:'View'};
  if(id==='@expo/vector-icons/Ionicons')return {__esModule:true,default:'Icon'};
  if(id==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:47,bottom:34})};
  return load.call(this,id,...args);

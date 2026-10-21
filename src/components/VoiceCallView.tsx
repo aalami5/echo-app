@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, AppState, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { AccessibilityInfo, AppState, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { colors } from '../constants/theme';
 import { useRealtimeVoice } from '../hooks/useRealtimeVoice';
+import { VoiceOrb, VoiceOrbMode } from './VoiceOrb';
 
 type Voice = ReturnType<typeof useRealtimeVoice>;
 export function VoiceIconButton({ icon, label, onPress, disabled, selected, danger }: {
@@ -30,9 +31,12 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
   const [reduceMotion, setReduceMotion] = useState(true);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [captions, setCaptions] = useState(false);
-  const glow = useRef(new Animated.Value(0.3)).current;
-  const scale = useRef(new Animated.Value(1)).current;
   const state = !ready ? { label: connectionError ? 'Connection unavailable' : 'Connecting to Echo', color: '#F5B95E' } : voicePresentation(voice, working);
+  const orbMode: VoiceOrbMode = !ready ? (connectionError ? 'paused' : 'connecting')
+    : voice.status === 'connecting' || voice.status === 'reconnecting' ? 'connecting'
+    : voice.status === 'paused' || voice.status === 'stopping' ? 'paused'
+    : voice.status !== 'connected' ? 'idle'
+    : voice.speaking ? 'speaking' : working ? 'working' : voice.muted ? 'muted' : 'listening';
   useEffect(() => {
     let alive = true;
     void AccessibilityInfo.isReduceMotionEnabled().then(value => { if (alive) setReduceMotion(value); });
@@ -40,26 +44,13 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
     const app = AppState.addEventListener('change', value => setForeground(value === 'active'));
     return () => { alive = false; motion.remove(); app.remove(); };
   }, []);
-  useEffect(() => {
-    if (!visible || !foreground || reduceMotion || !voice.isActive) { glow.setValue(0.3); return; }
-    const animation = Animated.loop(Animated.sequence([
-      Animated.timing(glow, { toValue: 0.7, duration: 1500, useNativeDriver: true }),
-      Animated.timing(glow, { toValue: 0.3, duration: 1500, useNativeDriver: true }),
-    ]));
-    animation.start(); return () => animation.stop();
-  }, [visible, foreground, reduceMotion, voice.isActive, glow]);
-  useEffect(() => {
-    const animation = Animated.timing(scale, { toValue: reduceMotion || !foreground ? 1 : 1 + voice.level * 0.15, duration: 160, useNativeDriver: true });
-    animation.start(); return () => animation.stop();
-  }, [voice.level, reduceMotion, foreground, scale]);
   if (!visible) return null;
   // Inline within ChatViewport: the original tab bar stays visible and usable.
   return <View testID="voice-inline-view" style={styles.root}>
       <View style={styles.header}><Text numberOfLines={2} style={styles.title}>Echo · {title}</Text><VoiceIconButton icon="ellipsis-horizontal" label="More options" onPress={onMore}/></View>
       {content || <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.center}>
-        <View accessible accessibilityLabel={state.label} style={styles.orbArea}>
-          {[232, 202, 172, 142, 112, 82].map((size) => <Animated.View key={size} style={[styles.ring, { width: size, height: size, borderRadius: size / 2, borderColor: state.color, opacity: glow, transform: [{ scale }] }]}/>)}
-          <Animated.View style={[styles.core, { backgroundColor: state.color, transform: [{ scale }] }]}/>
+        <View accessible accessibilityLabel={state.label}>
+          <VoiceOrb color={state.color} mode={orbMode} level={voice.level} motionEnabled={visible && foreground && !reduceMotion}/>
         </View>
         <Text accessibilityLiveRegion="polite" style={[styles.state, { color: state.color }]}>{state.label}</Text>
         {(voice.error || (!ready && connectionError)) && <Text accessibilityRole="alert" style={styles.error}>{voice.error || connectionError}</Text>}
@@ -84,8 +75,6 @@ const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 0, backgroundColor: colors.background, paddingHorizontal: 12, paddingTop: 8 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 }, title: { flex: 1, color: colors.textSecondary, fontSize: 18, fontWeight: '500' },
   center: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 20 },
-  orbArea: { height: 250, width: 250, alignItems: 'center', justifyContent: 'center' }, ring: { position: 'absolute', borderWidth: 1.5 },
-  core: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
   state: { fontSize: 20, fontWeight: '500', textAlign: 'center', marginTop: 12 },
   error: { color: colors.warning, fontSize: 15, textAlign: 'center', marginTop: 16, lineHeight: 22 },
   start: { backgroundColor: '#68DAD4', borderRadius: 26, paddingHorizontal: 32, paddingVertical: 15, marginTop: 24, minHeight: 50 }, startText: { color: colors.textInverse, fontSize: 17, fontWeight: '600' },
