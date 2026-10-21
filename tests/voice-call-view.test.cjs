@@ -24,8 +24,8 @@ test('muted control uses mic-slash and accessible action; view switch does not c
  await act(async()=>ui.unmount());
 });
 test('voice view stays inline with media actions separate from explicit Hang up',async()=>{
- let ui,photos=0,camera=0,stops=0;await act(async()=>{ui=create(React.createElement(VoiceCallView,{visible:true,title:'Home',voice:{...base,stop:()=>stops++},working:false,ready:true,onRetry(){},onText(){},onMore(){},onPhotos:()=>photos++,onCamera:()=>camera++}));});
+ let ui,attachments=0,stops=0;await act(async()=>{ui=create(React.createElement(VoiceCallView,{visible:true,title:'Home',voice:{...base,stop:()=>stops++},working:false,ready:true,onRetry(){},onText(){},onMore(){},onAttach:()=>attachments++}));});
  assert.equal(ui.root.findAllByType('Modal').length,0);assert.ok(ui.root.findByProps({testID:'voice-inline-view'}));
- const buttons=ui.root.findAllByType('Button');buttons.find(b=>b.props.accessibilityLabel==='Add photos').props.onPress();buttons.find(b=>b.props.accessibilityLabel==='Open live camera').props.onPress();assert.equal(photos,1);assert.equal(camera,1);assert.equal(stops,0);
+ const buttons=ui.root.findAllByType('Button');const attach=buttons.find(b=>b.props.accessibilityLabel==='Add attachment');assert.equal(attach.findByType('Icon').props.name,'add');attach.props.onPress();assert.equal(attachments,1);assert.equal(buttons.some(b=>['Add photos','Open live camera'].includes(b.props.accessibilityLabel)),false);assert.equal(stops,0);
  buttons.find(b=>b.props.accessibilityLabel==='Hang up').props.onPress();assert.equal(stops,1);await act(async()=>ui.unmount());
 });

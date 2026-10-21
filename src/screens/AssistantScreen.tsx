@@ -310,7 +310,7 @@ export default function AssistantScreen() {
   const attachmentTray = <AssistantAttachmentTray files={attachments} disabled={mediaBusy} onRemove={removeAttachment}/>;
   const mediaControls = <View style={s.mediaMenu}>
     <Text style={s.subtle}>Add to Echo · {title}</Text>
-    <View style={s.row}><Button title="Files" disabled={mediaBusy} onPress={() => {void pickMedia('files');}}/><Button title="Photos" disabled={mediaBusy} onPress={() => {void pickMedia('photos');}}/><Button title="Live Camera" disabled={mediaBusy} onPress={openCamera}/><Button title="Cancel" onPress={() => setMediaMenu(false)}/></View>
+    <View style={s.row}><Button title="Camera" disabled={mediaBusy} onPress={openCamera}/><Button title="Photo Library" disabled={mediaBusy} onPress={() => {void pickMedia('photos');}}/><Button title="Files" disabled={mediaBusy} onPress={() => {void pickMedia('files');}}/><Button title="Cancel" onPress={() => setMediaMenu(false)}/></View>
   </View>;
   const cameraPanel = cameraOpen && focused && foreground ? <AssistantCamera busy={mediaPicking} onCapture={capturePhoto} onClose={() => setCameraOpen(false)}/> : undefined;
   const voiceDraft = <>
@@ -322,7 +322,7 @@ export default function AssistantScreen() {
     {(attachments.length > 0 || text.trim()) && <View><Text numberOfLines={2} style={s.subtle}>{text.trim() || `Send to Echo · ${title}`}</Text><Button primary title={sending ? uploadProgress || 'Sending…' : 'Send to Echo'} disabled={mediaBusy || !ready} onPress={() => {void send();}}/></View>}
   </>;
   return <ChatViewport>
-    {voiceView ? <VoiceCallView visible={focused} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => {setCameraOpen(false);setVoiceView(false);}} onMore={() => setSheet('more')} onPhotos={() => {void pickMedia('photos');}} onCamera={openCamera} onHangUp={() => {setCameraOpen(false);void voice.stop();}} mediaDisabled={!ready || mediaBusy || cameraOpen} content={cameraPanel} draftContent={voiceDraft}/> : <>
+    {voiceView ? <VoiceCallView visible={focused} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => {setCameraOpen(false);setMediaMenu(false);setVoiceView(false);}} onMore={() => setSheet('more')} onAttach={() => setMediaMenu(value => !value)} onHangUp={() => {setCameraOpen(false);setMediaMenu(false);void voice.stop();}} mediaDisabled={!ready || mediaBusy || cameraOpen} content={cameraPanel} draftContent={voiceDraft}/> : <>
     <ScrollView style={s.conversationControls} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
     <View style={s.header}>
       <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button" accessibilityLabel="Select conversation" style={{ flex: 1 }}><Text style={s.heading}>Echo · {title} ▾</Text></TouchableOpacity>

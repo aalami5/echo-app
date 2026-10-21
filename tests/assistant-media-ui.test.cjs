@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),ts=require('typescript'),Module=require('module');
 const React=require('react'),{create,act}=require('react-test-renderer');global.IS_REACT_ACT_ENVIRONMENT=true;
-const load=Module._load;let focused=true,photos=0,uploads=[],submissions=[],stops=0,failUpload=false;
+const load=Module._load;let focused=true,photos=0,files=0,uploads=[],submissions=[],stops=0,failUpload=false;
 const storage=new Map(),appListeners=new Set();const voice={status:'connected',isActive:true,isConnected:true,isSupported:true,muted:false,speaking:false,level:0,startedAt:1,stop:()=>stops++,start(){},resume(){},toggleMute(){}};
 const animation=()=>({start(){},stop(){}});
 Module._load=function(id,...args){
@@ -9,6 +9,7 @@ Module._load=function(id,...args){
  if(id==='react-native-safe-area-context')return {useSafeAreaInsets:()=>({top:47,bottom:34})};
  if(id==='@react-native-async-storage/async-storage')return {getItem:async k=>storage.get(k)||null,setItem:async(k,v)=>storage.set(k,v)};
  if(id==='expo-image-picker')return {launchImageLibraryAsync:async()=>{photos++;return {canceled:false,assets:[{uri:'file:///photo',width:100,height:100,fileName:'Picture.jpg'}]}}};
+ if(id==='expo-document-picker')return {getDocumentAsync:async()=>{files++;return {canceled:true}}};
  if(id==='expo-file-system/legacy')return {documentDirectory:'file:///private/'};
  if(id.startsWith('expo-'))return {};
  if(id.includes('@expo/vector-icons'))return {__esModule:true,default:'Icon'};
@@ -26,7 +27,7 @@ const press=async(ui,label)=>{const b=ui.root.findAllByType('Button').find(b=>b.
 test('photo draft survives voice/text/tab switches and upload failure; explicit send shares same conversation',async()=>{
  let ui;await act(async()=>{ui=create(React.createElement(Screen));});
  assert.equal(ui.root.findAllByType('Modal').length,0);
- await press(ui,'Add photos');assert.equal(photos,1);assert.equal(uploads.length,0);assert.equal(submissions.length,0);assert.ok(ui.root.findAllByType('Image').length);
+ await press(ui,'Add attachment');await press(ui,'Photo Library');assert.equal(photos,1);assert.equal(uploads.length,0);assert.equal(submissions.length,0);assert.ok(ui.root.findAllByType('Image').length);
  focused=false;await act(async()=>ui.update(React.createElement(Screen)));assert.equal(stops,0);
  focused=true;await act(async()=>ui.update(React.createElement(Screen)));assert.ok(ui.root.findAllByType('Image').length);
  await press(ui,'Switch to text; keep connection active');await press(ui,'Add attachment');await press(ui,'Cancel');assert.equal(stops,0);
@@ -35,12 +36,25 @@ test('photo draft survives voice/text/tab switches and upload failure; explicit 
  assert.equal(ui.root.findAllByType('Image').length,0);await act(async()=>ui.unmount());
 });
 test('camera closes on navigation away without hanging up or changing conversation',async()=>{
- let ui;await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Open live camera');assert.equal(ui.root.findAllByType('CameraPanel').length,1);
+ let ui;await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Add attachment');await press(ui,'Camera');assert.equal(ui.root.findAllByType('CameraPanel').length,1);
  focused=false;await act(async()=>ui.update(React.createElement(Screen)));assert.equal(ui.root.findAllByType('CameraPanel').length,0);
  focused=true;await act(async()=>ui.update(React.createElement(Screen)));assert.equal(ui.root.findAllByType('CameraPanel').length,0);assert.equal(stops,0);await act(async()=>ui.unmount());
 });
 
 test('Hang up also closes an open camera, but retains the conversation draft',async()=>{
- let ui;await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Add photos');await press(ui,'Open live camera');assert.equal(ui.root.findAllByType('CameraPanel').length,1);
+ let ui;await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Add attachment');await press(ui,'Photo Library');await press(ui,'Add attachment');await press(ui,'Camera');assert.equal(ui.root.findAllByType('CameraPanel').length,1);
  await press(ui,'Hang up');assert.equal(stops,1);assert.equal(ui.root.findAllByType('CameraPanel').length,0);assert.equal(ui.root.findAllByType('Image').length,1);await act(async()=>ui.unmount());
+});
+
+test('voice plus menu offers all sources; Files cancellation and menu cancellation do not send or disconnect',async()=>{
+ const before={stops,uploads:uploads.length,submissions:submissions.length,files};let ui;
+ await act(async()=>{ui=create(React.createElement(Screen));});
+ assert.equal(ui.root.findAllByType('Button').filter(b=>b.props.accessibilityLabel==='Add attachment').length,1);
+ await press(ui,'Add attachment');
+ for(const label of ['Camera','Photo Library','Files','Cancel'])assert.ok(ui.root.findAllByType('Button').some(b=>b.props.accessibilityLabel===label));
+ await press(ui,'Files');assert.equal(files,before.files+1);
+ assert.equal(ui.root.findAllByType('Button').some(b=>b.props.accessibilityLabel==='Files'),false);
+ await press(ui,'Add attachment');await press(ui,'Cancel');
+ assert.equal(stops,before.stops);assert.equal(uploads.length,before.uploads);assert.equal(submissions.length,before.submissions);
+ await act(async()=>ui.unmount());
 });

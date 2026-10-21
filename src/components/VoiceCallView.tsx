@@ -24,8 +24,8 @@ export function voicePresentation(voice: Pick<Voice, 'status' | 'muted' | 'speak
   if (voice.muted) return { label: 'Microphone muted', color: '#94A3B8' };
   return { label: 'Listening', color: '#68E1D4' };
 }
-export function VoiceCallView({ visible, title, voice, working, ready, caption, connectionError, onRetry, onText, onMore, onPhotos, onCamera, onHangUp, mediaDisabled, content, draftContent }: {
-  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; connectionError?: string | null; onRetry: () => void; onText: () => void; onMore: () => void; onPhotos?: () => void; onCamera?: () => void; onHangUp?: () => void; mediaDisabled?: boolean; content?: React.ReactNode; draftContent?: React.ReactNode;
+export function VoiceCallView({ visible, title, voice, working, ready, caption, connectionError, onRetry, onText, onMore, onAttach, onHangUp, mediaDisabled, content, draftContent }: {
+  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; connectionError?: string | null; onRetry: () => void; onText: () => void; onMore: () => void; onAttach?: () => void; onHangUp?: () => void; mediaDisabled?: boolean; content?: React.ReactNode; draftContent?: React.ReactNode;
 }) {
   const [reduceMotion, setReduceMotion] = useState(true);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
@@ -74,8 +74,7 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
         <View style={styles.controls}>
           <View style={styles.control}><VoiceIconButton icon={voice.muted ? 'mic-off' : 'mic'} label={voice.muted ? 'Unmute microphone' : 'Mute microphone'} selected={voice.muted} disabled={!voice.isConnected} onPress={voice.toggleMute}/></View>
           <View style={styles.control}><VoiceIconButton icon="chatbubble-outline" label="Switch to text; keep connection active" onPress={onText}/><Text style={styles.small}>Text</Text></View>
-          {onPhotos && <View style={styles.control}><VoiceIconButton icon="images-outline" label="Add photos" disabled={mediaDisabled} onPress={onPhotos}/><Text style={styles.small}>Photos</Text></View>}
-          {onCamera && <View style={styles.control}><VoiceIconButton icon="camera-outline" label="Open live camera" disabled={mediaDisabled} onPress={onCamera}/><Text style={styles.small}>Camera</Text></View>}
+          {onAttach && <View style={styles.control}><VoiceIconButton icon="add" label="Add attachment" disabled={mediaDisabled} onPress={onAttach}/></View>}
           <View style={styles.control}><VoiceIconButton icon="power-outline" label="Hang up" danger disabled={!voice.isActive || voice.status === 'stopping'} onPress={() => { if (onHangUp) onHangUp(); else void voice.stop(); }}/><Text style={styles.small}>Hang up</Text></View>
         </View>
       </View>
