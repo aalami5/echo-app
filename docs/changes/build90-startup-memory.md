@@ -13,3 +13,9 @@ Startup memory is server-side, not baked into the IPA. `scripts/install-startup-
 ## Evidence and limits
 
 Targeted unit tests cover owner/session restrictions, newer corrections, unfinished work, failed/slow retrieval, Unicode bounds and source refresh. Post-restart native voice-create probe loaded a ready packet (3 sources, 2 memory notes, 6432 bytes, approximately 6 seconds). No clinical endpoints or data changed. Physical-phone recall acceptance remains required; bounded recent context is not a guarantee of exhaustive older conversation recall.
+
+## Delivery — October 21, 2026
+
+Build90 `8aed9b10-4c4c-400a-8e13-54511e5ed18f` compiled from `befca0eb1fea52d1bd1d58b75a26222e653b4577`. Apple build `db573c53-8a83-44ec-853a-df169d3676ba` is VALID and IN_BETA_TESTING, confirmed directly. Signed IPA verifies Chat accessibility text, original rings, attachment menu and background audio. SHA256 `dcff470e7b25ab9cd696118fa0622c99fe73c02439d5038bc01116acd0f6d9ef`.
+
+A live synthetic spoken request correctly recalled the Stanford review's 230 screened entries and unfinished final report, distinguished unverified follow-ups, and did not resume work. Physical-phone acceptance remains pending. Update in place via TestFlight.
