@@ -19,7 +19,7 @@ test('voice-first connection failure exposes Retry rather than trapping user beh
 test('muted control uses mic-slash and accessible action; view switch does not call End',async()=>{
  let ui,toggled=0,text=0,stopped=0;await act(async()=>{ui=create(React.createElement(VoiceCallView,{visible:true,title:'Home',voice:{...base,muted:true,toggleMute:()=>toggled++,stop:()=>stopped++},ready:true,onRetry(){},onText:()=>text++,onMore(){}}));});
  const buttons=ui.root.findAllByType('Button'),mic=buttons.find(b=>b.props.accessibilityLabel==='Unmute microphone');assert.ok(mic);assert.equal(mic.findByType('Icon').props.name,'mic-off');assert.equal(mic.props.accessibilityState.selected,true);mic.props.onPress();assert.equal(toggled,1);
- buttons.find(b=>b.props.accessibilityLabel==='Switch to text; keep connection active').props.onPress();assert.equal(text,1);assert.equal(stopped,0);
+ buttons.find(b=>b.props.accessibilityLabel==='Switch to chat; keep connection active').props.onPress();assert.equal(text,1);assert.equal(stopped,0);
  assert.match(voicePresentation({...base,speaking:true,muted:true},false).label,/mic muted/);
  await act(async()=>ui.unmount());
 });

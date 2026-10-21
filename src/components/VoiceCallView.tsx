@@ -64,7 +64,7 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={captions ? 'Hide captions' : 'Show captions'} onPress={() => setCaptions(value => !value)} style={styles.captionButton}><Ionicons name="chatbox-ellipses-outline" size={20} color={captions ? colors.primary : colors.textSecondary}/><Text style={styles.small}>Captions</Text></TouchableOpacity>
         <View style={styles.controls}>
           <View style={styles.control}><VoiceIconButton icon={voice.muted ? 'mic-off' : 'mic'} label={voice.muted ? 'Unmute microphone' : 'Mute microphone'} selected={voice.muted} disabled={!voice.isConnected} onPress={voice.toggleMute}/></View>
-          <View style={styles.control}><VoiceIconButton icon="chatbubble-outline" label="Switch to text; keep connection active" onPress={onText}/><Text style={styles.small}>Text</Text></View>
+          <View style={styles.control}><VoiceIconButton icon="chatbubble-outline" label="Switch to chat; keep connection active" onPress={onText}/><Text style={styles.small}>Chat</Text></View>
           {onAttach && <View style={styles.control}><VoiceIconButton icon="add" label="Add attachment" disabled={mediaDisabled} onPress={onAttach}/></View>}
           <View style={styles.control}><VoiceIconButton icon="power-outline" label="Hang up" danger disabled={!voice.isActive || voice.status === 'stopping'} onPress={() => { if (onHangUp) onHangUp(); else void voice.stop(); }}/><Text style={styles.small}>Hang up</Text></View>
         </View>
