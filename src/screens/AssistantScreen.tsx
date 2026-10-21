@@ -3,6 +3,11 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useIsFocused } from '@react-navigation/native';
+import * as ImagePicker from 'expo-image-picker';
+import { AssistantCamera } from '../components/AssistantCamera';
+import { AssistantAttachmentTray } from '../components/AssistantAttachmentTray';
+import { AssistantAttachment, MAX_ATTACHMENTS, prepareAttachment, uploadAttachments, removeLocalAttachments } from '../services/assistantMedia';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -34,7 +39,18 @@ export default function AssistantScreen() {
   const [stream, setStream] = useState<Record<string, string>>({});
   const [outbox, setOutbox] = useState<Submission[]>([]);
   const [text, setText] = useState('');
-  const [attachments, setAttachments] = useState<{ id: string; fileName: string }[]>([]);
+  const [attachments, setAttachments] = useState<AssistantAttachment[]>([]);
+  const [mediaPicking, setMediaPicking] = useState(false);
+  const [mediaMenu, setMediaMenu] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const [draftReady, setDraftReady] = useState(false);
+  const draftWrites = useRef<Promise<unknown>>(Promise.resolve());
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  const [uploadProgress, setUploadProgress] = useState('');
+  const mediaLock = useRef(false);
+  const sendLock = useRef(false);
+  const focused = useIsFocused();
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -47,9 +63,7 @@ export default function AssistantScreen() {
   const [newMessages, setNewMessages] = useState(false);
   const [voiceView, setVoiceView] = useState(true);
   const [voiceCaption, setVoiceCaption] = useState('');
-  const pendingMore = useRef(false);
   const pendingVoice = useRef(false);
-  const dismissVoice = () => { if (pendingMore.current) { pendingMore.current = false; setSheet('more'); } };
   const dismissSheet = () => { if (pendingVoice.current) { pendingVoice.current = false; setVoiceView(true); } };
   const [voiceNotice, setVoiceNotice] = useState<string | null>(null);
   const list = useRef<FlatList<AssistantMessage>>(null);
@@ -152,37 +166,104 @@ export default function AssistantScreen() {
   }, [ready, legacyHydrated, legacy]);
   const selectConversation = async (id: string) => {
     if (id === conversationId) { setSheet(null); return; }
-    if (voice.isActive || sending || uploading) { Alert.alert('Disconnect first', 'Each Live Voice connection stays with its selected conversation.'); return; }
+    if (voice.isActive || sending || uploading || mediaPicking || cameraOpen) { Alert.alert('Disconnect first', 'Each Live Voice connection stays with its selected conversation.'); return; }
     if (attachments.length || text.trim()) { Alert.alert('Keep your draft', 'Send your draft or clear it before switching conversations.'); return; }
-    await AsyncStorage.setItem(SELECTED, id); selected.current = id; setConversationId(id); setSheet(null);
+    setDraftReady(false); await AsyncStorage.setItem(SELECTED, id); selected.current = id; setConversationId(id); setSheet(null);
+  };
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', state => setForeground(state === 'active'));
+    return () => sub.remove();
+  }, []);
+  useEffect(() => { if (!focused || AppState.currentState === 'background') { setCameraOpen(false); setMediaMenu(false); } }, [focused, foreground]);
+  useEffect(() => {
+    if (!ready) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await draftWrites.current;
+        const raw = await AsyncStorage.getItem(`echo-assistant-draft-${conversationId}`);
+        const draft = raw ? JSON.parse(raw) : { text: '', attachments: [] };
+        const pending = await loadSubmissions();
+        const consumed = new Set(pending.filter(p => p.conversationId === conversationId).flatMap(p => p.attachmentIds));
+        if (cancelled || selected.current !== conversationId) return;
+        setText(typeof draft.text === 'string' ? draft.text : '');
+        setAttachments((draft.attachments || []).filter((f: AssistantAttachment) => f.uri?.startsWith(`${FileSystem.documentDirectory}assistant-drafts/`) && !consumed.has(f.id)).slice(0, MAX_ATTACHMENTS));
+      } catch { if (!cancelled) setMediaError('Could not restore your attachment draft. Please select the files again.'); }
+      finally { if (!cancelled) setDraftReady(true); }
+    })();
+    return () => { cancelled = true; };
+  }, [ready, conversationId]);
+  useEffect(() => {
+    if (!draftReady) return;
+    const key = `echo-assistant-draft-${conversationId}`, value = JSON.stringify({ text, attachments });
+    draftWrites.current = draftWrites.current.catch(() => {}).then(() => AsyncStorage.setItem(key, value)).catch(() => { if (alive.current) setMediaError('Could not save this draft on your phone. Keep this screen open until you send it.'); });
+  }, [draftReady, conversationId, text, attachments]);
+  const mediaBusy = mediaPicking || uploading || sending || !draftReady;
+  const addPhoto = async (asset: { uri: string; width: number; height: number; fileName?: string | null; mimeType?: string }) => {
+    const prepared = await prepareAttachment({ ...asset, name: asset.fileName || 'Camera photo' }, true);
+    setAttachments(old => [...old, prepared]);
+  };
+  const capturePhoto = async (photo: { uri: string; width: number; height: number }) => {
+    if (mediaLock.current || sendLock.current || !draftReady) return;
+    mediaLock.current = true; setMediaPicking(true);
+    try { await addPhoto(photo); setCameraOpen(false); }
+    finally { mediaLock.current = false; setMediaPicking(false); }
+  };
+  const openCamera = () => {
+    if (mediaBusy || !ready) return;
+    if (attachments.length >= MAX_ATTACHMENTS) { Alert.alert('Five attachments per message', 'Send or remove an attachment first.'); return; }
+    setMediaMenu(false); setCameraOpen(true);
+  };
+  const pickMedia = async (source: 'files' | 'photos') => {
+    if (mediaLock.current || sendLock.current || !ready || !draftReady) return;
+    if (attachments.length >= MAX_ATTACHMENTS) { Alert.alert('Five attachments per message', 'Send or remove an attachment first.'); return; }
+    mediaLock.current = true; setMediaPicking(true); setMediaMenu(false); setMediaError(null);
+    try {
+      const remaining = MAX_ATTACHMENTS - attachments.length;
+      if (source === 'files') {
+        const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: true });
+        if (!result.canceled) for (const asset of result.assets.slice(0, remaining)) {
+          const f = await prepareAttachment(asset, !!asset.mimeType?.startsWith('image/'));
+          setAttachments(old => [...old, f]);
+        }
+      } else {
+        // System photo picker grants access only to the chosen items; no broad library permission.
+        const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsMultipleSelection: true, selectionLimit: remaining, quality: 1 });
+        if (!result.canceled) for (const asset of result.assets.slice(0, remaining)) await addPhoto(asset);
+      }
+    } catch (e: any) { setMediaError(e.message || 'Could not open your photos. Try Files, or check photo access in Settings.'); }
+    finally { mediaLock.current = false; setMediaPicking(false); }
+  };
+  const removeAttachment = (id: string) => {
+    if (sendLock.current || mediaLock.current) return;
+    const removed = attachments.filter(a => a.id === id);
+    setAttachments(old => old.filter(a => a.id !== id)); void removeLocalAttachments(removed);
   };
   const send = async (retry?: Submission) => {
-    if (sending || uploading || (!retry && !text.trim() && !attachments.length)) return;
-    const item = retry || { id: newSubmissionId(), conversationId, message: text.trim() || 'Please review the attached files.', attachmentIds: attachments.map(f => f.id), mode: 'steer' as const, state: 'pending' as const };
-    setSending(true); setError(null);
+    if (!draftReady || sendLock.current || mediaLock.current || uploading || (!retry && !text.trim() && !attachments.length)) return;
+    sendLock.current = true; setSending(true); setError(null); setMediaError(null);
+    let item: Submission | undefined = retry;
+    const files = attachments;
+    const clearDraft = () => { setText(''); setAttachments([]); void removeLocalAttachments(files); };
     try {
+      if (!item) {
+        setUploading(files.length > 0);
+        const ids = await uploadAttachments(conversationId, files, (done, total) => setUploadProgress(total ? `Uploading ${done}/${total}…` : ''));
+        setUploading(false);
+        item = { id: newSubmissionId(), conversationId, message: text.trim() || 'Please review the attached files.', attachmentIds: ids, mode: 'steer', state: 'pending' };
+      }
       await submit(item);
-      if (!retry) { setText(''); setAttachments([]); }
+      if (!retry) clearDraft();
       await refresh();
     } catch (e: any) {
-      const saved = await loadSubmissions();
-      if (!retry && saved.some(i => i.id === item.id)) { setText(''); setAttachments([]); }
-      setOutbox(saved.filter(i => i.conversationId === conversationId && i.state !== 'accepted'));
-      setError(e.message);
-    } finally { setSending(false); }
-  };
-  const pickFile = async () => {
-    if (attachments.length >= 5) { Alert.alert('Five files per message', 'Send these files before adding more.'); return; }
-    const result = await DocumentPicker.getDocumentAsync({ copyToCacheDirectory: true, multiple: true }); if (result.canceled) return;
-    setUploading(true);
-    try {
-      for (const file of result.assets.slice(0, 5 - attachments.length)) {
-        if ((file.size || 0) > 6 * 1024 * 1024) throw new Error(`${file.name} exceeds 6 MB.`);
-        const content = await FileSystem.readAsStringAsync(file.uri, { encoding: FileSystem.EncodingType.Base64 });
-        const u = await assistantApi('/uploads', { conversationId, idempotencyKey: newSubmissionId(), content, name: file.name, mimeType: file.mimeType });
-        setAttachments(old => [...old, { id: u.id, fileName: u.fileName }]);
+      // Failed uploads retain local selections. An uncertain send retries the SAME receipt, never a duplicate.
+      if (item) {
+        const saved = await loadSubmissions();
+        if (!retry && saved.some(i => i.id === item!.id)) clearDraft();
+        setOutbox(saved.filter(i => i.conversationId === conversationId && i.state !== 'accepted'));
       }
-    } catch (e: any) { setError(e.message); } finally { setUploading(false); }
+      setMediaError(e.message);
+    } finally { sendLock.current = false; setSending(false); setUploading(false); setUploadProgress(''); }
   };
   const loadEarlier = async () => {
     if (loadingEarlier.current || refreshing.current) return;
@@ -226,7 +307,22 @@ export default function AssistantScreen() {
   const voiceState = voicePresentation(voice, !!active || voiceNotice === 'Echo is working on your request.');
   useEffect(() => { setVoiceCaption(''); }, [voice.startedAt]);
   const caption = callActive ? voiceCaption : undefined;
+  const attachmentTray = <AssistantAttachmentTray files={attachments} disabled={mediaBusy} onRemove={removeAttachment}/>;
+  const mediaControls = <View style={s.mediaMenu}>
+    <Text style={s.subtle}>Add to Echo · {title}</Text>
+    <View style={s.row}><Button title="Files" disabled={mediaBusy} onPress={() => {void pickMedia('files');}}/><Button title="Photos" disabled={mediaBusy} onPress={() => {void pickMedia('photos');}}/><Button title="Live Camera" disabled={mediaBusy} onPress={openCamera}/><Button title="Cancel" onPress={() => setMediaMenu(false)}/></View>
+  </View>;
+  const cameraPanel = cameraOpen && focused && foreground ? <AssistantCamera busy={mediaPicking} onCapture={capturePhoto} onClose={() => setCameraOpen(false)}/> : undefined;
+  const voiceDraft = <>
+    {mediaMenu && mediaControls}
+    {attachmentTray}
+    {mediaPicking && <Text style={s.subtle}>Preparing attachment…</Text>}
+    {!!(mediaError || error) && ready && <Text accessibilityRole="alert" style={s.error}>{mediaError || error}</Text>}
+    {outbox.length > 0 && <Button title="Delivery not confirmed · check in Text" onPress={() => setVoiceView(false)}/>}
+    {(attachments.length > 0 || text.trim()) && <View><Text numberOfLines={2} style={s.subtle}>{text.trim() || `Send to Echo · ${title}`}</Text><Button primary title={sending ? uploadProgress || 'Sending…' : 'Send to Echo'} disabled={mediaBusy || !ready} onPress={() => {void send();}}/></View>}
+  </>;
   return <ChatViewport>
+    {voiceView ? <VoiceCallView visible={focused} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => {setCameraOpen(false);setVoiceView(false);}} onMore={() => setSheet('more')} onPhotos={() => {void pickMedia('photos');}} onCamera={openCamera} onHangUp={() => {setCameraOpen(false);void voice.stop();}} mediaDisabled={!ready || mediaBusy || cameraOpen} content={cameraPanel} draftContent={voiceDraft}/> : <>
     <ScrollView style={s.conversationControls} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
     <View style={s.header}>
       <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button" accessibilityLabel="Select conversation" style={{ flex: 1 }}><Text style={s.heading}>Echo · {title} ▾</Text></TouchableOpacity>
@@ -237,10 +333,10 @@ export default function AssistantScreen() {
       <Text style={[s.voiceTitle, { flex: 1, marginBottom: 0 }]}>{callActive ? voiceState.label : 'Talk with Echo'}</Text>
       <Text style={s.subtle}>{callActive ? 'Live Voice' : 'Live Voice'} ›</Text>
     </TouchableOpacity>
-    {(error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || error || voiceNotice}</Text>}
+    {(mediaError || error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || mediaError || error || voiceNotice}</Text>}
     {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={reconnect} /></View>}
     </ScrollView>
-    <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
+    {cameraPanel || <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
       onScroll={e => { const n = e.nativeEvent; atBottom.current = n.contentOffset.y + n.layoutMeasurement.height >= n.contentSize.height - 100; }} scrollEventThrottle={100}
       onContentSizeChange={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); else setNewMessages(true); }}
       ListHeaderComponent={historyMore ? <Button title="Load earlier messages" onPress={() => { void loadEarlier(); }} /> : null}
@@ -252,14 +348,16 @@ export default function AssistantScreen() {
         {(activity.artifacts || []).map((a: any) => <View key={a.id} style={s.message}><Text style={s.role}>File</Text><Button title={a.title} onPress={() => { void openArtifact(a); }}/></View>)}
         {active && <Text style={s.subtle}>Echo is working. You can add instructions, disconnect, or leave the app.</Text>}
       </View>}
-    />
+    />}
     {newMessages && <Button title="Jump to latest" onPress={() => { atBottom.current = true; setNewMessages(false); list.current?.scrollToEnd({ animated: true }); }} />}
     <View testID="chat-composer" style={s.composer}>
-      {attachments.length > 0 && <ScrollView style={{ maxHeight: 72 }} keyboardShouldPersistTaps="handled">{attachments.map(a => <TouchableOpacity key={a.id} onPress={() => setAttachments(old => old.filter(x => x.id !== a.id))}><Text style={s.subtle}>{a.fileName} · uploaded, not yet reviewed · remove ×</Text></TouchableOpacity>)}</ScrollView>}
-      <TextInput accessibilityLabel="Message Echo" style={[s.input, { minHeight: 44, maxHeight: 120 }]} multiline placeholder={active ? 'Add instructions to this work…' : 'Message Echo…'} placeholderTextColor={colors.textTertiary} value={text} onChangeText={setText} />
-      <View style={s.row}><VoiceIconButton icon="add" label={uploading ? 'Uploading attachment' : 'Attach file'} disabled={!ready || uploading} onPress={() => { void pickFile(); }} /><View style={{ flex: 1 }}/><Button primary disabled={!ready || sending || uploading || (!text.trim() && !attachments.length)} title={sending ? 'Sending…' : active ? 'Add instructions' : 'Send'} onPress={() => { void send(); }} /></View>
+      {mediaMenu && mediaControls}
+      {attachmentTray}
+      {(mediaPicking || uploading) && <Text style={s.subtle}>{uploadProgress || 'Preparing attachment…'}</Text>}
+      <TextInput accessibilityLabel="Message Echo" editable={!sending && draftReady} style={[s.input, { minHeight: 44, maxHeight: 120 }]} multiline placeholder={active ? 'Add instructions to this work…' : 'Message Echo…'} placeholderTextColor={colors.textTertiary} value={text} onChangeText={setText} />
+      <View style={s.row}><VoiceIconButton icon="add" label="Add attachment" disabled={!ready || mediaBusy || cameraOpen} onPress={() => setMediaMenu(value => !value)} /><View style={{ flex: 1 }}/><Button primary disabled={!ready || mediaBusy || (!text.trim() && !attachments.length)} title={sending ? 'Sending…' : active ? 'Add instructions' : 'Send'} onPress={() => { void send(); }} /></View>
     </View>
-    <VoiceCallView visible={voiceView} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => setVoiceView(false)} onMore={() => { pendingMore.current = true; setVoiceView(false); if (Platform.OS !== 'ios') dismissVoice(); }} onDismiss={dismissVoice}/>
+    </>}
     <Modal visible={sheet !== null} animationType="slide" presentationStyle="pageSheet" onDismiss={dismissSheet} onRequestClose={() => setSheet(null)}>
       <View style={[s.root, { padding: 20, paddingTop: 24, paddingBottom: Math.max(20, insets.bottom) }]}><View style={s.row}><Text style={[s.heading, { flex: 1 }]}>{sheet === 'more' ? 'More' : sheet === 'projects' ? 'Conversations' : sheet === 'memory' ? 'What Echo remembers' : sheet === 'legacy' ? 'Inbox & earlier chats' : 'Activity'}</Text><Button title="Done" onPress={() => setSheet(null)}/></View>
         <ScrollView keyboardShouldPersistTaps="handled">
@@ -298,6 +396,7 @@ export default function AssistantScreen() {
   </ChatViewport>;
 }
 const s = StyleSheet.create({
+  mediaMenu: { padding: 10, borderRadius: 14, backgroundColor: colors.surface, marginBottom: 6 },
   conversationControls: { flexGrow: 0, flexShrink: 1, maxHeight: '45%' },
   root: { flex: 1, backgroundColor: colors.background }, header: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 },
   heading: { color: colors.textPrimary, fontSize: 21, fontWeight: '600' }, subtle: { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },

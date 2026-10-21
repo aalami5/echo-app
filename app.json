@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.oppersmedical.echo",
-      "buildNumber": "87",
+      "buildNumber": "88",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "Echo needs microphone access for voice conversations",
@@ -24,7 +24,9 @@
           "remote-notification",
           "fetch",
           "audio"
-        ]
+        ],
+        "NSCameraUsageDescription": "Echo uses your camera to preview and capture photos you choose to share.",
+        "NSPhotoLibraryUsageDescription": "Echo lets you choose photos to share in your conversation."
       }
     },
     "android": {
@@ -54,7 +56,14 @@
       ],
       "@react-native-community/datetimepicker",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Echo uses your camera to preview and capture photos you choose to share.",
+          "recordAudioAndroid": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

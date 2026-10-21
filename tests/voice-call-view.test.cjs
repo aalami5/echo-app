@@ -23,3 +23,9 @@ test('muted control uses mic-slash and accessible action; view switch does not c
  assert.match(voicePresentation({...base,speaking:true,muted:true},false).label,/mic muted/);
  await act(async()=>ui.unmount());
 });
+test('voice view stays inline with media actions separate from explicit Hang up',async()=>{
+ let ui,photos=0,camera=0,stops=0;await act(async()=>{ui=create(React.createElement(VoiceCallView,{visible:true,title:'Home',voice:{...base,stop:()=>stops++},working:false,ready:true,onRetry(){},onText(){},onMore(){},onPhotos:()=>photos++,onCamera:()=>camera++}));});
+ assert.equal(ui.root.findAllByType('Modal').length,0);assert.ok(ui.root.findByProps({testID:'voice-inline-view'}));
+ const buttons=ui.root.findAllByType('Button');buttons.find(b=>b.props.accessibilityLabel==='Add photos').props.onPress();buttons.find(b=>b.props.accessibilityLabel==='Open live camera').props.onPress();assert.equal(photos,1);assert.equal(camera,1);assert.equal(stops,0);
+ buttons.find(b=>b.props.accessibilityLabel==='Hang up').props.onPress();assert.equal(stops,1);await act(async()=>ui.unmount());
+});

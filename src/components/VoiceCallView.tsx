@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, AppState, Modal, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors } from '../constants/theme';
 import { useRealtimeVoice } from '../hooks/useRealtimeVoice';
 
@@ -25,10 +24,9 @@ export function voicePresentation(voice: Pick<Voice, 'status' | 'muted' | 'speak
   if (voice.muted) return { label: 'Microphone muted', color: '#94A3B8' };
   return { label: 'Listening', color: '#68E1D4' };
 }
-export function VoiceCallView({ visible, title, voice, working, ready, caption, connectionError, onRetry, onText, onMore, onDismiss }: {
-  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; connectionError?: string | null; onRetry: () => void; onText: () => void; onMore: () => void; onDismiss?: () => void;
+export function VoiceCallView({ visible, title, voice, working, ready, caption, connectionError, onRetry, onText, onMore, onPhotos, onCamera, onHangUp, mediaDisabled, content, draftContent }: {
+  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; connectionError?: string | null; onRetry: () => void; onText: () => void; onMore: () => void; onPhotos?: () => void; onCamera?: () => void; onHangUp?: () => void; mediaDisabled?: boolean; content?: React.ReactNode; draftContent?: React.ReactNode;
 }) {
-  const insets = useSafeAreaInsets();
   const [reduceMotion, setReduceMotion] = useState(true);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [captions, setCaptions] = useState(false);
@@ -54,10 +52,11 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
     const animation = Animated.timing(scale, { toValue: reduceMotion || !foreground ? 1 : 1 + voice.level * 0.15, duration: 160, useNativeDriver: true });
     animation.start(); return () => animation.stop();
   }, [voice.level, reduceMotion, foreground, scale]);
-  return <Modal visible={visible} animationType="fade" presentationStyle="fullScreen" onRequestClose={onText} onDismiss={onDismiss}>
-    <View style={[styles.root, { paddingTop: insets.top + 8, paddingBottom: Math.max(insets.bottom, 16) }]}>
+  if (!visible) return null;
+  // Inline within ChatViewport: the original tab bar stays visible and usable.
+  return <View testID="voice-inline-view" style={styles.root}>
       <View style={styles.header}><Text numberOfLines={2} style={styles.title}>Echo · {title}</Text><VoiceIconButton icon="ellipsis-horizontal" label="More options" onPress={onMore}/></View>
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.center}>
+      {content || <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.center}>
         <View accessible accessibilityLabel={state.label} style={styles.orbArea}>
           {[232, 202, 172, 142, 112, 82].map((size) => <Animated.View key={size} style={[styles.ring, { width: size, height: size, borderRadius: size / 2, borderColor: state.color, opacity: glow, transform: [{ scale }] }]}/>)}
           <Animated.View style={[styles.core, { backgroundColor: state.color, transform: [{ scale }] }]}/>
@@ -68,20 +67,22 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
         {voice.status === 'paused' && <TouchableOpacity accessibilityRole="button" onPress={() => { void voice.resume(); }} style={styles.start}><Text style={styles.startText}>Resume audio</Text></TouchableOpacity>}
         {ready && !voice.isActive && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Connect to Echo" disabled={!ready || !voice.isSupported} onPress={() => { void voice.start(); }} style={[styles.start, (!ready || !voice.isSupported) && { opacity: 0.4 }]}><Text style={styles.startText}>{ready ? 'Connect' : 'Connecting to Echo…'}</Text></TouchableOpacity>}
         {captions && <Text style={styles.caption}>{caption ? caption.slice(-400) : 'Spoken replies appear here.'}</Text>}
-      </ScrollView>
+      </ScrollView>}
       <View style={styles.footer}>
+        {draftContent}
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={captions ? 'Hide captions' : 'Show captions'} onPress={() => setCaptions(value => !value)} style={styles.captionButton}><Ionicons name="chatbox-ellipses-outline" size={20} color={captions ? colors.primary : colors.textSecondary}/><Text style={styles.small}>Captions</Text></TouchableOpacity>
         <View style={styles.controls}>
           <View style={styles.control}><VoiceIconButton icon={voice.muted ? 'mic-off' : 'mic'} label={voice.muted ? 'Unmute microphone' : 'Mute microphone'} selected={voice.muted} disabled={!voice.isConnected} onPress={voice.toggleMute}/></View>
           <View style={styles.control}><VoiceIconButton icon="chatbubble-outline" label="Switch to text; keep connection active" onPress={onText}/><Text style={styles.small}>Text</Text></View>
-          <View style={styles.control}><VoiceIconButton icon="power-outline" label="Disconnect from Echo" danger disabled={!voice.isActive || voice.status === 'stopping'} onPress={() => { void voice.stop(); }}/><Text style={styles.small}>Disconnect</Text></View>
+          {onPhotos && <View style={styles.control}><VoiceIconButton icon="images-outline" label="Add photos" disabled={mediaDisabled} onPress={onPhotos}/><Text style={styles.small}>Photos</Text></View>}
+          {onCamera && <View style={styles.control}><VoiceIconButton icon="camera-outline" label="Open live camera" disabled={mediaDisabled} onPress={onCamera}/><Text style={styles.small}>Camera</Text></View>}
+          <View style={styles.control}><VoiceIconButton icon="power-outline" label="Hang up" danger disabled={!voice.isActive || voice.status === 'stopping'} onPress={() => { if (onHangUp) onHangUp(); else void voice.stop(); }}/><Text style={styles.small}>Hang up</Text></View>
         </View>
       </View>
-    </View>
-  </Modal>;
+    </View>;
 }
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background, paddingHorizontal: 24 },
+  root: { flex: 1, minHeight: 0, backgroundColor: colors.background, paddingHorizontal: 12, paddingTop: 8 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 }, title: { flex: 1, color: colors.textSecondary, fontSize: 18, fontWeight: '500' },
   center: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 20 },
   orbArea: { height: 250, width: 250, alignItems: 'center', justifyContent: 'center' }, ring: { position: 'absolute', borderWidth: 1.5 },
@@ -90,7 +91,7 @@ const styles = StyleSheet.create({
   error: { color: colors.warning, fontSize: 15, textAlign: 'center', marginTop: 16, lineHeight: 22 },
   start: { backgroundColor: '#68DAD4', borderRadius: 26, paddingHorizontal: 32, paddingVertical: 15, marginTop: 24, minHeight: 50 }, startText: { color: colors.textInverse, fontSize: 17, fontWeight: '600' },
   caption: { color: colors.textSecondary, textAlign: 'center', fontSize: 16, lineHeight: 23, marginTop: 22 },
-  footer: { flexShrink: 0, paddingTop: 8 }, controls: { flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'flex-start', paddingVertical: 12 },
+  footer: { flexShrink: 0, paddingTop: 8, paddingBottom: 8 }, controls: { flexDirection: 'row', justifyContent: 'space-evenly', alignItems: 'flex-start', paddingVertical: 12 },
   control: { alignItems: 'center', gap: 8, flex: 1 }, iconButton: { width: 54, height: 54, borderRadius: 27, backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center' },
   small: { fontSize: 13, color: colors.textSecondary, textAlign: 'center' }, captionButton: { alignSelf: 'center', flexDirection: 'row', gap: 8, alignItems: 'center', minHeight: 44, paddingHorizontal: 12 },
 });
