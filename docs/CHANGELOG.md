@@ -1,6 +1,17 @@
 # Changelog
 
-**Last Updated:** October 19, 2026
+**Last Updated:** October 20, 2026
+
+## Builds 86–88 — Voice continuity, camera and photo input (2026-10-20)
+
+- **Build 86:** Added a voice-first view with explicit connection, mute, optional captions, text switching, and connection recovery. An app-scoped call controller survives screen unmount and ordinary background transitions; logout ends audio without canceling accepted agent work.
+- Added iOS background audio and native interruption/route-loss/reset events, headset-aware routing, a 20-second transient-disconnection window, and explicit audio resume that keeps the microphone muted. Clinical recording requires confirmed voice disconnection and holds an audio lease through pending recorder cleanup.
+- **Build 87:** Replaced the orb's ECG/glyph with six concentric rings and a solid center, retaining measured audio animation, state colors, accessibility labels and Reduce Motion support; introduced Connect/Disconnect wording.
+- **Build 88:** Moved Live Voice inline above persistent bottom navigation, with Photos, Camera, Text and Hang up controls. Switching tabs preserves the call; hangup closes camera without discarding the draft.
+- Added system photo selection and live camera preview with front/back capture, review, retake and explicit Add photo → Send. Only sent still images reach Echo; continuous video is not implemented and camera does not request microphone capture.
+- Shared media preparation normalizes images to bounded JPEG, keeps private local draft copies, and enforces five attachments / 6 MB each. Conversation-local drafts persist; stable upload IDs and existing submission receipts support retries without new duplicate requests.
+- Release records confirm Builds 86, 87 and 88 available in internal TestFlight. Physical-iPhone camera, background/lock, audio-route and image-round-trip acceptance remains pending. No store implementation or backend production-code changes.
+- Details: [Build 86 lifecycle](changes/build-86-voice-first.md), [Build 87 rings](changes/build-87-concentric-voice.md), and [Build 88 media/navigation](changes/build-88-media-navigation.md).
 
 ## Builds 83–85 — Native connection and chat composer fixes (2026-10-19)
 

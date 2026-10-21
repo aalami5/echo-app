@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** October 19, 2026
+**Last Updated:** October 20, 2026
 
 ---
 
@@ -367,14 +367,14 @@ Layout wrapper for `AssistantScreen`, used within the bottom-tab navigator and s
 
 The inner `KeyboardAvoidingView` applies top safe-area padding, iOS `padding` behavior, zero keyboard offset, and `minHeight: 0`. Keyboard visibility initializes from `Keyboard.isVisible()` where available; listeners use will-show/hide events on iOS and did-show/hide elsewhere, with cleanup on unmount. Test IDs are `chat-viewport` and `chat-keyboard-area`.
 
-### AssistantScreen / Chat tab (Builds 82–85)
+### AssistantScreen / Chat tab (Builds 82–88)
 
 **File:** `src/screens/AssistantScreen.tsx`, rendered by `app/(tabs)/index.tsx`.
 
 - Home/project selector and new-conversation sheet; typed messages and Live Voice use the selected native conversation.
 - Paginated message list, incremental responses, copy/share actions, tappable web links, and Jump to latest without forcing readers away from older messages.
 - Live Voice start/end and mute/unmute controls via `useRealtimeVoice(conversationId)`; ending a call does not cancel accepted work.
-- Document attachments via `expo-document-picker` and authenticated artifact download/share via `expo-file-system` and `expo-sharing`.
+- Files via `expo-document-picker`, system Photos selection, and Live Camera share draft preparation, previews and Send behavior. Authenticated artifact download/share uses `expo-file-system` and `expo-sharing`.
 - Activity sheet shows native run/task state and submission receipts, with confirmation for exact-run stop. Uncertain delivery offers same-request reconciliation rather than a new action.
 - Memory sheet displays curated sources and sends remember/correct/forget requests to Echo; changes are confirmed in Home, not treated as transactional local edits.
 - Inbox & earlier chats preserves `chatStore` content without replaying historical requests. The old avatar recorder, photo-only composer, and next-meeting card are no longer the main Chat tab interface.
@@ -383,7 +383,27 @@ Builds 84–85 wrap the screen in `ChatViewport`. Conversation controls scroll w
 
 Screen-local `Button` supplies labeled touch controls; `MessageText` renders selectable text and HTTP(S) links. Local result files use authenticated artifact cards instead of arbitrary file URLs. `src/services/assistant.ts` owns API calls, public-history normalization, persistent submissions, and abandoned-call cleanup; no new Zustand store was introduced.
 
-Release status and physical-phone acceptance limitations: [Build 82](changes/build-82-live-voice-continuity.md).
+Builds 86–88 add voice/text switching with a compact call strip in text, More for conversations/Activity/Memory/Inbox, and long-press message Copy/Share. Live Voice now renders inline in `ChatViewport`, preserving bottom-tab navigation. Text/attachment drafts persist by conversation; camera closes on tab departure, background or Hang up without discarding the draft. Tab changes do not stop audio.
+
+### VoiceCallView / VoiceIconButton (Builds 86–88)
+
+**File:** `src/components/VoiceCallView.tsx`.
+
+Inline voice presentation with six concentric rings and a solid center, state labels/colors, measured audio-level animation, optional captions, Reduce Motion support and labeled icon buttons. It renders Connect, startup Retry and muted Resume audio recovery as appropriate; current controls include microphone, Text, Photos, Camera and Hang up. `content` can replace the ring area with camera preview; `draftContent` hosts the shared attachment draft. Hidden views render nothing; animation lifecycle is separate from the app-scoped call.
+
+### AssistantCamera (Build 88)
+
+**File:** `src/components/AssistantCamera.tsx`. **Props:** `busy`, `onCapture`, `onClose`.
+
+Permission-aware `expo-camera` still-photo preview with front/back selection, capture, review, retake and explicit Add photo. Permission denial offers settings when needed. Add photo stages a draft; Send is separate. Camera uses picture mode without microphone capture and does not stream video to Echo.
+
+### AssistantAttachmentTray (Build 88)
+
+**File:** `src/components/AssistantAttachmentTray.tsx`.
+
+Shared draft previews for voice/text: image thumbnails or file indicators, filenames, removal controls and disabled state during busy operations. Preparation and uploads live in `src/services/assistantMedia.ts`; limits are five attachments and 6 MB each, with no upload before Send.
+
+Release status and physical-phone acceptance limitations: [Build 88](changes/build-88-media-navigation.md) and [Build 86 lifecycle](changes/build-86-voice-first.md).
 
 ---
 

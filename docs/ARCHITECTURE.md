@@ -2,9 +2,22 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** October 17, 2026
+**Last Updated:** October 20, 2026
 
 ---
+
+## Voice lifecycle and media drafts (Builds 86–88)
+
+The Build 82 server-owned conversation model below remains in place. These builds change client lifecycle and media input, not backend production code or Zustand store implementations.
+
+- `useRealtimeVoice.ts` now exposes an app-scoped controller through `useSyncExternalStore`; screen unmount, text switching and tab navigation do not end a call. `app/_layout.tsx` stops the session on logout. Explicit Hang up releases audio independently of accepted agent tasks.
+- `plugins/withEchoAudioSession.js` emits native interruption, route-loss and media-services-reset events. The controller pauses/mutes on those events; explicit Resume audio restores reception but requires a separate unmute. `liveAudioRoute.ts` enables background audio only during the call and preserves headset routing. iOS declares audio alongside existing fetch/notification background modes.
+- Temporary WebRTC disconnection gets 20 seconds to recover; terminal failures release audio and offer a fresh explicit connection in the saved conversation, without provider re-offer or tool replay. WebRTC statistics drive audio-level presentation; background metering is skipped.
+- `clinicalAudioHandoff.ts` requires confirmed voice disconnection before clinical capture. `audioOwnership.ts` leases prevent personal voice startup during clinical recording, including pending permission/recorder acquisition. `useVoiceRecording.ts` retains ownership until late-created recorders are cleaned up.
+- `assistantMedia.ts` prepares shared Files/Photos/Camera attachments: image normalization to JPEG (maximum known dimension 2200 pixels), 6 MB per file, five files per message, and private copies under the app document directory's `assistant-drafts/`. Upload happens only on Send; each attachment ID is an upload idempotency key scoped to its conversation.
+- `AssistantScreen` persists text/attachment drafts in AsyncStorage under `echo-assistant-draft-${conversationId}`. Existing outbox/receipt reconciliation handles uncertain sends. Camera preview closes on tab departure, background or hangup, while the draft remains. Voice stays audio-only; captured still images use the existing conversation upload path, not a video stream.
+
+Internal TestFlight delivery is recorded for all three builds. Background/lock, headset/interruption recovery, camera permission and simultaneous voice/image behavior still require physical-device acceptance; browser renders and native compilation do not prove those behaviors. See [Build 86](changes/build-86-voice-first.md) and [Build 88](changes/build-88-media-navigation.md).
 
 ## Current assistant continuity (Build 82)
 
