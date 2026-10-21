@@ -13,10 +13,10 @@ Implements the native UI/media work from [issue 4](https://github.com/aalami5/ec
 ## Verification
 
 - TypeScript passes; 23 distinct targeted checks across media preparation/UI, voice view/lifecycle, chat viewport, native requests and clinical audio/input handoff pass.
-- iOS production JS/Hermes export passes.
+- iOS production JS/Hermes export passes. Thirteen server adapter checks also pass, including image attachment scoping to the live voice conversation and no duplicate request on retry.
 - Actual VoiceCallView/ChatViewport browser renders checked at 320×568, 375×667, and 393×852; media and Hang up controls fit above reserved navigation. Draft preview/send also fits at 320×568. Browser renders are not physical-device screenshots.
 - Still requires physical iPhone verification: camera permission prompt, simultaneous voice/camera audio routing, system photo picker, background/lock/AirPods recovery, and a real image round trip during voice. Continuous live video is not implemented or claimed.
 
 ## Release
 
-Build 88 requested. Native build/submission status will be recorded after verification. Update in place; do not uninstall (preserve existing local clinical data).
+Source `dd1d6b3`. [Build 88](https://expo.dev/accounts/aalami/projects/echo-app/builds/2524eced-96a6-41b9-9f54-7afdfa71be09) is compiling; [internal submission](https://expo.dev/accounts/aalami/projects/echo-app/submissions/f6000b3f-1c58-4ccd-9f37-1f54d4afcecf) awaits the build. Delivery is not yet verified. Update in place; do not uninstall (preserve existing local clinical data).

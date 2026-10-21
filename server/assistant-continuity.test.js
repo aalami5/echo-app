@@ -144,3 +144,17 @@ test('external artifact URLs are not fetched with gateway authority; oversized n
   url = '/api/chat/media/outgoing/test/file/full?signature=synthetic';
   assert.equal((await request('/conversations/home/artifacts/result-2')).status, 413);
 });
+
+test('camera/photo uploads reach the same native voice conversation as image attachments', async t => {
+  const {rpc,request}=await fixture(t);
+  await request('/conversations/home/voice',{});
+  const content=Buffer.from('synthetic-image-bytes').toString('base64');
+  const upload=await request('/uploads',{conversationId:'home',idempotencyKey:'camera_frame_1234',name:'Camera photo.jpg',mimeType:'image/jpeg',content});
+  assert.equal(upload.status,200);assert.equal(rpc.sent,0,'preview/upload alone must not trigger a response');
+  const body={message:'What is in this photo?',idempotencyKey:'camera_send_1234',attachmentIds:[upload.data.id]};
+  assert.equal((await request('/conversations/expenses/send',body)).status,403);
+  assert.equal((await request('/conversations/home/send',body)).status,200);
+  const voice=rpc.calls.find(c=>c.method==='talk.client.create'),send=rpc.calls.find(c=>c.method==='chat.send');
+  assert.equal(send.params.sessionKey,voice.params.sessionKey);assert.equal(send.params.attachments[0].type,'image');assert.equal(send.params.attachments[0].mimeType,'image/jpeg');assert.equal(send.params.attachments[0].content,content);
+  assert.equal((await request('/conversations/home/send',body)).status,200);assert.equal(rpc.sent,1);
+});
