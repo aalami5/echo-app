@@ -1,6 +1,6 @@
-# Next build — original Echo rings and attachment menu
+# Build 89 — original Echo rings and attachment menu
 
-Status: source prepared for the next build after 88 (planned 89). Not built or submitted to TestFlight by this change.
+Status: user authorized build and TestFlight deployment on October 21, 2026. Release candidate prepared; Apple availability not yet confirmed.
 
 ## Approved scope
 
