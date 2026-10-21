@@ -19,4 +19,6 @@ Implements the native UI/media work from [issue 4](https://github.com/aalami5/ec
 
 ## Release
 
-Source `dd1d6b3`. [Build 88](https://expo.dev/accounts/aalami/projects/echo-app/builds/2524eced-96a6-41b9-9f54-7afdfa71be09) is compiling; [internal submission](https://expo.dev/accounts/aalami/projects/echo-app/submissions/f6000b3f-1c58-4ccd-9f37-1f54d4afcecf) awaits the build. Delivery is not yet verified. Update in place; do not uninstall (preserve existing local clinical data).
+Source `dd1d6b3`. [Build 88](https://expo.dev/accounts/aalami/projects/echo-app/builds/2524eced-96a6-41b9-9f54-7afdfa71be09) FINISHED; [internal submission](https://expo.dev/accounts/aalami/projects/echo-app/submissions/f6000b3f-1c58-4ccd-9f37-1f54d4afcecf) FINISHED. Apple build `a06ef713-3c7d-4e7d-ad5f-9feccdc891d6` is VALID / IN_BETA_TESTING internally, verified October20 at 7:16 PM Pacific. External state READY_FOR_BETA_SUBMISSION; no external review requested. Update in place; do not uninstall (preserve existing local clinical data).
+
+Downloaded IPA verified Build88, native ExpoCamera, new controls, and preserved background audio modes. SHA-256 `674b506d0668a99c9a43002079efe845dd2317ad57b83d79f30d9460aa79e042`. Evidence: workspace `artifacts/echo-build88/`.
