@@ -2,9 +2,20 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** October 20, 2026
+**Last Updated:** October 21, 2026
 
 ---
+
+## Voice startup continuity (Build 90)
+
+`gateway/startup-memory.mjs` prepares fresh historical reference context before provider creation for the single-owner deployment. Browser and app voice routes share the preparation function; this is gateway-side behavior, not IPA-bundled memory or a new client store.
+
+- Only the main agent and explicitly allowed personal sessions are eligible. The assistant conversation index supplies recognized project sessions; groups, unknown sessions and clinical workflow keys are excluded. Native read RPC calls retain the connecting client's authority.
+- Preparation reads recent history, task and artifact snapshots from up to four allowed sessions plus selected `MEMORY.md`/dated daily-note search hits. It filters context envelopes, secret patterns and clinical note snippets, clips text, and trims the packet against a 15,000-byte default budget. Read calls have 12-second timeout bounds; this is not an overall startup deadline.
+- The packet includes capture time, source identities and ready/partial status. Failures produce explicit limitations or unavailable guidance, never reuse an old packet. Historical requests and promises do not authorize execution or establish completion; current task/external status still requires `agent_consult` verification.
+- `scripts/install-startup-memory.cjs` patches the version-checked local OpenClaw Talk bundle and imports the repository module at runtime. It backs up the original bundle, requires a gateway restart, and must be reviewed/reapplied after OpenClaw upgrades. Roll back by restoring that bundle and restarting; this is a local integration, not an upstream feature.
+
+Recorded native-create and synthetic spoken probes validate bounded startup retrieval, not exhaustive historical recall or physical-phone acceptance. See [Build 90 operational dependency and evidence](changes/build90-startup-memory.md).
 
 ## Voice lifecycle and media drafts (Builds 86–88)
 
@@ -28,7 +39,7 @@ Internal TestFlight delivery is recorded for all three builds. Background/lock, 
 - Native history is paginated; bounded in-memory events carry an epoch/cursor so clients can reset after reconnect/restart. Stable submission IDs and a persistent phone outbox distinguish accepted requests from uncertain acknowledgements; Activity reconciles native input receipts instead of blindly repeating actions.
 - Uploads are conversation-scoped (6 MB each, up to five per submission). Artifact downloads use native artifact identity; managed gateway-relative media is relayed as base64 with a 12 MB bound, timeout, and no redirects. Arbitrary external URLs are not fetched by the adapter.
 - `useRealtimeVoice(conversationId)` creates an audio-only WebRTC offer. The adapter creates `talk.client.create` with `gateway-control-v1`, exchanges SDP through the gateway, and keeps provider credentials server-side. The phone opens no provider data channel; gateway sideband owns tools and finalized transcripts. Ending audio closes the voice session, not accepted work; stopping work separately checks the exact active run. Persisted call identity supports abandoned-call cleanup on reconnect.
-- The Memory panel reads curated workspace sources and submits changes as Home conversation requests. Cross-private recall requires protected native recall plus active-memory configuration; original private-transcript recall remains an unresolved integration defect, not a verified capability. This feature retains text, not raw call audio.
+- The Memory panel reads curated workspace sources and submits changes as Home conversation requests. Cross-private recall requires protected native recall plus active-memory configuration; Build 90 adds bounded allowlisted startup retrieval (above), not exhaustive original private-transcript recall. This feature retains text, not raw call audio.
 
 No Zustand store implementations or clinical/report endpoints changed. The older chat/voice flows below describe retained legacy paths, not the Build 82 Chat tab. See [continuity requirements](live-voice-continuity.md) and [release blockers and acceptance](changes/build-82-live-voice-continuity.md); native compilation does not establish TestFlight availability or physical-phone acceptance.
 

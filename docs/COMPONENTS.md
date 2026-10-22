@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** October 20, 2026
+**Last Updated:** October 21, 2026
 
 ---
 
@@ -385,11 +385,17 @@ Screen-local `Button` supplies labeled touch controls; `MessageText` renders sel
 
 Builds 86–88 add voice/text switching with a compact call strip in text, More for conversations/Activity/Memory/Inbox, and long-press message Copy/Share. Live Voice now renders inline in `ChatViewport`, preserving bottom-tab navigation. Text/attachment drafts persist by conversation; camera closes on tab departure, background or Hang up without discarding the draft. Tab changes do not stop audio.
 
-### VoiceCallView / VoiceIconButton (Builds 86–88)
+### VoiceOrb (Build 89)
+
+**File:** `src/components/VoiceOrb.tsx`.
+
+Personal-voice visual, separate from the clinical Avatar. Props are `color`, `mode`, `level` and `motionEnabled`; modes cover idle, listening, working, speaking, connecting, paused and muted. Three outward-lighter rings surround a solid center, with staggered breathing and bounded measured-audio response during listening/speaking. Working/connecting adjust breathing; paused/muted stop breathing. Hidden/background/Reduce Motion disables motion through the parent, and effects stop animations on cleanup. No fabricated speech pulses.
+
+### VoiceCallView / VoiceIconButton (Builds 86–90)
 
 **File:** `src/components/VoiceCallView.tsx`.
 
-Inline voice presentation with six concentric rings and a solid center, state labels/colors, measured audio-level animation, optional captions, Reduce Motion support and labeled icon buttons. It renders Connect, startup Retry and muted Resume audio recovery as appropriate; current controls include microphone, Text, Photos, Camera and Hang up. `content` can replace the ring area with camera preview; `draftContent` hosts the shared attachment draft. Hidden views render nothing; animation lifecycle is separate from the app-scoped call.
+Inline voice presentation using `VoiceOrb` for the original three graduated rings and solid center, with state labels/colors, measured audio-level animation, optional captions, Reduce Motion support and labeled icon buttons. It renders Connect, startup Retry and muted Resume audio recovery as appropriate; current controls include microphone, Chat, a shared + attachment menu (Camera, Photo Library, Files) and Hang up. `onAttach` toggles the shared menu; `onText` switches to Chat without disconnecting. Switching to Chat or hanging up closes the camera/menu while preserving drafts. `content` can replace the ring area with camera preview; `draftContent` hosts the shared attachment draft. Hidden views render nothing; animation lifecycle is separate from the app-scoped call.
 
 ### AssistantCamera (Build 88)
 

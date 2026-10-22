@@ -2,6 +2,15 @@
 
 **Last Updated:** October 21, 2026
 
+## Build 90 — Fresh voice startup context and Chat control (2026-10-21)
+
+- Renamed the Live Voice Text control to Chat, including its accessibility label; switching preserves the active connection.
+- Added server-side startup continuity: fresh allowed personal conversation turns, task/artifact snapshots and selected saved notes are prepared before voice provider creation. Historical requests are reference only, never replayed or automatically resumed; current work status requires a fresh tool check.
+- Restricted retrieval to the single owner's allowed sessions with native RPC authorization; group, unknown and clinical sessions are excluded. Retrieval failures disclose partial/unavailable context rather than reusing a previous packet.
+- Added a version-checked local gateway installer with backup/rollback. This integration is not embedded in the IPA and must be revalidated after OpenClaw upgrades.
+- Release evidence records Apple VALID / IN_BETA_TESTING internally, signed-package checks and a successful synthetic spoken continuity check. Physical-phone recall acceptance remains pending. No Zustand store changes.
+- [Build 90 release evidence and operational dependency](changes/build90-startup-memory.md).
+
 ## Build 89 — Original ring animation and unified attachments (2026-10-21)
 
 - Restored three graduated rings and solid center, gentle staggered breathing and audio-level response; preserved mode colors and accessibility/foreground animation controls.
