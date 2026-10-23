@@ -1,6 +1,15 @@
 # Changelog
 
-**Last Updated:** October 21, 2026
+**Last Updated:** October 22, 2026
+
+## Build 91 — Readiness-gated spoken startup recap (2026-10-22)
+
+- Added one interruptible, 35–60-word personal voice recap, prioritizing attention-needed items, newly completed work and recent discussion. Current task claims use fresh read-only snapshots; historical requests never start work.
+- Native Live Voice acknowledges readiness once per logical call after WebRTC connects; browser voice waits for both peer connection and data channel. Speech-first, an existing response, close or continuity reset suppresses the pending recap; remounts and transient reconnects do not repeat it.
+- Recaps use an out-of-band audio response with tools disabled, owner-private filtered context and bounded call-ID/timestamp checkpoints, not stored recap transcripts.
+- Added an authenticated adapter readiness route and version-pinned local gateway/browser installer with backup/rollback. Older clients remain silent on startup; readiness failure does not break ordinary native audio.
+- iOS build number is 91. Targeted regression coverage was added; this commit alone does not establish TestFlight availability or physical-iPhone audio acceptance. No Zustand stores or UI components changed.
+- [Build 91 behavior, deployment and verification scope](changes/build91-spoken-recap.md).
 
 ## Build 90 — Fresh voice startup context and Chat control (2026-10-21)
 

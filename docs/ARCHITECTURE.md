@@ -2,9 +2,20 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** October 21, 2026
+**Last Updated:** October 22, 2026
 
 ---
+
+## Spoken startup recap (Build 91)
+
+The startup packet below also feeds `gateway/voice-recap.mjs`: a separate, read-only, out-of-band audio response (`conversation: none`, no tools, `tool_choice: none`). Policy requests 35–60 words and at most three topics. Task snapshots older than 90 seconds are unavailable for current-status claims; sensitive snippets are filtered and discussion remains historical reference, never authorization.
+
+- Native `useRealtimeVoice` sends one authenticated `POST /patients/assistant/conversations/:id/voice/:voiceId/ready` after WebRTC connects. The adapter checks conversation ownership and SDP exchange, marks readiness before awaiting the gateway, and clears the retained broker secret after forwarding. Missing/expired secrets skip the recap; client acknowledgement failures leave normal audio working without replay.
+- The gateway-owned bridge waits 750 ms after readiness and requires an idle provider. Speech, another response, continuity reset or closure suppresses the pending recap; provider VAD handles spoken interruption. The browser-owned path in `gateway/browser-recap.mjs` waits for both an open data channel and connected peer before its own 750 ms delay.
+- Per-call client readiness and durable claims prevent duplicate greetings. `data/assistant/voice-recap-state.json` in the gateway workspace keeps at most 200 call IDs/timestamps plus the last claim time, not transcripts. Existing conversation history and memory files are not rewritten; no Zustand store is added.
+- `scripts/install-voice-recap.cjs --check` validates installed bundle anchors without writes. Installation backs up and patches local Talk, bridge factory, broker and browser bootstrap bundles. Revalidate both startup-memory and recap integrations after gateway upgrades, then restart the gateway and patient-sync adapter. This is a local integration, not an upstream feature.
+
+Build 90 clients retain silent startup. Build 91 fails open to ordinary audio against servers without readiness support. See [Build 91 deployment, rollback and acceptance scope](changes/build91-spoken-recap.md); physical-phone audio acceptance is separate from automated coverage.
 
 ## Voice startup continuity (Build 90)
 
