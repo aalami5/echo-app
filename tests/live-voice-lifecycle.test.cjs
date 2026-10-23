@@ -43,12 +43,14 @@ test('call survives UI unmount and backgrounding; mute changes only outgoing tra
   assert.equal(pc.track.stopped,false);assert.equal(liveVoiceSession.getSnapshot().status,'connected');
   await act(async()=>{ui=create(React.createElement(Screen));});assert.equal(currentVoice.muted,true);
   assert.equal(requests.filter(x=>x.endsWith('/voice')).length,1);
+  assert.equal(requests.filter(x=>x.endsWith('/ready')).length,1);
   await act(async()=>{currentVoice.toggleMute();});assert.equal(pc.track.enabled,true);
   app.currentState='active';
   // Transient network loss keeps the existing session rather than replaying a request.
   await act(async()=>{pc.connectionState='disconnected';pc.onconnectionstatechange();});assert.equal(currentVoice.status,'reconnecting');
   await act(async()=>{pc.connectionState='connected';pc.onconnectionstatechange();});assert.equal(currentVoice.status,'connected');
   assert.equal(requests.filter(x=>x.endsWith('/voice')).length,1);
+  assert.equal(requests.filter(x=>x.endsWith('/ready')).length,1,'transient reconnect must not request another recap');
   // Native interruption requires explicit resume and never silently unmutes.
   await act(async()=>{nativeListeners.forEach(fn=>fn({type:'interruption'}));});assert.equal(currentVoice.status,'paused');assert.equal(pc.track.enabled,false);
   await act(async()=>{currentVoice.toggleMute();});assert.equal(pc.track.enabled,false);

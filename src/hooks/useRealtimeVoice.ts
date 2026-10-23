@@ -7,7 +7,7 @@ import { getWebRtcRuntime, hasWebRtcRuntime } from '../services/realtimeVoice';
 import { assistantApi, ACTIVE_VOICE_KEY, closeAbandonedVoice } from '../services/assistant';
 import { prepareLiveVoiceAudioRoute, releaseLiveVoiceAudioRoute } from '../services/liveAudioRoute';
 type LiveVoiceStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'paused' | 'stopping' | 'unsupported' | 'error';
-type VoiceCall = { generation: number; pc?: any; stream?: any; voiceId?: string; conversationId: string; audio?: any; timers?: ReturnType<typeof setTimeout>[]; stats?: ReturnType<typeof setInterval>; nativeSub?: { remove(): void }; appSub?: { remove(): void } };
+type VoiceCall = { generation: number; pc?: any; stream?: any; voiceId?: string; conversationId: string; audio?: any; recapReady?: boolean; timers?: ReturnType<typeof setTimeout>[]; stats?: ReturnType<typeof setInterval>; nativeSub?: { remove(): void }; appSub?: { remove(): void } };
 // The call outlives screen mounts. Only explicit End, logout or terminal failure closes it.
 const listeners = new Set<() => void>();
 let snapshot = { status: (hasWebRtcRuntime() ? 'idle' : 'unsupported') as LiveVoiceStatus, error: null as string | null, muted: false, conversationId: 'home', startedAt: 0, speaking: false, level: 0 };
@@ -51,6 +51,12 @@ const stop = async () => {
     update({ conversationId, startedAt: Date.now(), muted: false, speaking: false, level: 0 });
     current.current = call; setStatus('connecting'); setError(null);
     const active = () => current.current === call && generation.current === call.generation;
+    const signalRecapReady = async () => {
+      if(!active() || call.recapReady || !call.voiceId || call.pc?.connectionState!=='connected' || snapshot.status==='paused') return;
+      call.recapReady=true;
+      // Readiness is per logical call, not per screen mount or transient reconnect.
+      try {await assistantApi(`/conversations/${conversationId}/voice/${call.voiceId}/ready`,{});} catch { /* Never fail audio or replay a greeting after an uncertain acknowledgement. */ }
+    };
     try {
       await closeAbandonedVoice();
       if (!active()) return;
@@ -115,6 +121,7 @@ const stop = async () => {
         if (pc.connectionState === 'connected') {
           if (disconnectTimer) { clearTimeout(disconnectTimer); disconnectTimer = undefined; }
           if (snapshot.status !== 'paused') setStatus('connected');
+          void signalRecapReady();
         }
         if (pc.connectionState === 'disconnected' && !disconnectTimer) {
           if (snapshot.status !== 'paused') setStatus('reconnecting');
@@ -150,7 +157,7 @@ const stop = async () => {
       const timer = setTimeout(() => { if (active() && pc.connectionState !== 'connected') { void stop(); setError('Voice connection timed out. Your history is safe; try again.'); } }, 20000);
       call.timers!.push(timer);
       // Timer only observes this call; an old call cannot stop its replacement.
-      if (pc.connectionState === 'connected') { clearTimeout(timer); if ((snapshot.status as LiveVoiceStatus) !== 'paused') setStatus('connected'); }
+      if (pc.connectionState === 'connected') { clearTimeout(timer); if ((snapshot.status as LiveVoiceStatus) !== 'paused') setStatus('connected'); await signalRecapReady(); }
     } catch (e: any) {
       if (active()) { await stop(); setError(e.message || 'Could not connect Live Voice.'); setStatus('error'); }
     }

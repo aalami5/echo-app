@@ -43,6 +43,23 @@ test('voice and text use one stable session; new projects cannot select WhatsApp
   await request('/conversations/home/voice/voice-one/close', {});
   assert.equal(rpc.calls.some(c => c.method === 'chat.abort'), false, 'ending call must not cancel task');
 });
+test('recap readiness is authenticated, call-scoped and at-most-once without a chat send', async t=>{
+  const upstream=[];
+  const {rpc,request}=await fixture(t,new FakeGateway(),{fetchVoice:async(url,options)=>{
+    upstream.push({url,options});return new Response(options.headers['Content-Type']==='application/sdp'?'v=0\r\n':'Ready');
+  }});
+  await request('/conversations/home/voice',{});
+  assert.equal((await request('/conversations/home/voice/voice-one/ready',{})).status,409);
+  assert.equal((await request('/conversations/expenses/voice/voice-one/ready',{})).status,404);
+  assert.equal((await request('/conversations/home/voice/voice-one/ready',{},'wrong-token')).status,403);
+  await request('/conversations/home/voice/voice-one/offer',{sdp:'v=0\r\n'});
+  const responses=await Promise.all([request('/conversations/home/voice/voice-one/ready',{}),request('/conversations/home/voice/voice-one/ready',{})]);
+  assert.ok(responses.every(r=>r.status===200));assert.equal(upstream.length,2);
+  assert.equal(upstream[1].options.headers['Content-Type'],'application/vnd.echo.recap-ready+json');
+  assert.equal(rpc.sent,0);assert.doesNotMatch(JSON.stringify(responses),/do-not-expose/);
+  await request('/conversations/home/voice/voice-one/close',{});
+  assert.equal((await request('/conversations/home/voice/voice-one/ready',{})).status,404);
+});
 test('same request and uploaded PDF are not replayed after lost acknowledgement or restart', async t => {
   const { rpc, request, dir } = await fixture(t);
   const upload = await request('/uploads', { conversationId: 'home', idempotencyKey: 'upload_1234', name: '../../synthetic.pdf', mimeType: 'application/pdf', content: Buffer.from('%PDF-synthetic').toString('base64') });

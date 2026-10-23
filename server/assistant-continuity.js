@@ -21,7 +21,7 @@ function publicText(message) {
   if (typeof message.content === 'string') return message.content;
   return (message.content || []).filter(p => (p.type === 'text' || p.type === 'output_text') && typeof p.text === 'string').map(p => p.text).join('\n');
 }
-function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, workspace, rpc: injectedRpc, fetchArtifact = fetch }) {
+function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, workspace, rpc: injectedRpc, fetchArtifact = fetch, fetchVoice = fetch }) {
   // This deployment is the existing single-operator Echo install. Do not derive
   // authority from supplied user IDs, session keys, filenames or channel names.
   const rpc = injectedRpc || new AssistantGateway({ url: gatewayUrl, token: authToken });
@@ -225,11 +225,24 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
     const sdp = req.body?.sdp;
     if (typeof sdp !== 'string' || !sdp.startsWith('v=') || sdp.length > 262144 || /m=application\b/.test(sdp)) bad('Expected audio-only SDP');
     v.exchanged = true;
-    const r = await fetch(`${gatewayUrl}/plugins/openai/realtime/calls`, { method: 'POST', headers: { Authorization: `Bearer ${v.secret}`, 'Content-Type': 'application/sdp' }, body: sdp, redirect: 'error', signal: AbortSignal.timeout(30000) });
-    v.secret = undefined;
+    const r = await fetchVoice(`${gatewayUrl}/plugins/openai/realtime/calls`, { method: 'POST', headers: { Authorization: `Bearer ${v.secret}`, 'Content-Type': 'application/sdp' }, body: sdp, redirect: 'error', signal: AbortSignal.timeout(30000) });
     if (!r.ok) bad('Live Voice connection failed; end the call and reconnect');
     const answerSdp = await r.text(); if (!answerSdp.startsWith('v=')) bad('Invalid voice connection response');
     res.json({ answerSdp });
+  });
+  route('post', '/conversations/:id/voice/:voiceId/ready', async (req,res)=>{
+    conversation(req.params.id); const v=voices.get(req.params.voiceId);
+    if(!v || v.conversationId!==req.params.id) bad('Voice session not found',404);
+    if(!v.exchanged) bad('Voice audio is not connected',409);
+    if(v.recapReady) return res.json({ok:true});
+    if(!v.secret || Date.now()>v.expiresAt) return res.json({ok:true,recap:'skipped'});
+    // Mark before awaiting: duplicate readiness events cannot create two greetings.
+    v.recapReady=true;
+    try {
+      const r=await fetchVoice(`${gatewayUrl}/plugins/openai/realtime/calls`,{method:'POST',headers:{Authorization:`Bearer ${v.secret}`,'Content-Type':'application/vnd.echo.recap-ready+json'},body:'{}',redirect:'error',signal:AbortSignal.timeout(5000)});
+      await r.body?.cancel();
+      res.json({ok:true,recap:r.ok?'ready':'unavailable'});
+    } finally {v.secret=undefined;}
   });
   route('post', '/conversations/:id/voice/:voiceId/close', async (req, res) => {
     const c = conversation(req.params.id); const v = voices.get(req.params.voiceId);
