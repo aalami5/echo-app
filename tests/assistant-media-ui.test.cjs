@@ -30,7 +30,7 @@ test('photo draft survives voice/text/tab switches and upload failure; explicit 
  await press(ui,'Add attachment');await press(ui,'Photo Library');assert.equal(photos,1);assert.equal(uploads.length,0);assert.equal(submissions.length,0);assert.ok(ui.root.findAllByType('Image').length);
  focused=false;await act(async()=>ui.update(React.createElement(Screen)));assert.equal(stops,0);
  focused=true;await act(async()=>ui.update(React.createElement(Screen)));assert.ok(ui.root.findAllByType('Image').length);
- await press(ui,'Switch to text; keep connection active');await press(ui,'Add attachment');await press(ui,'Cancel');assert.equal(stops,0);
+ await press(ui,'Switch to chat; keep connection active');await press(ui,'Add attachment');await press(ui,'Cancel');assert.equal(stops,0);
  await press(ui,'Return to Live Voice');failUpload=true;await press(ui,'Send to Echo');assert.equal(submissions.length,0);assert.ok(ui.root.findAllByType('Image').length);
  failUpload=false;await press(ui,'Send to Echo');assert.equal(submissions.length,1);assert.equal(submissions[0].conversationId,'home');assert.deepEqual(submissions[0].attachmentIds,['photo1']);assert.equal(stops,0);
  assert.equal(ui.root.findAllByType('Image').length,0);await act(async()=>ui.unmount());

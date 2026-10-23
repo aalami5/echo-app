@@ -310,7 +310,12 @@ export default function AssistantScreen() {
   const attachmentTray = <AssistantAttachmentTray files={attachments} disabled={mediaBusy} onRemove={removeAttachment}/>;
   const mediaControls = <View style={s.mediaMenu}>
     <Text style={s.subtle}>Add to Echo · {title}</Text>
-    <View style={s.row}><Button title="Camera" disabled={mediaBusy} onPress={openCamera}/><Button title="Photo Library" disabled={mediaBusy} onPress={() => {void pickMedia('photos');}}/><Button title="Files" disabled={mediaBusy} onPress={() => {void pickMedia('files');}}/><Button title="Cancel" onPress={() => setMediaMenu(false)}/></View>
+    <View style={s.mediaIcons}>
+      <VoiceIconButton icon="camera-outline" label="Camera" disabled={mediaBusy} onPress={openCamera}/>
+      <VoiceIconButton icon="images-outline" label="Photo Library" disabled={mediaBusy} onPress={() => {void pickMedia('photos');}}/>
+      <VoiceIconButton icon="document-outline" label="Files" disabled={mediaBusy} onPress={() => {void pickMedia('files');}}/>
+      <VoiceIconButton icon="close" label="Cancel" onPress={() => setMediaMenu(false)}/>
+    </View>
   </View>;
   const cameraPanel = cameraOpen && focused && foreground ? <AssistantCamera busy={mediaPicking} onCapture={capturePhoto} onClose={() => setCameraOpen(false)}/> : undefined;
   const voiceDraft = <>
@@ -397,6 +402,7 @@ export default function AssistantScreen() {
 }
 const s = StyleSheet.create({
   mediaMenu: { padding: 10, borderRadius: 14, backgroundColor: colors.surface, marginBottom: 6 },
+  mediaIcons: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', alignItems: 'center', gap: 8, paddingTop: 8 },
   conversationControls: { flexGrow: 0, flexShrink: 1, maxHeight: '45%' },
   root: { flex: 1, backgroundColor: colors.background }, header: { paddingHorizontal: 16, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 4 },
   heading: { color: colors.textPrimary, fontSize: 21, fontWeight: '600' }, subtle: { color: colors.textSecondary, fontSize: 13, lineHeight: 19 },
