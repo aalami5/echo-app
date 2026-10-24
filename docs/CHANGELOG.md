@@ -1,6 +1,13 @@
 # Changelog
 
-**Last Updated:** October 22, 2026
+**Last Updated:** October 23, 2026
+
+## Build 92 — Accessible attachment-menu icons (2026-10-23)
+
+- Replaced the shared voice/chat attachment menu's Camera, Photo Library, Files and Cancel text buttons with camera, stacked-image, document and close icons. Reuses the existing 54-point `VoiceIconButton` with accessible labels, busy-state disabling for picker actions and a wrapping layout.
+- Picker handlers, previews, explicit sending and voice lifecycle are unchanged. No new components, store implementation or system-design changes.
+- Updated the attachment regression test's stale Text label to Chat. Release notes record TypeScript and 11 attachment/voice checks passing, completed native build/submission, Apple VALID / IN_BETA_TESTING internally and verified signed-package identity. Physical-iPhone layout/picker acceptance remains pending.
+- [Build 92 change and release evidence](changes/attachment-menu-icons.md).
 
 ## Build 91 — Readiness-gated spoken startup recap (2026-10-22)
 

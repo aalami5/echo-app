@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** October 21, 2026
+**Last Updated:** October 23, 2026
 
 ---
 
@@ -367,9 +367,11 @@ Layout wrapper for `AssistantScreen`, used within the bottom-tab navigator and s
 
 The inner `KeyboardAvoidingView` applies top safe-area padding, iOS `padding` behavior, zero keyboard offset, and `minHeight: 0`. Keyboard visibility initializes from `Keyboard.isVisible()` where available; listeners use will-show/hide events on iOS and did-show/hide elsewhere, with cleanup on unmount. Test IDs are `chat-viewport` and `chat-keyboard-area`.
 
-### AssistantScreen / Chat tab (Builds 82–88)
+### AssistantScreen / Chat tab (Builds 82–92)
 
 **File:** `src/screens/AssistantScreen.tsx`, rendered by `app/(tabs)/index.tsx`.
+
+Build 92 uses the existing 54-point `VoiceIconButton` for the shared voice/chat attachment menu: `camera-outline` (Camera), `images-outline` (Photo Library), `document-outline` (Files) and `close` (Cancel). Accessible action labels remain available; picker actions disable while media is busy, while Cancel stays available. The icon row wraps with 8-point gaps. Picker handlers, previews, explicit sending and voice lifecycle are unchanged. See [change and release evidence](changes/attachment-menu-icons.md); physical-iPhone layout/picker acceptance remains pending.
 
 - Home/project selector and new-conversation sheet; typed messages and Live Voice use the selected native conversation.
 - Paginated message list, incremental responses, copy/share actions, tappable web links, and Jump to latest without forcing readers away from older messages.
