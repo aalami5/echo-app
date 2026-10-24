@@ -86,6 +86,10 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
       events.push(entry); if (events.length > 500) events.shift();
     }
   });
+  route('get', '/tasks', async (_req, res) => {
+    const result = await rpc.call('echo.tasks.list', {});
+    res.json(result);
+  });
   route('get', '/bootstrap', async (req, res) => {
     for (const [id, p] of Object.entries(PROJECTS)) {
       if (!state.conversations[id]) state.conversations[id] = { id, title: p.title, project: id, key: `agent:main:echo-app:${id}`, createdAt: Date.now() };

@@ -6,12 +6,12 @@ import { useRealtimeVoice } from '../hooks/useRealtimeVoice';
 import { VoiceOrb, VoiceOrbMode } from './VoiceOrb';
 
 type Voice = ReturnType<typeof useRealtimeVoice>;
-export function VoiceIconButton({ icon, label, onPress, disabled, selected, danger }: {
-  icon: React.ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void; disabled?: boolean; selected?: boolean; danger?: boolean;
+export function VoiceIconButton({ icon, label, onPress, disabled, selected, danger, muted }: {
+  icon: React.ComponentProps<typeof Ionicons>['name']; label: string; onPress: () => void; disabled?: boolean; selected?: boolean; danger?: boolean; muted?: boolean;
 }) {
   return <TouchableOpacity accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled, selected: !!selected }}
-    disabled={disabled} onPress={onPress} style={[styles.iconButton, selected && { backgroundColor: '#334155' }, danger && { backgroundColor: '#9F2835' }, disabled && { opacity: 0.4 }]}>
-    <Ionicons name={icon} size={26} color={danger ? '#FFF' : colors.textPrimary}/>
+    disabled={disabled} onPress={onPress} style={[styles.iconButton, selected && { backgroundColor: '#334155' }, danger && { backgroundColor: '#9F2835' }, muted && { backgroundColor: '#663F49', borderColor: '#D99AA4', borderWidth: 1 }, disabled && { opacity: 0.4 }]}>
+    <Ionicons name={icon} size={26} color={muted ? '#FFD8DE' : danger ? '#FFF' : colors.textPrimary}/>
   </TouchableOpacity>;
 }
 export function voicePresentation(voice: Pick<Voice, 'status' | 'muted' | 'speaking'>, working: boolean) {
@@ -25,8 +25,8 @@ export function voicePresentation(voice: Pick<Voice, 'status' | 'muted' | 'speak
   if (voice.muted) return { label: 'Microphone muted', color: '#94A3B8' };
   return { label: 'Listening', color: '#68E1D4' };
 }
-export function VoiceCallView({ visible, title, voice, working, ready, caption, connectionError, onRetry, onText, onMore, onAttach, onHangUp, mediaDisabled, content, draftContent }: {
-  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; connectionError?: string | null; onRetry: () => void; onText: () => void; onMore: () => void; onAttach?: () => void; onHangUp?: () => void; mediaDisabled?: boolean; content?: React.ReactNode; draftContent?: React.ReactNode;
+export function VoiceCallView({ visible, title, voice, working, ready, caption, connectionError, onRetry, onText, onMore, onAttach, onHangUp, mediaDisabled, content, draftContent, taskContent }: {
+  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; connectionError?: string | null; onRetry: () => void; onText: () => void; onMore: () => void; onAttach?: () => void; onHangUp?: () => void; mediaDisabled?: boolean; content?: React.ReactNode; draftContent?: React.ReactNode; taskContent?: React.ReactNode;
 }) {
   const [reduceMotion, setReduceMotion] = useState(true);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
@@ -53,6 +53,7 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
           <VoiceOrb color={state.color} mode={orbMode} level={voice.level} motionEnabled={visible && foreground && !reduceMotion}/>
         </View>
         <Text accessibilityLiveRegion="polite" style={[styles.state, { color: state.color }]}>{state.label}</Text>
+        {taskContent}
         {(voice.error || (!ready && connectionError)) && <Text accessibilityRole="alert" style={styles.error}>{voice.error || connectionError}</Text>}
         {!ready && connectionError && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry connection" onPress={onRetry} style={styles.start}><Text style={styles.startText}>Try again</Text></TouchableOpacity>}
         {voice.status === 'paused' && <TouchableOpacity accessibilityRole="button" onPress={() => { void voice.resume(); }} style={styles.start}><Text style={styles.startText}>Resume audio</Text></TouchableOpacity>}
@@ -63,7 +64,7 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
         {draftContent}
         <TouchableOpacity accessibilityRole="button" accessibilityLabel={captions ? 'Hide captions' : 'Show captions'} onPress={() => setCaptions(value => !value)} style={styles.captionButton}><Ionicons name="chatbox-ellipses-outline" size={20} color={captions ? colors.primary : colors.textSecondary}/><Text style={styles.small}>Captions</Text></TouchableOpacity>
         <View style={styles.controls}>
-          <View style={styles.control}><VoiceIconButton icon={voice.muted ? 'mic-off' : 'mic'} label={voice.muted ? 'Unmute microphone' : 'Mute microphone'} selected={voice.muted} disabled={!voice.isConnected} onPress={voice.toggleMute}/></View>
+          <View style={styles.control}><VoiceIconButton icon={voice.muted ? 'mic-off' : 'mic'} label={voice.muted ? 'Unmute microphone' : 'Mute microphone'} selected={voice.muted} muted={voice.muted} disabled={!voice.isConnected} onPress={voice.toggleMute}/></View>
           <View style={styles.control}><VoiceIconButton icon="chatbubble-outline" label="Switch to chat; keep connection active" onPress={onText}/><Text style={styles.small}>Chat</Text></View>
           {onAttach && <View style={styles.control}><VoiceIconButton icon="add" label="Add attachment" disabled={mediaDisabled} onPress={onAttach}/></View>}
           <View style={styles.control}><VoiceIconButton icon="power-outline" label="Hang up" danger disabled={!voice.isActive || voice.status === 'stopping'} onPress={() => { if (onHangUp) onHangUp(); else void voice.stop(); }}/><Text style={styles.small}>Hang up</Text></View>
@@ -74,7 +75,7 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
 const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 0, backgroundColor: colors.background, paddingHorizontal: 12, paddingTop: 8 },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12 }, title: { flex: 1, color: colors.textSecondary, fontSize: 18, fontWeight: '500' },
-  center: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 20 },
+  center: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 12 },
   state: { fontSize: 20, fontWeight: '500', textAlign: 'center', marginTop: 12 },
   error: { color: colors.warning, fontSize: 15, textAlign: 'center', marginTop: 16, lineHeight: 22 },
   start: { backgroundColor: '#68DAD4', borderRadius: 26, paddingHorizontal: 32, paddingVertical: 15, marginTop: 24, minHeight: 50 }, startText: { color: colors.textInverse, fontSize: 17, fontWeight: '600' },

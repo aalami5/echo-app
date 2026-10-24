@@ -29,3 +29,9 @@ test('voice view stays inline with media actions separate from explicit Hang up'
  const buttons=ui.root.findAllByType('Button');const attach=buttons.find(b=>b.props.accessibilityLabel==='Add attachment');assert.equal(attach.findByType('Icon').props.name,'add');attach.props.onPress();assert.equal(attachments,1);assert.equal(buttons.some(b=>['Add photos','Open live camera'].includes(b.props.accessibilityLabel)),false);assert.equal(stops,0);
  buttons.find(b=>b.props.accessibilityLabel==='Hang up').props.onPress();assert.equal(stops,1);await act(async()=>ui.unmount());
 });
+test('muted microphone has a faded red bubble distinct from hangup red',async()=>{
+ let ui;await act(async()=>{ui=create(React.createElement(VoiceCallView,{visible:true,title:'Home',voice:{...base,muted:true},ready:true,onRetry(){},onText(){},onMore(){}}));});
+ const buttons=ui.root.findAllByType('Button'),mic=buttons.find(b=>b.props.accessibilityLabel==='Unmute microphone'),end=buttons.find(b=>b.props.accessibilityLabel==='Hang up');
+ const color=b=>Object.assign({},...b.props.style.filter(Boolean)).backgroundColor;
+ assert.equal(color(mic),'#663F49');assert.equal(color(end),'#9F2835');await act(async()=>ui.unmount());
+});
