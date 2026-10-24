@@ -175,3 +175,65 @@ test('camera/photo uploads reach the same native voice conversation as image att
   assert.equal(send.params.sessionKey,voice.params.sessionKey);assert.equal(send.params.attachments[0].type,'image');assert.equal(send.params.attachments[0].mimeType,'image/jpeg');assert.equal(send.params.attachments[0].content,content);
   assert.equal((await request('/conversations/home/send',body)).status,200);assert.equal(rpc.sent,1);
 });
+
+test('terminal voice event frees only its session; reconnect never aborts accepted work', async t => {
+  const {request,rpc}=await fixture(t);
+  await request('/conversations/home/voice',{});
+  rpc.emit('event',{event:'talk.event',payload:{voiceSessionId:'unrelated',talkEvent:{type:'session.ended'}}});
+  assert.equal((await request('/conversations/home/voice',{})).status,409);
+  rpc.emit('event',{event:'talk.event',payload:{voiceSessionId:'voice-one',talkEvent:{type:'session.ended'}}});
+  const events=await request('/conversations/home/events');
+  assert.equal(events.data.events.at(-1).state,'session.ended');
+  assert.equal((await request('/conversations/home/voice',{})).status,200);
+  assert.equal(rpc.calls.some(c=>c.method==='chat.abort'),false);
+});
+test('abandoned unexchanged offers expire, while established calls survive credential expiry', async t => {
+  let time=1000;
+  const {request,rpc}=await fixture(t,new FakeGateway(),{now:()=>time,fetchVoice:async()=>new Response('v=0\r\n')});
+  await request('/conversations/home/voice',{});
+  assert.equal((await request('/conversations/home/voice',{})).status,409);
+  time+=61000;
+  assert.equal((await request('/conversations/home/voice',{})).status,200);
+  assert.equal(rpc.calls.filter(c=>c.method==='talk.client.close').length,1);
+  assert.equal((await request('/conversations/home/voice/voice-one/offer',{sdp:'v=0\r\n'})).status,200);
+  time+=61000;
+  assert.equal((await request('/conversations/home/voice',{})).status,409);
+  assert.equal(rpc.calls.filter(c=>c.method==='talk.client.close').length,1);
+});
+test('provider rejection, invalid answer and transport failure release failed session', async t => {
+  for(const failure of ['reject','invalid','network']) {
+    const {request,rpc}=await fixture(t,new FakeGateway(),{fetchVoice:async()=>{
+      if(failure==='network') throw Error('connection reset');
+      return failure==='reject'?new Response('unavailable',{status:503}):new Response('not SDP');
+    }});
+    await request('/conversations/home/voice',{});
+    assert.equal((await request('/conversations/home/voice/voice-one/offer',{sdp:'v=0\r\n'})).status,failure==='network'?503:502);
+    assert.equal(rpc.calls.filter(c=>c.method==='talk.client.close').length,1);
+    assert.equal((await request('/conversations/home/voice',{})).status,200);
+    assert.equal(rpc.calls.some(c=>c.method==='chat.abort'),false);
+  }
+});
+test('failed cleanup is retained and retried, never bypassed to create a competing session', async t => {
+  const rpc=new FakeGateway();const original=rpc.call.bind(rpc);let rejectClose=true;
+  rpc.call=async(method,p)=>{if(method==='talk.client.close' && rejectClose)throw Error('gateway unavailable');return original(method,p);};
+  const {request}=await fixture(t,rpc,{fetchVoice:async()=>new Response('failure',{status:503})});
+  await request('/conversations/home/voice',{});
+  await request('/conversations/home/voice/voice-one/offer',{sdp:'v=0\r\n'});
+  assert.equal((await request('/conversations/home/voice',{})).status,503);
+  assert.equal(rpc.calls.filter(c=>c.method==='talk.client.create').length,1);
+  rejectClose=false;
+  assert.equal((await request('/conversations/home/voice',{})).status,200);
+});
+test('concurrent recovery serializes creation; a slow offer remains protected', async t => {
+  let time=1000,resolveOffer;
+  const {request,rpc}=await fixture(t,new FakeGateway(),{now:()=>time,fetchVoice:()=>new Promise(r=>{resolveOffer=r;})});
+  await request('/conversations/home/voice',{});time+=61000;
+  const results=await Promise.all([request('/conversations/home/voice',{}),request('/conversations/home/voice',{})]);
+  assert.deepEqual(results.map(r=>r.status).sort(),[200,409]);
+  const pending=request('/conversations/home/voice/voice-one/offer',{sdp:'v=0\r\n'});
+  while(!resolveOffer)await new Promise(r=>setImmediate(r));
+  time+=61000;
+  assert.equal((await request('/conversations/home/voice',{})).status,409);
+  resolveOffer(new Response('v=0\r\n'));assert.equal((await pending).status,200);
+  assert.equal(rpc.calls.filter(c=>c.method==='talk.client.create').length,2);
+});

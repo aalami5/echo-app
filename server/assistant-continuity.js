@@ -21,7 +21,7 @@ function publicText(message) {
   if (typeof message.content === 'string') return message.content;
   return (message.content || []).filter(p => (p.type === 'text' || p.type === 'output_text') && typeof p.text === 'string').map(p => p.text).join('\n');
 }
-function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, workspace, rpc: injectedRpc, fetchArtifact = fetch, fetchVoice = fetch }) {
+function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, workspace, rpc: injectedRpc, fetchArtifact = fetch, fetchVoice = fetch, now = Date.now }) {
   // This deployment is the existing single-operator Echo install. Do not derive
   // authority from supplied user IDs, session keys, filenames or channel names.
   const rpc = injectedRpc || new AssistantGateway({ url: gatewayUrl, token: authToken });
@@ -72,6 +72,9 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
           error: t.type === 'error' ? 'Live Voice reported a problem. Check Activity before repeating an action.' : undefined };
         events.push(entry); if (events.length > 500) events.shift();
       }
+      // A terminal gateway event is authoritative: keeping this record blocks
+      // the next call even though the phone has no live connection.
+      if (t.type === 'session.ended') voices.delete(p.voiceSessionId);
       return;
     }
     const c = Object.values(state.conversations).find(c => c.key === p.sessionKey || c.key === p.agentSessionKey);
@@ -204,31 +207,49 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
     }
     res.json(result);
   });
+  const closeVoice = async (id, v) => {
+    await rpc.call('talk.client.close', { sessionKey: v.key, voiceSessionId: id });
+    if (voices.get(id) === v) voices.delete(id);
+  };
   route('post', '/conversations/:id/voice', async (req, res) => {
     const c = await ensure(req.params.id);
-    if (creatingVoice.has(c.id) || [...voices.values()].some(v => v.conversationId === c.id)) bad('End the current call before starting another', 409);
+    if (creatingVoice.has(c.id)) bad('A voice connection is already being started. Please wait.', 409);
     creatingVoice.add(c.id);
     try {
+    // Lock recovery and creation together. Never expire an established call
+    // merely because its short-lived offer credential has expired.
+    for (const [id, v] of voices) {
+      if (v.conversationId === c.id && (v.failed || (!v.exchanged && now() > v.expiresAt))) await closeVoice(id, v);
+    }
+    if ([...voices.values()].some(v => v.conversationId === c.id)) bad('End the current call before starting another', 409);
     const voice = await rpc.call('talk.client.create', { sessionKey: c.key, provider: 'openai', model: 'gpt-realtime-2.1', voice: 'marin', mode: 'realtime', transport: 'webrtc', brain: 'agent-consult', capabilities: ['gateway-control-v1', 'voice-transcript'] }, 45000);
     if (voice.clientControl?.owner !== 'gateway' || voice.transport !== 'webrtc' || voice.offerUrl !== '/plugins/openai/realtime/calls') {
       if (voice.voiceSessionId) await rpc.call('talk.client.close', { sessionKey: c.key, voiceSessionId: voice.voiceSessionId });
       bad('Gateway-controlled Live Voice is not available');
     }
-    voices.set(voice.voiceSessionId, { conversationId: c.id, key: c.key, secret: voice.clientSecret, expiresAt: Date.now() + 60000, exchanged: false });
-    res.json({ voiceSessionId: voice.voiceSessionId, control: 'gateway', expiresAt: Date.now() + 60000 });
+    voices.set(voice.voiceSessionId, { conversationId: c.id, key: c.key, secret: voice.clientSecret, expiresAt: now() + 60000, exchanged: false });
+    res.json({ voiceSessionId: voice.voiceSessionId, control: 'gateway', expiresAt: now() + 60000 });
     } finally { creatingVoice.delete(c.id); }
   });
   route('post', '/conversations/:id/voice/:voiceId/offer', async (req, res) => {
     conversation(req.params.id); const v = voices.get(req.params.voiceId);
     if (!v || v.conversationId !== req.params.id) bad('Voice session not found', 404);
-    if (v.exchanged || Date.now() > v.expiresAt) bad('Voice offer expired; start a new call', 409);
+    if (v.exchanged || now() > v.expiresAt) bad('Voice offer expired; start a new call', 409);
     const sdp = req.body?.sdp;
     if (typeof sdp !== 'string' || !sdp.startsWith('v=') || sdp.length > 262144 || /m=application\b/.test(sdp)) bad('Expected audio-only SDP');
     v.exchanged = true;
+    try {
     const r = await fetchVoice(`${gatewayUrl}/plugins/openai/realtime/calls`, { method: 'POST', headers: { Authorization: `Bearer ${v.secret}`, 'Content-Type': 'application/sdp' }, body: sdp, redirect: 'error', signal: AbortSignal.timeout(30000) });
-    if (!r.ok) bad('Live Voice connection failed; end the call and reconnect');
-    const answerSdp = await r.text(); if (!answerSdp.startsWith('v=')) bad('Invalid voice connection response');
+    if (!r.ok) bad('Live Voice connection failed. Tap Connect to try again.', 502);
+    const answerSdp = await r.text(); if (!answerSdp.startsWith('v=')) bad('Invalid voice connection response', 502);
     res.json({ answerSdp });
+    } catch (error) {
+      v.failed = true;
+      // The client never received a usable answer. Close the exact session;
+      // retain it for a retry if gateway cleanup is temporarily unavailable.
+      try { await closeVoice(req.params.voiceId, v); } catch {}
+      throw error;
+    }
   });
   route('post', '/conversations/:id/voice/:voiceId/ready', async (req,res)=>{
     conversation(req.params.id); const v=voices.get(req.params.voiceId);
@@ -247,7 +268,7 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
   route('post', '/conversations/:id/voice/:voiceId/close', async (req, res) => {
     const c = conversation(req.params.id); const v = voices.get(req.params.voiceId);
     if (v && v.conversationId !== c.id) bad('Voice session not found', 404);
-    if (v) { await rpc.call('talk.client.close', { sessionKey: c.key, voiceSessionId: req.params.voiceId }); voices.delete(req.params.voiceId); }
+    if (v) await closeVoice(req.params.voiceId, v);
     res.json({ ok: true });
   });
   route('get', '/memory', async (req, res) => {
