@@ -4,7 +4,7 @@ const { randomUUID, createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const OWNER_DM = 'agent:main:whatsapp:direct:+16503153236';
-const allowed = key => key === OWNER_DM || key === 'agent:main:main' || /^agent:main:echo-app:(home|echo|noharm|expenses|woodside|[a-f0-9-]{36})$/.test(key || '');
+const allowed = key => key === OWNER_DM || key === 'agent:main:main' || /^agent:main:echo-app:(home|echo|noharm|expenses|woodside|superchill|[a-f0-9-]{36})$/.test(key || '');
 const digest = value => createHash('sha256').update(value).digest('hex');
 const clean = (s, n = 2000) => String(s || '').replace(/[\x00-\x08\x0b-\x1f]/g, '').slice(0, n);
 const terminal = new Set(['completed', 'failed', 'cancelled']);

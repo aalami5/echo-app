@@ -8,6 +8,7 @@ const PROJECTS = Object.freeze({
   noharm: { title: 'NOHARM', wiki: 'wiki/pages/projects/noharm.md' },
   expenses: { title: 'Expenses', wiki: 'wiki/pages/topics/expense.md' },
   echo: { title: 'Echo app', wiki: 'wiki/pages/projects/echo-app.md' },
+  superchill: { title: 'Superchill', wiki: 'wiki/pages/projects/superchill.md' },
   woodside: { title: 'Woodside', wiki: null },
 });
 const hash = value => createHash('sha256').update(value).digest('hex');

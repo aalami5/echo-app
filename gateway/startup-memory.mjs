@@ -40,7 +40,7 @@ export async function prepareStartupMemory({ sessionKey, agentId, workspace, cal
   if (agentId !== 'main') return undefined;
   let index;
   try { index = JSON.parse(await fs.readFile(path.join(workspace, 'data/assistant/index.json'), 'utf8')); } catch { index = { conversations: {} }; }
-  const personal = Object.values(index.conversations || {}).filter(c => /^agent:main:echo-app:(home|echo|noharm|expenses|woodside|[a-f0-9-]{36})$/.test(c.key));
+  const personal = Object.values(index.conversations || {}).filter(c => /^agent:main:echo-app:(home|echo|noharm|expenses|woodside|superchill|[a-f0-9-]{36})$/.test(c.key));
   const allowed = new Set([...BASE_KEYS, ...personal.map(c => c.key)]);
   if (!allowed.has(sessionKey)) return undefined; // deny group, patient, subagent, unknown owner
   const started = now();

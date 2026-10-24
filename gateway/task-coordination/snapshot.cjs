@@ -1,5 +1,5 @@
 const {allowed}=require('./registry.cjs');
-const BASE=['agent:main:whatsapp:direct:+16503153236','agent:main:echo-app:home','agent:main:echo-app:echo','agent:main:echo-app:noharm','agent:main:echo-app:expenses','agent:main:echo-app:woodside'];
+const BASE=['agent:main:whatsapp:direct:+16503153236','agent:main:echo-app:home','agent:main:echo-app:echo','agent:main:echo-app:noharm','agent:main:echo-app:expenses','agent:main:echo-app:woodside','agent:main:echo-app:superchill'];
 async function snapshot(registry,call){
  const managed=registry.list();const keys=[...new Set([...BASE,...managed.flatMap(t=>t.sources).filter(allowed)])].slice(0,20);
  const observed=[],unavailable=[];
