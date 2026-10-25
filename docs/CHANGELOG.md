@@ -1,6 +1,15 @@
 # Changelog
 
-**Last Updated:** October 23, 2026
+**Last Updated:** October 24, 2026
+
+## Build 93 — Shared private tasks and voice recovery (2026-10-24)
+
+- Added an owner-private SQLite task registry shared across Echo app conversations and direct WhatsApp: canonical task keys, transactional resource claims, revision checks, durable action receipts and explicit reconciliation after interrupted work. Existing OpenClaw runs remain read-only projections; a finished run does not prove an external action succeeded.
+- Added `VoiceTaskPanel` below the Live Voice avatar, with active/history views, collapsible rows, task context and Discuss, which prepares a chat draft without sending. Native and browser views poll read-only snapshots and disclose unavailable coverage. Muted microphone styling now uses a faded red bubble distinct from Hang up.
+- Added Superchill to the project catalog, private task snapshots and eligible voice startup context. No Zustand store implementation changed.
+- Fixed stale voice-session records blocking reconnect: authoritative terminal events clear the exact session, recovery and creation are serialized, expired unexchanged allocations and failed SDP exchanges are closed, and failed cleanup is retried without admitting a competing call. Established calls are not expired with their offer credentials; accepted tasks are not replayed or canceled.
+- iOS build number is 93. Shared-task release notes record 88 targeted/backend tests, TypeScript and iOS export passing, but deployment remains pending in those notes; this does not establish TestFlight or physical-iPhone acceptance. The separate voice cleanup hotfix has recorded deployment/public-service verification, with live audio and physical-phone reconnect still unverified.
+- [Shared-task scope and release limits](changes/build93-shared-tasks.md) · [Voice cleanup deployment and rollback](changes/2026-10-24-voice-session-cleanup.md).
 
 ## Build 92 — Accessible attachment-menu icons (2026-10-23)
 

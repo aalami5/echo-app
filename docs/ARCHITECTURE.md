@@ -2,9 +2,28 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** October 22, 2026
+**Last Updated:** October 24, 2026
 
 ---
+
+## Shared owner task coordination (Build 93)
+
+`gateway/task-coordination/` adds a gateway plugin with an owner-private registry at `~/.openclaw/echo-tasks/tasks.sqlite`. SQLite WAL transactions coordinate canonical task keys, resource locks, revision checks, terminal status history and durable action receipts. This is the existing single-owner installation, not a multi-tenant authorization boundary; groups and clinical session keys are excluded.
+
+- The `echo_tasks` agent tool lists, claims, annotates, updates and explicitly reconciles work. Hooks require a running claim for non-exempt tools in allowed sessions. Exact canonical keys deduplicate; semantic matching and resource naming remain the assistant's responsibility. Action receipts are not universal exactly-once guarantees for shell, browser or provider effects.
+- Turn endings and gateway startup mark unfinished running claims `needs_review` while retaining locks. There is no timer-based retry or automatic lock stealing. Viewing records never restarts historical requests.
+- `snapshot.cjs` combines managed records with read-only native task/active-run projections from allowed owner sessions. Native completion maps to `run_finished`, not verified external success; partial retrieval reports unavailable sources. The plugin caches snapshots for five seconds.
+- Authenticated `GET /patients/assistant/tasks` forwards to gateway RPC `echo.tasks.list` (`operator.read`). `AssistantScreen` polls every four seconds while ready, focused and foregrounded, retaining last-known records on failure. State is local React state, not a new Zustand store.
+- `gateway/browser-tasks.mjs` uses the existing authenticated Talk RPC client, polling every four seconds while visible and cleaning up on session change. `scripts/install-task-panel.cjs` provides a version-checked local browser patch with backups; this is not an upstream browser feature.
+- Superchill is now a server-owned project conversation, included in task snapshots and eligible indexed startup-memory sessions. Existing private-source filtering remains in place.
+
+See [Build 93 scope and release evidence](changes/build93-shared-tasks.md). Those notes still mark deployment pending; source implementation and automated checks do not establish deployed browser behavior or physical-phone acceptance.
+
+## Voice-session recovery hotfix (October 24, 2026)
+
+`server/assistant-continuity.js` now removes the exact retained voice record on authoritative `talk.event / session.ended`, preserving the public status event. A per-conversation creation guard serializes recovery and new allocation. Expired allocations are closed only before SDP exchange; established calls do not expire with offer credentials. Failed SDP exchanges close their session; failed cleanup retains the record for reconnect reconciliation rather than allowing a competing call. Audio cleanup never replays requests or aborts accepted tasks.
+
+The deployed adapter hotfix runs from a separate isolated checkout; future backend deployment must preserve it. See [deployment, verification and rollback](changes/2026-10-24-voice-session-cleanup.md). Live audio and physical-iPhone reconnect remain unverified in that record.
 
 ## Spoken startup recap (Build 91)
 
