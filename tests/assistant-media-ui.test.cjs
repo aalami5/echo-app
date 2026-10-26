@@ -27,6 +27,8 @@ const press=async(ui,label)=>{const b=ui.root.findAllByType('Button').find(b=>b.
 test('photo draft survives voice/text/tab switches and upload failure; explicit send shares same conversation',async()=>{
  let ui;await act(async()=>{ui=create(React.createElement(Screen));});
  assert.equal(ui.root.findAllByType('Modal').length,0);
+ assert.equal(ui.root.findAllByType('Text').some(t=>t.children.some(v=>typeof v==='string'&&/^(Tasks(?: ·.*)?|Show all|Active only)$/.test(v))),false);
+ for(const label of ['Show captions','Mute microphone','Hang up','Switch to chat; keep connection active'])assert.ok(ui.root.findAllByType('Button').some(b=>b.props.accessibilityLabel===label),label);
  await press(ui,'Add attachment');await press(ui,'Photo Library');assert.equal(photos,1);assert.equal(uploads.length,0);assert.equal(submissions.length,0);assert.ok(ui.root.findAllByType('Image').length);
  focused=false;await act(async()=>ui.update(React.createElement(Screen)));assert.equal(stops,0);
  focused=true;await act(async()=>ui.update(React.createElement(Screen)));assert.ok(ui.root.findAllByType('Image').length);

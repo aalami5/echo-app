@@ -1,4 +1,3 @@
-import { VoiceTaskPanel, EchoTask } from '../components/VoiceTaskPanel';
 import { VoiceCallView, VoiceIconButton, voicePresentation } from '../components/VoiceCallView';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -36,9 +35,6 @@ export default function AssistantScreen() {
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [historyMore, setHistoryMore] = useState(false);
   const [historyCount, setHistoryCount] = useState(0);
-  const [sharedTasks, setSharedTasks] = useState<EchoTask[]>([]);
-  const [tasksUnavailable, setTasksUnavailable] = useState(false);
-  const [tasksLoading, setTasksLoading] = useState(true);
   const [activity, setActivity] = useState<any>({ tasks: [], artifacts: [], session: {} });
   const [stream, setStream] = useState<Record<string, string>>({});
   const [outbox, setOutbox] = useState<Submission[]>([]);
@@ -79,13 +75,6 @@ export default function AssistantScreen() {
   const loadingEarlier = useRef(false);
   const historyPosition = useRef({ nextOffset: 0, total: 0, hasMore: false });
   const voice = useRealtimeVoice(conversationId);
-  useEffect(() => {
-    if (!ready || !focused || !foreground) return;
-    let current = true, busy = false;
-    const poll = async () => { if (busy) return; busy = true; try { const result = await assistantApi('/tasks'); if (current) {setSharedTasks(result.tasks || []);setTasksUnavailable(!!result.partial);} } catch {if(current)setTasksUnavailable(true);} finally {busy=false;if(current)setTasksLoading(false);} };
-    void poll(); const timer = setInterval(poll, 4000);
-    return () => {current=false;clearInterval(timer);};
-  }, [ready, focused, foreground]);
   const legacy = useChatStore(st => st.messages);
   const legacyHydrated = useChatStore(st => st.hasHydrated);
   const title = conversations.find(c => c.id === conversationId)?.title || 'Home';
@@ -338,7 +327,7 @@ export default function AssistantScreen() {
     {(attachments.length > 0 || text.trim()) && <View><Text numberOfLines={2} style={s.subtle}>{text.trim() || `Send to Echo · ${title}`}</Text><Button primary title={sending ? uploadProgress || 'Sending…' : 'Send to Echo'} disabled={mediaBusy || !ready} onPress={() => {void send();}}/></View>}
   </>;
   return <ChatViewport>
-    {voiceView ? <VoiceCallView visible={focused} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => {setCameraOpen(false);setMediaMenu(false);setVoiceView(false);}} onMore={() => setSheet('more')} onAttach={() => setMediaMenu(value => !value)} onHangUp={() => {setCameraOpen(false);setMediaMenu(false);void voice.stop();}} mediaDisabled={!ready || mediaBusy || cameraOpen} content={cameraPanel} draftContent={voiceDraft} taskContent={<VoiceTaskPanel tasks={sharedTasks} unavailable={tasksUnavailable} loading={tasksLoading} onDiscuss={id => {setText(`Regarding task ${id}: `);setVoiceView(false);}}/>}/> : <>
+    {voiceView ? <VoiceCallView visible={focused} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => {setCameraOpen(false);setMediaMenu(false);setVoiceView(false);}} onMore={() => setSheet('more')} onAttach={() => setMediaMenu(value => !value)} onHangUp={() => {setCameraOpen(false);setMediaMenu(false);void voice.stop();}} mediaDisabled={!ready || mediaBusy || cameraOpen} content={cameraPanel} draftContent={voiceDraft}/> : <>
     <ScrollView style={s.conversationControls} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
     <View style={s.header}>
       <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button" accessibilityLabel="Select conversation" style={{ flex: 1 }}><Text style={s.heading}>Echo · {title} ▾</Text></TouchableOpacity>

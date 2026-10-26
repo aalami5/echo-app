@@ -25,8 +25,8 @@ export function voicePresentation(voice: Pick<Voice, 'status' | 'muted' | 'speak
   if (voice.muted) return { label: 'Microphone muted', color: '#94A3B8' };
   return { label: 'Listening', color: '#68E1D4' };
 }
-export function VoiceCallView({ visible, title, voice, working, ready, caption, connectionError, onRetry, onText, onMore, onAttach, onHangUp, mediaDisabled, content, draftContent, taskContent }: {
-  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; connectionError?: string | null; onRetry: () => void; onText: () => void; onMore: () => void; onAttach?: () => void; onHangUp?: () => void; mediaDisabled?: boolean; content?: React.ReactNode; draftContent?: React.ReactNode; taskContent?: React.ReactNode;
+export function VoiceCallView({ visible, title, voice, working, ready, caption, connectionError, onRetry, onText, onMore, onAttach, onHangUp, mediaDisabled, content, draftContent }: {
+  visible: boolean; title: string; voice: Voice; working: boolean; ready: boolean; caption?: string; connectionError?: string | null; onRetry: () => void; onText: () => void; onMore: () => void; onAttach?: () => void; onHangUp?: () => void; mediaDisabled?: boolean; content?: React.ReactNode; draftContent?: React.ReactNode;
 }) {
   const [reduceMotion, setReduceMotion] = useState(true);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
@@ -53,7 +53,6 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
           <VoiceOrb color={state.color} mode={orbMode} level={voice.level} motionEnabled={visible && foreground && !reduceMotion}/>
         </View>
         <Text accessibilityLiveRegion="polite" style={[styles.state, { color: state.color }]}>{state.label}</Text>
-        {taskContent}
         {(voice.error || (!ready && connectionError)) && <Text accessibilityRole="alert" style={styles.error}>{voice.error || connectionError}</Text>}
         {!ready && connectionError && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry connection" onPress={onRetry} style={styles.start}><Text style={styles.startText}>Try again</Text></TouchableOpacity>}
         {voice.status === 'paused' && <TouchableOpacity accessibilityRole="button" onPress={() => { void voice.resume(); }} style={styles.start}><Text style={styles.startText}>Resume audio</Text></TouchableOpacity>}
