@@ -2,7 +2,7 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** October 24, 2026
+**Last Updated:** October 26, 2026
 
 ---
 
@@ -13,7 +13,7 @@
 - The `echo_tasks` agent tool lists, claims, annotates, updates and explicitly reconciles work. Hooks require a running claim for non-exempt tools in allowed sessions. Exact canonical keys deduplicate; semantic matching and resource naming remain the assistant's responsibility. Action receipts are not universal exactly-once guarantees for shell, browser or provider effects.
 - Turn endings and gateway startup mark unfinished running claims `needs_review` while retaining locks. There is no timer-based retry or automatic lock stealing. Viewing records never restarts historical requests.
 - `snapshot.cjs` combines managed records with read-only native task/active-run projections from allowed owner sessions. Native completion maps to `run_finished`, not verified external success; partial retrieval reports unavailable sources. The plugin caches snapshots for five seconds.
-- Authenticated `GET /patients/assistant/tasks` forwards to gateway RPC `echo.tasks.list` (`operator.read`). `AssistantScreen` polls every four seconds while ready, focused and foregrounded, retaining last-known records on failure. State is local React state, not a new Zustand store.
+- Authenticated `GET /patients/assistant/tasks` forwards to gateway RPC `echo.tasks.list` (`operator.read`). Build 94 removes the native `AssistantScreen` task panel, its four-second polling and panel-only local React state; the endpoint and backend registry remain unchanged. More → Activity, startup memory/spoken recap and uncertain-send receipts are preserved. See [Build 94](changes/build94-remove-voice-task-panel.md).
 - `gateway/browser-tasks.mjs` uses the existing authenticated Talk RPC client, polling every four seconds while visible and cleaning up on session change. `scripts/install-task-panel.cjs` provides a version-checked local browser patch with backups; this is not an upstream browser feature.
 - Superchill is now a server-owned project conversation, included in task snapshots and eligible indexed startup-memory sessions. Existing private-source filtering remains in place.
 

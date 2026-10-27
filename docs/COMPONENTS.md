@@ -2,7 +2,7 @@
 
 > UI Component Library
 
-**Last Updated:** October 24, 2026
+**Last Updated:** October 26, 2026
 
 ---
 
@@ -399,15 +399,15 @@ Personal-voice visual, separate from the clinical Avatar. Props are `color`, `mo
 
 Inline voice presentation using `VoiceOrb` for the original three graduated rings and solid center, with state labels/colors, measured audio-level animation, optional captions, Reduce Motion support and labeled icon buttons. It renders Connect, startup Retry and muted Resume audio recovery as appropriate; current controls include microphone, Chat, a shared + attachment menu (Camera, Photo Library, Files) and Hang up. `onAttach` toggles the shared menu; `onText` switches to Chat without disconnecting. Switching to Chat or hanging up closes the camera/menu while preserving drafts. `content` can replace the ring area with camera preview; `draftContent` hosts the shared attachment draft. Hidden views render nothing; animation lifecycle is separate from the app-scoped call.
 
-Build 93 adds a `taskContent` slot beneath the voice state label for the shared task panel. `VoiceIconButton` accepts `muted`, retaining the slashed microphone while applying a faded red background (`#663F49`), border and lighter icon distinct from the Hang up danger background (`#9F2835`).
+Build 94 removes the Build 93 `taskContent` slot and the Tasks / Show all panel beneath the voice state label, without adding a replacement row or spacer. `VoiceIconButton` accepts `muted`, retaining the slashed microphone while applying a faded red background (`#663F49`), border and lighter icon distinct from the Hang up danger background (`#9F2835`).
 
-### VoiceTaskPanel (Build 93)
+### VoiceTaskPanel (Build 93; unmounted in Build 94)
 
 **File:** `src/components/VoiceTaskPanel.tsx`. **Props:** `tasks`, `unavailable`, `loading`, `onDiscuss`.
 
 Owner-private task view with collapse/expand, active count, Show all/Active only, status icons and a bounded scrollable list. Active filtering excludes `completed`, `failed`, `cancelled` and `run_finished`; the latter describes execution completion, not verified external success. Loading, empty and unavailable/last-known states are distinct.
 
-A task-context modal shows title, status, timestamp, source channel labels, goal, summary, next step, evidence and notes. Discuss closes the modal and calls `onDiscuss(id)`; `AssistantScreen` prepares `Regarding task <id>: ` in Chat without sending or disconnecting voice. The screen owns four-second foreground/focus-gated polling of `/patients/assistant/tasks`; the panel owns only presentation state and adds no persistent store.
+A task-context modal shows title, status, timestamp, source channel labels, goal, summary, next step, evidence and notes. Discuss closes the modal and calls `onDiscuss(id)`. In Build 93, `AssistantScreen` used this callback to prepare a Chat draft and owned four-second foreground/focus-gated polling of `/patients/assistant/tasks`. Build 94 removes that integration and polling; the component source remains but is no longer mounted by the screen. The panel adds no persistent store. The separate More → Activity view remains available.
 
 The separate browser Talk view in `gateway/browser-tasks.mjs` provides read-only task rows, history and inline context using its authenticated RPC client. See [Build 93 release scope](changes/build93-shared-tasks.md) for deployment and physical-device verification limits.
 

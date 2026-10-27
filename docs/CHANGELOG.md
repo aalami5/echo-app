@@ -1,6 +1,13 @@
 # Changelog
 
-**Last Updated:** October 24, 2026
+**Last Updated:** October 26, 2026
+
+## Build 94 — Simpler Live Voice (2026-10-25)
+
+- Removed the Tasks / Show all panel beneath Listening, its `taskContent` slot and panel-only four-second task polling. No replacement row or spacer was added.
+- Preserved captions, attachments, Chat, Hang up, muted-red microphone styling, navigation, startup memory/spoken recap and More → Activity. Backend task history and uncertain-send receipts are unchanged; no stores changed or backend deployment was needed.
+- Release notes record TypeScript, 11 targeted checks and iOS export passing, completed native build/submission and verified signed-package identity. Apple reported VALID / IN_BETA_TESTING on October 26 UTC; notification receipt and physical-iPhone layout/audio acceptance remain unverified.
+- [Build 94 change and verified release evidence](changes/build94-remove-voice-task-panel.md).
 
 ## Build 93 — Shared private tasks and voice recovery (2026-10-24)
 
