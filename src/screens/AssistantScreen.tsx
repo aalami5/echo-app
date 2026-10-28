@@ -17,6 +17,7 @@ import { useChatStore } from '../stores/chatStore';
 import { useRealtimeVoice, liveVoiceSession } from '../hooks/useRealtimeVoice';
 import { ChatViewport } from '../components/ChatViewport';
 import { assistantApi, AssistantMessage, Conversation, loadSubmissions, newSubmissionId, Submission, submit, visibleHistory, saveSubmission } from '../services/assistant';
+import { createConversationTailCache } from '../services/conversationTailCache';
 
 const SELECTED = 'echo-assistant-conversation-v1';
 function Button({ title, onPress, disabled, primary }: { title: string; onPress: () => void; disabled?: boolean; primary?: boolean }) {
@@ -73,6 +74,7 @@ export default function AssistantScreen() {
   const cursor = useRef({ epoch: '', after: 0 });
   const refreshing = useRef(false);
   const loadingEarlier = useRef(false);
+  const [tailCache] = useState(() => createConversationTailCache(AsyncStorage));
   const historyPosition = useRef({ nextOffset: 0, total: 0, hasMore: false });
   const voice = useRealtimeVoice(conversationId);
   const legacy = useChatStore(st => st.messages);
@@ -105,7 +107,7 @@ export default function AssistantScreen() {
         pending.state = 'accepted'; pending.receipt = accepted.get(pending.id); await saveSubmission(pending);
       }
       setActivity(a); setOutbox(q.filter(x => x.conversationId === id && x.state !== 'accepted'));
-      void AsyncStorage.setItem(`echo-assistant-tail-${id}`, JSON.stringify(tail)).catch(() => {});
+      void tailCache.save(id, tail).catch(() => {});
       cursor.current = { epoch: e.epoch, after: e.cursor };
       for (const event of e.events || []) {
         if (!event.voice || event.at < liveVoiceSession.getSnapshot().startedAt) continue;
@@ -127,7 +129,7 @@ export default function AssistantScreen() {
       setError(null);
     } catch (e: any) { if (alive.current && selected.current === id) setError(e.message); }
     finally { refreshing.current = false; }
-  }, []);
+  }, [tailCache]);
   useEffect(() => {
     alive.current = true;
     void (async () => {
@@ -147,14 +149,15 @@ export default function AssistantScreen() {
     cursor.current = { epoch: '', after: 0 };
     historyPosition.current = { nextOffset: 0, total: 0, hasMore: false };
     const id = conversationId;
-    void AsyncStorage.getItem(`echo-assistant-tail-${id}`).then(raw => {
-      if (raw && selected.current === id) setMessages(old => old.length ? old : JSON.parse(raw));
+    let cacheReadActive = true;
+    void tailCache.read(id).then(cached => {
+      if (cacheReadActive && selected.current === id) setMessages(old => old.length ? old : cached);
     }).catch(() => {});
     void refresh(true);
     const timer = setInterval(() => { if (AppState.currentState === 'active') void refresh(); }, 1800);
     const sub = AppState.addEventListener('change', state => { if (state === 'active') void refresh(); });
-    return () => { clearInterval(timer); sub.remove(); };
-  }, [conversationId, ready, refresh]);
+    return () => { cacheReadActive = false; clearInterval(timer); sub.remove(); };
+  }, [conversationId, ready, refresh, tailCache]);
   useEffect(() => {
     if (!ready || !legacyHydrated || !legacy.length) return;
     // Snapshot the legacy cache once, retaining the existing on-device copy.
