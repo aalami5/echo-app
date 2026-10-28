@@ -2,7 +2,7 @@
 
 > Gateway Protocol & External Services
 
-**Last Updated:** February 7, 2026
+**Last Updated:** August 25, 2026
 
 ---
 
@@ -39,7 +39,10 @@ Send a message and receive Echo's response.
 POST /v1/chat/completions
 Content-Type: application/json
 Authorization: Bearer <token>
+x-openclaw-scopes: operator.write
 ```
+
+> **Note:** As of OpenClaw 2026.3.28, the `x-openclaw-scopes: operator.write` header is required. Without it, requests return 403 `missing scope: operator.write`.
 
 **Request Body:**
 
@@ -89,6 +92,308 @@ GET /ping
 ```
 
 **Response:** `200 OK` with body `pong` or similar.
+
+### Realtime Voice Token
+
+Create an ephemeral OpenAI Realtime client secret for mobile WebRTC setup. The server owns the OpenAI API key; the app authenticates to Echo with the gateway token, then exchanges its SDP offer directly with OpenAI using the returned secret.
+
+```http
+POST /patients/voice/realtime/token?model=gpt-realtime-2.1&voice=marin
+Accept: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Response:**
+
+```json
+{
+  "client_secret": {
+    "value": "ek_..."
+  }
+}
+```
+
+Optional query parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `model` | `OPENAI_REALTIME_MODEL` or `gpt-realtime-2.1` | OpenAI Realtime model |
+| `voice` | `OPENAI_REALTIME_VOICE` or `marin` | Realtime voice |
+| `instructions` | server default | Session instructions |
+
+The sync server also exposes a root-level mirror:
+
+```http
+POST /voice/realtime/token
+```
+
+### Realtime Voice Session
+
+Fallback endpoint that proxies a native WebRTC SDP offer to OpenAI Realtime and returns the answer SDP. The app now prefers the token endpoint for direct OpenAI SDP exchange, but keeps this server-side proxy path for recovery.
+
+```http
+POST /patients/voice/realtime/session?model=gpt-realtime-2.1&voice=marin
+Content-Type: application/sdp
+Accept: application/sdp
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:** raw WebRTC offer SDP.
+
+**Response:** raw WebRTC answer SDP (`application/sdp`).
+
+Optional query parameters:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `model` | `OPENAI_REALTIME_MODEL` or `gpt-realtime-2.1` | OpenAI Realtime model |
+| `voice` | `OPENAI_REALTIME_VOICE` or `marin` | Realtime voice |
+| `instructions` | server default | Session instructions |
+
+The sync server also exposes a root-level mirror:
+
+```http
+POST /voice/realtime/session
+```
+
+### Realtime Voice Bridge
+
+Bridge an `ask_echo` Realtime data-channel tool call to Echo through the authenticated OpenClaw gateway and return the answer text to the app.
+
+```http
+POST /patients/voice/bridge/ask
+Content-Type: application/json
+Accept: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:**
+
+```json
+{
+  "request": "What is next on my schedule?"
+}
+```
+
+**Response:**
+
+```json
+{
+  "answer": "Your next event is..."
+}
+```
+
+The sync server also exposes a root-level mirror:
+
+```http
+POST /voice/bridge/ask
+```
+
+### Finalized Dictation Sync
+
+Upload the current finalized operative-report set to the sync server. The payload is a snapshot of all finalized reports currently known to the app, not a per-report delta.
+
+```http
+POST /patients/dictations/sync
+Content-Type: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:**
+
+```json
+{
+  "dictations": {
+    "uuid-1": {
+      "id": "uuid-1",
+      "patientId": "patient-123",
+      "status": "final",
+      "dateOfOperation": "2026-04-18T00:00:00.000Z",
+      "selectedProcedures": ["Right carotid endarterectomy"],
+      "generatedReport": "This is Dr. Aalami...",
+      "transcriptParts": [
+        {
+          "id": "part-1",
+          "type": "text",
+          "content": "Patient had symptomatic carotid stenosis",
+          "timestamp": "2026-04-18T18:10:00.000Z"
+        }
+      ],
+      "createdAt": "2026-04-18T18:00:00.000Z",
+      "updatedAt": "2026-04-18T18:12:00.000Z"
+    }
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "dictationCount": 1,
+  "lastSync": "2026-04-18T18:12:30.000Z"
+}
+```
+
+### Finalized Dictation Retrieval
+
+```http
+GET /patients/dictations/list
+Authorization: Bearer <gateway-token>
+```
+
+Returns:
+
+```json
+{
+  "dictations": {
+    "uuid-1": { "...": "dictation payload" }
+  },
+  "lastSync": "2026-04-18T18:12:30.000Z"
+}
+```
+
+```http
+GET /patients/dictations/:id
+Authorization: Bearer <gateway-token>
+```
+
+Returns one finalized dictation or `404` if not found.
+
+The sync server also exposes root-level mirrors for local/direct use:
+
+```http
+POST /dictations/sync
+GET /dictations/list
+GET /dictations/:id
+```
+
+---
+
+### Operative Report Email
+
+Send generated operative report text through the sync server's configured Gmail account.
+
+```http
+POST /patients/dictations/email
+Content-Type: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:**
+
+```json
+{
+  "report": "This is Dr. Aalami with a dictated operative report...",
+  "subject": "Operative Report - July 16, 2026"
+}
+```
+
+`subject` is optional. If omitted, the server generates a date-based operative-report subject.
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "recipients": [
+    "aalami@gmail.com",
+    "Oliver.Aalami@sutterhealth.org",
+    "Rajka.Campbell@sutterhealth.org"
+  ],
+  "subject": "Operative Report - July 16, 2026",
+  "messageId": "gmail-message-id",
+  "sentAt": "2026-07-16T19:00:00.000Z"
+}
+```
+
+The sync server also exposes a root-level mirror for local/direct use:
+
+```http
+POST /dictations/email
+```
+
+---
+
+## Message Sync Queue
+
+Push-backed messages and briefs are queued server-side so the app can recover them after missed/delayed APNs delivery.
+
+```http
+GET /patients/messages/pending
+Authorization: Bearer <gateway-token>
+```
+
+Returns pending queued messages from `pending-messages.json`.
+
+```http
+POST /patients/messages/ack
+Content-Type: application/json
+Authorization: Bearer <gateway-token>
+```
+
+```json
+{ "messageIds": ["msg-123"] }
+```
+
+Acknowledges synced messages, removes them from the pending queue, and records an `acked` receipt event in `notification-deliveries.json`.
+
+Queued messages can include an optional `card` object. Build 67 defines `meeting_reply` cards with `replyText`, `suggestions`, `conflictSummary`, `durationMinutes`, `windowLabel`, and `timeZone` fields under `card.data`.
+
+---
+
+## Meeting Reply Cards
+
+Generate a conflict-checked scheduling reply and queue it as a rich chat card.
+
+```http
+POST /notify/meeting-reply
+Content-Type: application/json
+Authorization: Bearer <gateway-token>
+```
+
+**Request Body:**
+
+```json
+{
+  "requester": "Jane",
+  "subject": "Biodesign sync",
+  "windowStart": "2026-05-21T15:00:00.000Z",
+  "windowEnd": "2026-05-28T00:00:00.000Z",
+  "durationMinutes": 30,
+  "maxSuggestions": 3,
+  "location": "Zoom",
+  "sendPush": true
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "messageId": "meeting-reply-...",
+  "card": {
+    "type": "meeting_reply",
+    "title": "Meeting reply: Biodesign sync",
+    "subtitle": "3 clean options found",
+    "body": "Hi Jane...",
+    "data": {
+      "replyText": "Hi Jane...",
+      "suggestions": [
+        { "start": "2026-05-21T16:00:00.000Z", "end": "2026-05-21T16:30:00.000Z", "label": "Thu, May 21, 9:00-9:30 AM" }
+      ],
+      "conflictSummary": ["Thu, May 21, 10:00-11:00 AM: Clinic"],
+      "durationMinutes": 30,
+      "windowLabel": "Thu, May 21 - Wed, May 27",
+      "timeZone": "America/Los_Angeles"
+    }
+  }
+}
+```
+
+Defaults: `MEETING_REPLY_ACCOUNT` or `aalami@gmail.com`, `MEETING_REPLY_TIME_ZONE` or `America/Los_Angeles`, 14-day search window, and 8 AM-5 PM workday bounds.
 
 ---
 
@@ -174,8 +479,11 @@ The app receives calendar data as part of chat responses.
 | Status | Meaning | App Behavior |
 |--------|---------|--------------|
 | 401 | Invalid token | Prompt to check Settings |
-| 502/503 | Gateway down | Show offline, enable retry |
-| 408 | Timeout | Show timeout message |
+| 403 | Access denied or expired token | Show access-denied token guidance |
+| 502/503/504 | Gateway temporarily unavailable | Show retryable gateway message |
+| 524 | Cloudflare timeout | Explain that the request may still finish in the background |
+
+Gateway calls parse JSON error bodies when available and reuse the same error-message helper for chat completions, OpenResponses/image requests, and operative-report email sends.
 
 ### Network Errors
 

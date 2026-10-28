@@ -2,19 +2,37 @@
 
 > Zustand Stores Reference
 
-**Last Updated:** February 25, 2026
+**Last Updated:** September 29, 2026
 
 ---
 
 ## Overview
 
-Echo App uses [Zustand](https://github.com/pmndrs/zustand) for state management with the `persist` middleware for durable storage via `expo-secure-store`.
+Echo App uses [Zustand](https://github.com/pmndrs/zustand) for state management with the `persist` middleware.
 
-All persisted stores use iOS Keychain encryption.
+Persisted state is split across:
+- **AsyncStorage** for larger non-secret local data like chat transcripts and dictation state
+- **expo-secure-store** for secrets and sensitive patient/settings data that should live in iOS Keychain
 
 ---
 
 ## Stores
+
+### emailReceiptsStore
+
+**File:** `src/stores/emailReceiptsStore.ts`
+
+**Export:** `useEmailReceiptsStore`
+
+**Storage:** AsyncStorage key `operative-email-receipts-v1`
+
+- `receipts: EmailReceipt[]` persists confirmed delivery metadata: receipt ID, optional report ID/linked IDs, report hash, Gmail message ID, send time, recipients, and source.
+- `merge(receipts)` upserts by receipt ID, unions `linkedReportIds`, and retains existing receipts absent from a refresh. The server ledger remains authoritative.
+- `src/services/emailReceipts.ts` refreshes on launch/foreground and every five minutes while the authenticated root-layout effect is mounted; failed refreshes do not clear cached receipts.
+- Send-intent IDs are stored separately under `operative-email-attempt:<reportId>:<reportHash>` until confirmation, allowing retries to reuse the same request after timeout/restart.
+- `emailReceiptStatus()` derives Sent, Updated since last email, Not sent (tracked reports), or Send history unknown (legacy reports) using IDs and normalized content hashes.
+
+---
 
 ### chatStore
 
@@ -29,10 +47,9 @@ Manages conversation history with Echo.
 | `messages` | `Message[]` | ✅ | Chat history (max 100) |
 | `isConnected` | `boolean` | ❌ | Gateway connection status |
 | `avatarState` | `AvatarState` | ❌ | Current avatar animation state |
-| `_hydrated` | `boolean` | ❌ | Whether SecureStore rehydration is complete |
-| `_preHydrationQueue` | `Message[]` | ❌ | Messages queued before hydration finishes |
+| `hasHydrated` | `boolean` | ❌ | Whether local transcript hydration is complete |
 
-**Hydration Safety:** Messages added before rehydration completes are queued in `_preHydrationQueue` and replayed via `onRehydrateStorage`. This prevents cold-start notification messages from being overwritten by stale persisted state.
+**Hydration Safety:** `chatStore` now persists transcripts in AsyncStorage and uses a pre-hydration write lock plus queued-message replay during `onRehydrateStorage`. If legacy chat history exists in SecureStore under `echo-chat`, it is migrated forward once, then removed from SecureStore.
 
 **Actions:**
 
@@ -65,6 +82,8 @@ function ChatScreen() {
 
 **Persistence Details:**
 - Key: `echo-chat`
+- Storage backend: AsyncStorage
+- Legacy migration: reads old SecureStore value once and moves it to AsyncStorage automatically
 - Max messages: 100 (auto-trims oldest)
 - Only `messages` array is persisted
 
@@ -81,6 +100,7 @@ Manages on-call patient tracking.
 | Field | Type | Persisted | Description |
 |-------|------|-----------|-------------|
 | `patients` | `Record<string, Patient>` | ✅ | All patients indexed by ID |
+| `removedPatientIds` | `string[]` | ✅ | Device-local removals excluded from restore |
 | `callDays` | `Record<string, CallDay>` | ✅ | Call days indexed by ID |
 | `callDayOrder` | `string[]` | ✅ | Ordered call day IDs |
 | `searchQuery` | `string` | ❌ | Current search filter |
@@ -124,6 +144,8 @@ type Hospital = 'SEQ' | 'ECH' | 'SMCMC' | 'Mills' | 'OTHER';
 
 interface Patient {
   id: string;
+  recoveredFromReport?: boolean;
+  updatedAt?: string;
   name: string;
   mrn: string;
   dob: string;
@@ -145,8 +167,10 @@ interface CallDay {
 
 **Persistence Details:**
 - Key: `echo-patients`
-- Auto-deduplicates call days on hydration
-- Merges patients when duplicate dates detected
+- Hydration no longer triggers date reorganization or unsolicited uploads.
+- `restoreMissing(data)` merges missing patients/call days, rebuilds references and date order, and respects `removedPatientIds`.
+- Existing local records win except unedited `recoveredFromReport` placeholders without `updatedAt`, which can be enriched from full remote records. New records and edits receive `updatedAt`.
+- Missing/stale call-day references fall back to today when adding a patient; deleting a patient or call day records device-local removals.
 
 ---
 
@@ -194,6 +218,11 @@ clearAllKeys(): void
 **Persistence Details:**
 - Key: `echo-settings`
 - All fields persisted
+- **Crash Guard (Build 40):** Rehydration logic validates that API keys aren't overwritten with `null` from a stale/corrupt state snapshot
+- **Hydration Gate (Build 45):** Module-level `_hydrated` flag blocks ALL SecureStore writes until `onRehydrateStorage` fires, preventing Zustand's default null state from overwriting real credentials during cold start
+- **Gateway Bootstrap (Build 55):** Hardcoded obfuscated token removed; gateway URL and token now fetched from Supabase RPC via `gatewayBootstrap` service after authentication. `ensureGatewayConfig()` called from app layout after auth + hydration.
+- **API Key Bootstrap (Build 59):** OpenAI and ElevenLabs keys restored from Supabase RPC if currently empty (never overwrites user-set keys)
+- **Credential Hardening (Build 54):** Keychain accessibility changed to `AFTER_FIRST_UNLOCK`; XOR-obfuscated fallback for gateway token survives SecureStore loss after reboot
 
 ---
 
@@ -208,11 +237,15 @@ Manages authentication state (minimal, for future use).
 | Field | Type | Persisted | Description |
 |-------|------|-----------|-------------|
 | `user` | `User \| null` | ❌ | Current user |
-| `accessToken` | `string \| null` | ❌ | JWT token |
+| `accessToken` | `string \| null` | ❌ | JWT access token |
+| `refreshToken` | `string \| null` | ❌ | JWT refresh token |
 | `isAuthenticated` | `boolean` | ❌ | Auth status |
 | `isLoading` | `boolean` | ❌ | Loading state |
 
-**Note:** Auth is currently bypassed (app is single-user).
+**Auth Restore Notes (Apr 17):**
+- `loadStoredAuth()` now logs whether a Supabase session was found and always resolves to a fully signed-in or signed-out state
+- Manual token writes use `SecureStore.AFTER_FIRST_UNLOCK` for more reliable cold-start restoration
+- Root layout listens for `INITIAL_SESSION`, `SIGNED_IN`, `TOKEN_REFRESHED`, and `SIGNED_OUT` so auth state does not get stranded in a partial startup state
 
 ---
 
@@ -318,6 +351,39 @@ interface PendingNotification {
 
 ---
 
+### websocketStore
+
+Tracks WebSocket/transport connection state and current transport mode.
+
+**File:** `src/stores/websocketStore.ts`
+
+**State:**
+
+| Field | Type | Persisted | Description |
+|-------|------|-----------|-------------|
+| `isConnected` | `boolean` | ❌ | Whether any transport is connected |
+| `isConnecting` | `boolean` | ❌ | Whether a connection attempt is in progress |
+| `lastMessageTime` | `Date \| null` | ❌ | Timestamp of last received message |
+| `error` | `string \| null` | ❌ | Last connection error |
+| `transportMode` | `TransportMode` | ❌ | Current transport: `'websocket'` \| `'polling'` \| `'disconnected'` |
+
+**Actions:**
+
+```typescript
+setConnected(connected: boolean): void
+setConnecting(connecting: boolean): void
+setLastMessageTime(time: Date): void
+setError(error: string | null): void
+setTransportMode(mode: TransportMode): void
+reset(): void
+```
+
+**Transport Mode (Build 52):** The `transportMode` field is set by the transport manager (`src/lib/transport.ts`). It starts as `'disconnected'`, moves to `'websocket'` on successful WS connection, and falls back to `'polling'` after 3 WS failures in 60s. The `NetworkIndicator` component uses this to show a yellow "Limited" badge in polling mode.
+
+**Note:** Not persisted — transport state is re-established on app launch.
+
+---
+
 ### calendarStore
 
 Caches calendar events fetched from Google Calendar.
@@ -333,6 +399,101 @@ Caches calendar events fetched from Google Calendar.
 | `lastFetch` | `number \| null` | ❌ | Last refresh timestamp |
 
 **Note:** Events are fetched on-demand and not persisted. On rehydration, if the cache is from a different day, events are cleared and a fresh fetch is triggered to prevent stale/ghost events.
+
+---
+
+### dictationStore
+
+**Build 81 shared review metadata:** `ReportReview` now optionally carries `routineDefaults: { section: string; text: string }[]`, defined through `RoutineDefault` in `src/utils/reportPresentation.ts`. No store implementation or persistence key changed. Standalone review remains session-only; patient-linked `reportReview` persists and survives existing backup/restore. Manual edits retain provenance; display/readback/export/email keep the drafting note separate from report text.
+
+
+**Build 78 source metadata:** `TranscriptPart` adds optional `sourceKind` (`current`, `historical`, or `correction`), `ocrText`, and `ocrWarnings`. Retained OCR is reused when regenerating; historical sources and legacy `-copy` IDs are excluded from case evidence. Standalone session state adds optional `reportReview: ReportReview`, reset by `clearSession()` and not persisted with learning preferences.
+
+`ReportReview` is defined in `src/services/operativeDrafting.ts`: session/policy IDs, review items, evidence-linked statements, confirmed technique steps, optional extracted facts, source fingerprint, manual-edit flag, and review timestamp. Saved examples propose technique for explicit review; they are not automatically approved profiles or current-case facts. Approved technique profiles are server-owned, not a new Zustand store.
+
+**Build 73:** Session-only `reportId` identifies a standalone report across edits and sends. It is regenerated by `clearSession()` and is not persisted across app restarts; confirmed email receipts are persisted separately.
+
+Manages OR dictation sessions and persisted learning data.
+
+**File:** `src/stores/dictationStore.ts`
+
+**Persistence:** AsyncStorage (not SecureStore — non-sensitive data)
+
+**Persisted State:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `corrections` | `CorrectionEntry[]` | Learned corrections for report generation |
+| `stylePreferences` | `StylePreference[]` | Section-level style preferences |
+| `savedExamples` | `SavedExample[]` | Saved reports as future learning context |
+| `customProcedures` | `CustomProcedure[]` | User-added procedure tags |
+
+**Session State (not persisted):**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `transcriptParts` | `TranscriptPart[]` | Current session transcript (voice/text/image) |
+| `generatedReport` | `string \| null` | Generated operative report |
+| `isGenerating` | `boolean` | Report generation in progress |
+| `selectedProcedures` | `string[]` | Selected procedure tags for current session |
+
+**Key Actions:** `addTranscriptPart`, `toggleProcedure`, `setGeneratedReport`, `saveAsExample`, `addCustomProcedure`, `addCorrection`, `clearSession`
+
+---
+
+### patientDictationsStore
+
+**Build 78:** Each `PatientDictation` optionally persists `reportReview: ReportReview` with the report and includes it in backup. Patient-report UI uses the source fingerprint to detect stale generated content; manual edits clear generated sentence links and mark the report manually edited. Legacy reports may omit review metadata.
+
+**Build 73:** New records persist `emailTrackingEnabled: true`. Legacy records omit this optional flag, so missing receipts mean “Send history unknown,” not “Not sent.” Stable dictation IDs link email history across edits; sending does not change draft/final state.
+
+Manages per-patient operative report dictations with draft/final lifecycle.
+
+**File:** `src/stores/patientDictationsStore.ts`
+
+**Persistence:** AsyncStorage (key: `patient-dictations`)
+
+**Sync Behavior (Builds 74–75):** Creation, every update, and finalization call the legacy-named `syncFinalizedDictations()`, which now backs up both drafts and finals. Server merges preserve omitted records rather than treating snapshots as deletions. Sync uses a durable AsyncStorage outbox, single-flight protection, sanitized transcript parts, and up to 3 in-process retries; a completed older request cannot clear a newer queued payload. Empty uploads leave queued backups intact.
+
+**State:**
+
+| Field | Type | Persisted | Description |
+|-------|------|-----------|-------------|
+| `dictations` | `Record<string, PatientDictation>` | ✅ | All dictations keyed by ID |
+| `removedReportIds` | `string[]` | ✅ | Device-local removals excluded from restore |
+
+**PatientDictation Shape:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | `string` | UUID |
+| `patientId` | `string` | Links to `Patient.id` |
+| `status` | `'draft' \| 'final'` | Draft = in-progress, Final = completed |
+| `dateOfOperation` | `string` | ISO date string |
+| `transcriptParts` | `TranscriptPart[]` | Voice/text/image inputs (reuses dictationStore types) |
+| `selectedProcedures` | `string[]` | Selected procedure tags |
+| `generatedReport` | `string \| null` | AI-generated operative report |
+| `createdAt` / `updatedAt` | `string` | ISO timestamps |
+
+**Actions:** `createDictation(patientId)` → returns new ID, `updateDictation(id, updates)`, `deleteDictation(id)`, `finalizeDictation(id)`
+
+**Notes:**
+- `createDictation()` and every `updateDictation()` trigger backup, including drafts.
+- `deleteDictation()` records a local removal and re-syncs when removing a final report; omission does not delete server history.
+- `finalizeDictation()` always syncs immediately after flipping status to `final`
+- Sync payloads include draft/final text and sanitized transcript fields (`id`, `type`, `content`, `timestamp`, `sourceKind`, `ocrText`, `ocrWarnings`); media file URIs are not transferable recording backups.
+- `restoreMissing(reports)` preserves existing local reports and filters `removedReportIds`.
+- The retry outbox lives in `src/services/dictationSync.ts` and persists under `operative-dictation-sync-outbox-v1`, so pending draft/final report snapshots survive app restarts and are retried from `_layout.tsx`
+
+**Helpers:** `getDictationsForPatient(patientId)` — returns all dictations for a patient, sorted by date. `buildPatientDictationHeader(name, mrn, date)` — generates report header. `formatPatientDictationDate(iso)` — display-friendly date.
+
+---
+
+### useClinicalRestoreStatus
+
+**File:** `src/services/clinicalRestore.ts` (non-persisted Zustand store)
+
+Tracks `busy`, `error`, and `lastRestored` for restore/backup UI. Restore is single-flight, hydrates both clinical stores, and validates both server datasets before updating either. Backup failures expose a pending-backup message without deleting local cases.
 
 ---
 
@@ -375,12 +536,13 @@ const secureStorage = {
 |-------|-----|------------|
 | Chat | `echo-chat` | ~100 messages |
 | Patients | `echo-patients` | No hard limit |
+| Patient dictations | `patient-dictations` | No hard limit |
 | Settings | `echo-settings` | Small |
 
 ### Rehydration
 
 On app startup:
-1. Zustand's persist middleware reads from SecureStore
+1. Zustand's persist middleware reads from AsyncStorage or SecureStore, depending on the store
 2. State is hydrated before first render
 3. `onRehydrateStorage` callback cleans up data if needed
 

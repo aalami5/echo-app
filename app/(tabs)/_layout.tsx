@@ -1,3 +1,4 @@
+import { useRealtimeVoice } from '../../src/hooks/useRealtimeVoice';
 import React from 'react';
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +23,7 @@ function TabBarIcon({
 }
 
 export default function TabLayout() {
+  const voice = useRealtimeVoice();
   return (
     <Tabs
       screenOptions={{
@@ -42,11 +44,26 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Chat',
+          title: voice.isActive ? 'Live Voice' : 'Chat',
+          tabBarBadge: voice.isActive ? '•' : undefined,
+          tabBarHideOnKeyboard: true,
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon 
               name={focused ? 'chatbubble' : 'chatbubble-outline'} 
               color={color} 
+              focused={focused}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="dictation"
+        options={{
+          title: 'Dictate',
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon 
+              name={focused ? 'mic' : 'mic-outline'} 
+              color={color}
               focused={focused}
             />
           ),
@@ -105,7 +122,8 @@ export default function TabLayout() {
 const styles = StyleSheet.create({
   tabBar: {
     position: 'absolute',
-    borderTopWidth: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
     backgroundColor: 'transparent',
     elevation: 0,
     height: Platform.OS === 'ios' ? 85 : 65,

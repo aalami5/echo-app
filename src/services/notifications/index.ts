@@ -12,6 +12,7 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import { supabase } from '../supabase';
 import Constants from 'expo-constants';
+import type { RichCard } from '../../types';
 
 // Configure how notifications appear when app is in foreground
 Notifications.setNotificationHandler({
@@ -30,6 +31,7 @@ export interface NotificationData {
   messagePreview?: string;
   messageId?: string;
   messageContent?: string;
+  card?: RichCard;
   timestamp?: string;
   minutesBefore?: number;
 }
@@ -159,7 +161,7 @@ export async function isReminderAcknowledged(eventId: string): Promise<boolean> 
  */
 export function setupNotificationResponseHandler(
   onMeetingTap: (eventId: string) => void,
-  onMessageTap: (messageData: { id: string; content: string; timestamp: string } | null) => void,
+  onMessageTap: (messageData: { id: string; content: string; timestamp: string; card?: RichCard } | null) => void,
   onBriefTap: () => void
 ): Notifications.EventSubscription {
   return Notifications.addNotificationResponseReceivedListener((response) => {
@@ -176,6 +178,7 @@ export function setupNotificationResponseHandler(
         id: data.messageId,
         content: data.messageContent,
         timestamp: data.timestamp || new Date().toISOString(),
+        card: data.card,
       });
     } else {
       // Fallback: still navigate to chat, server sync will pick up the message

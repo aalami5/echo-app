@@ -1,8 +1,452 @@
 # Changelog
 
+**Last Updated:** October 26, 2026
+
+## Build 94 — Simpler Live Voice (2026-10-25)
+
+- Removed the Tasks / Show all panel beneath Listening, its `taskContent` slot and panel-only four-second task polling. No replacement row or spacer was added.
+- Preserved captions, attachments, Chat, Hang up, muted-red microphone styling, navigation, startup memory/spoken recap and More → Activity. Backend task history and uncertain-send receipts are unchanged; no stores changed or backend deployment was needed.
+- Release notes record TypeScript, 11 targeted checks and iOS export passing, completed native build/submission and verified signed-package identity. Apple reported VALID / IN_BETA_TESTING on October 26 UTC; notification receipt and physical-iPhone layout/audio acceptance remain unverified.
+- [Build 94 change and verified release evidence](changes/build94-remove-voice-task-panel.md).
+
+## Build 93 — Shared private tasks and voice recovery (2026-10-24)
+
+- Added an owner-private SQLite task registry shared across Echo app conversations and direct WhatsApp: canonical task keys, transactional resource claims, revision checks, durable action receipts and explicit reconciliation after interrupted work. Existing OpenClaw runs remain read-only projections; a finished run does not prove an external action succeeded.
+- Added `VoiceTaskPanel` below the Live Voice avatar, with active/history views, collapsible rows, task context and Discuss, which prepares a chat draft without sending. Native and browser views poll read-only snapshots and disclose unavailable coverage. Muted microphone styling now uses a faded red bubble distinct from Hang up.
+- Added Superchill to the project catalog, private task snapshots and eligible voice startup context. No Zustand store implementation changed.
+- Fixed stale voice-session records blocking reconnect: authoritative terminal events clear the exact session, recovery and creation are serialized, expired unexchanged allocations and failed SDP exchanges are closed, and failed cleanup is retried without admitting a competing call. Established calls are not expired with their offer credentials; accepted tasks are not replayed or canceled.
+- iOS build number is 93. Shared-task release notes record 88 targeted/backend tests, TypeScript and iOS export passing, but deployment remains pending in those notes; this does not establish TestFlight or physical-iPhone acceptance. The separate voice cleanup hotfix has recorded deployment/public-service verification, with live audio and physical-phone reconnect still unverified.
+- [Shared-task scope and release limits](changes/build93-shared-tasks.md) · [Voice cleanup deployment and rollback](changes/2026-10-24-voice-session-cleanup.md).
+
+## Build 92 — Accessible attachment-menu icons (2026-10-23)
+
+- Replaced the shared voice/chat attachment menu's Camera, Photo Library, Files and Cancel text buttons with camera, stacked-image, document and close icons. Reuses the existing 54-point `VoiceIconButton` with accessible labels, busy-state disabling for picker actions and a wrapping layout.
+- Picker handlers, previews, explicit sending and voice lifecycle are unchanged. No new components, store implementation or system-design changes.
+- Updated the attachment regression test's stale Text label to Chat. Release notes record TypeScript and 11 attachment/voice checks passing, completed native build/submission, Apple VALID / IN_BETA_TESTING internally and verified signed-package identity. Physical-iPhone layout/picker acceptance remains pending.
+- [Build 92 change and release evidence](changes/attachment-menu-icons.md).
+
+## Build 91 — Readiness-gated spoken startup recap (2026-10-22)
+
+- Added one interruptible, 35–60-word personal voice recap, prioritizing attention-needed items, newly completed work and recent discussion. Current task claims use fresh read-only snapshots; historical requests never start work.
+- Native Live Voice acknowledges readiness once per logical call after WebRTC connects; browser voice waits for both peer connection and data channel. Speech-first, an existing response, close or continuity reset suppresses the pending recap; remounts and transient reconnects do not repeat it.
+- Recaps use an out-of-band audio response with tools disabled, owner-private filtered context and bounded call-ID/timestamp checkpoints, not stored recap transcripts.
+- Added an authenticated adapter readiness route and version-pinned local gateway/browser installer with backup/rollback. Older clients remain silent on startup; readiness failure does not break ordinary native audio.
+- iOS build number is 91. Targeted regression coverage was added; this commit alone does not establish TestFlight availability or physical-iPhone audio acceptance. No Zustand stores or UI components changed.
+- [Build 91 behavior, deployment and verification scope](changes/build91-spoken-recap.md).
+
+## Build 90 — Fresh voice startup context and Chat control (2026-10-21)
+
+- Renamed the Live Voice Text control to Chat, including its accessibility label; switching preserves the active connection.
+- Added server-side startup continuity: fresh allowed personal conversation turns, task/artifact snapshots and selected saved notes are prepared before voice provider creation. Historical requests are reference only, never replayed or automatically resumed; current work status requires a fresh tool check.
+- Restricted retrieval to the single owner's allowed sessions with native RPC authorization; group, unknown and clinical sessions are excluded. Retrieval failures disclose partial/unavailable context rather than reusing a previous packet.
+- Added a version-checked local gateway installer with backup/rollback. This integration is not embedded in the IPA and must be revalidated after OpenClaw upgrades.
+- Release evidence records Apple VALID / IN_BETA_TESTING internally, signed-package checks and a successful synthetic spoken continuity check. Physical-phone recall acceptance remains pending. No Zustand store changes.
+- [Build 90 release evidence and operational dependency](changes/build90-startup-memory.md).
+
+## Build 89 — Original ring animation and unified attachments (2026-10-21)
+
+- Restored three graduated rings and solid center, gentle staggered breathing and audio-level response; preserved mode colors and accessibility/foreground animation controls.
+- Replaced separate voice Photos/Camera buttons with a shared + menu: Camera, Photo Library, Files. Explicit preview/send and conversation-local drafts remain intact.
+- Native build and submission finished; Apple VALID / IN_BETA_TESTING internally. Downloaded package verified. No audio transport, background configuration, clinical workflow or backend changes.
+- [Verification and release details](changes/build-89-original-orb-and-attachments.md). Physical-iPhone animation and attachment checks remain pending.
+
+## Builds 86–88 — Voice continuity, camera and photo input (2026-10-20)
+
+- **Build 86:** Added a voice-first view with explicit connection, mute, optional captions, text switching, and connection recovery. An app-scoped call controller survives screen unmount and ordinary background transitions; logout ends audio without canceling accepted agent work.
+- Added iOS background audio and native interruption/route-loss/reset events, headset-aware routing, a 20-second transient-disconnection window, and explicit audio resume that keeps the microphone muted. Clinical recording requires confirmed voice disconnection and holds an audio lease through pending recorder cleanup.
+- **Build 87:** Replaced the orb's ECG/glyph with six concentric rings and a solid center, retaining measured audio animation, state colors, accessibility labels and Reduce Motion support; introduced Connect/Disconnect wording.
+- **Build 88:** Moved Live Voice inline above persistent bottom navigation, with Photos, Camera, Text and Hang up controls. Switching tabs preserves the call; hangup closes camera without discarding the draft.
+- Added system photo selection and live camera preview with front/back capture, review, retake and explicit Add photo → Send. Only sent still images reach Echo; continuous video is not implemented and camera does not request microphone capture.
+- Shared media preparation normalizes images to bounded JPEG, keeps private local draft copies, and enforces five attachments / 6 MB each. Conversation-local drafts persist; stable upload IDs and existing submission receipts support retries without new duplicate requests.
+- Release records confirm Builds 86, 87 and 88 available in internal TestFlight. Physical-iPhone camera, background/lock, audio-route and image-round-trip acceptance remains pending. No store implementation or backend production-code changes.
+- Details: [Build 86 lifecycle](changes/build-86-voice-first.md), [Build 87 rings](changes/build-87-concentric-voice.md), and [Build 88 media/navigation](changes/build-88-media-navigation.md).
+
+## Builds 83–85 — Native connection and chat composer fixes (2026-10-19)
+
+- **Build 83:** Replaced unsupported native `AbortSignal.timeout()` with an `AbortController` and a cleared 55-second timer. Timeouts now explain how to reconnect without changing the saved conversation; unreadable JSON responses fail explicitly.
+- Direct local gateway URLs map authority port `18789` to adapter port `18790` without relying on React Native's unsupported URL port setter; matching text in paths is preserved.
+- **Build 84:** Added `ChatViewport` to reserve the measured absolute tab-bar height while the keyboard is hidden, remove that reservation when it opens, and apply top safe-area padding and iOS keyboard avoidance. The Chat tab hides its tab bar while typing.
+- Bounded attachment previews and multiline input height, added interactive keyboard dismissal and bottom safe-area spacing in sheets, and made the reconnect indicator compact with no spinner after an error.
+- **Build 85:** Made conversation controls scrollable and limited to 45% of the viewport, allowed the message list to shrink, and prevented the composer from shrinking on compact keyboard layouts.
+- Added native-client and viewport regression tests; iOS build number is now 85. These commits do not establish TestFlight availability or physical-device acceptance. Store implementations and backend architecture are unchanged.
+
+## Build 82 — Durable voice/text conversations (2026-10-17)
+
+- Replaced the Chat tab with `AssistantScreen`: Home/project conversations share native Echo history across typed messages and gateway-controlled Live Voice. Added paginated history, incremental responses, Activity, exact-run stop, and persistent submission IDs for uncertain-send reconciliation.
+- Added authenticated `/patients/assistant` adapter and native gateway RPC client. OpenClaw owns transcripts, tools, tasks, and artifacts; the phone retains a recoverable outbox and legacy inbox without replaying old requests.
+- Added document attachments, artifact download/share, and a curated Memory panel with agent-mediated remember/correct/forget requests. Forgetting derived memory does not promise deletion of original chats or backups.
+- Fixed mobile artifact downloads by relaying managed gateway-relative media as bounded base64, rejecting redirects and results over 12 MB; arbitrary external URLs are not fetched by the adapter.
+- Bumped iOS build to 82 and added document-picker/sharing dependencies. Clinical storage, report/email workflows, and store implementations are unchanged.
+- Release notes record backend deployment and successful native compilation, but TestFlight upload is blocked by an Apple account agreement. Original private-chat transcript recall remains defective; physical-iPhone acceptance is unverified. See [Build 82 verification and blockers](changes/build-82-live-voice-continuity.md) and [continuity requirements](live-voice-continuity.md).
+
+## Server drafting policies v3.3–v3.5 — Operative report formatting and focused Findings (2026-09-30)
+
+- Use **Dr. Oliver Aalami** in the dictated preamble and Surgeon section, expanding the abbreviated default while preserving an explicitly supplied different surgeon. Number preoperative diagnoses, postoperative diagnoses, and Procedure(s), including single-item lists.
+- Keep Description of Procedure last as chronological prose paragraphs. Policy v3.4 supersedes v3.3's numbered narrative steps; section-only legacy-format edits preserve wording and unrelated sections.
+- Active policy/cache version `draft-first-v3.5` separates key documented observations in Findings from technical actions recorded in brief-op notes. Relocate procedural details into the narrative or appropriate existing fields without dropping information; actions alone do not establish normal anatomy or success.
+- Focused AI edits preserve manual additions, unrelated sections, and suggestion provenance. Draft-first generation, clean Read Back, and separate routine-default review metadata remain unchanged; saved reports are not automatically rewritten.
+- Expanded synthetic coverage for full names, numbered lists, paragraph-only descriptions, narrow edits, and Findings classification, with optional public-endpoint testing. Release notes record all 18 provider-backed cases and four public Findings cases passing for v3.5; phone acceptance remains unverified. These were server-only updates, with no new native build.
+- Details: [v3.3 names and numbering](changes/draft-format-v3.3.md), [v3.4 paragraph narrative](changes/draft-format-v3.4.md), and [v3.5 focused Findings](changes/draft-format-v3.5.md).
+
+## Build 81 — Clean reports and separate drafting provenance (2026-09-29)
+
+- Moved inline suggested routine wording into a review-only `ReportDraftNote`, backed by section-specific `reportReview.routineDefaults`. Display, Read Back, copy, export, and email use clean report text; genuine uncertainty markers remain visible.
+- AI edits use the displayed draft and retain provenance without restoring deleted or changed manual wording. Patient-report metadata survives backup/restore; existing reports are not migrated on launch.
+- Verified native artifact and successful Apple upload; tester availability and real-phone acceptance remain unverified. See [Build 81 details](changes/build-81-clean-dictation.md).
+
+## Build 80 — Draft-first operative reports (2026-09-29)
+
+- Restored notes/photos → Generate draft → Edit with AI or Edit Text Directly, removing mandatory analysis/technique confirmation from both live dictation screens.
+- Added authenticated, resumable `/compose`: one model call after OCR, using current sources and corrections. Targeted AI edits preserve unrelated manual changes; stale results cannot replace newer edits. Draft failures return to saved notes.
+- Server policy v3.2 restores the dictated preamble and original section order, ending with Description of Procedure/recovery. Limited suggested routine wording is separate from documented facts; exceptions and uncertainty take precedence.
+- Verified native artifact and successful Apple upload. See [Build 80 details](changes/build-80-draft-first.md) and [format policy](changes/draft-format-v3.2.md); Build 81 supersedes inline suggestion presentation.
+
+## Build 79 — Faster, resumable drafting (2026-09-29)
+
+- Added authenticated content-addressed jobs with encrypted result persistence, retry deduplication, bounded concurrency, progress polling, and reconnect recovery.
+- Process up to two screenshots concurrently, preserving each successful OCR result and original page order; incomplete OCR stops composition without discarding extracted pages.
+- Bounded provider calls and disabled reasoning effort on the existing pinned model. Fixed whitespace-wrapped OCR evidence matching without accepting changed words, numbers, laterality, or negation.
+- Verified native artifact and successful Apple upload; physical-phone acceptance remains separate. See [Build 79 details](changes/build-79-operative-latency.md).
+
+## Build 78 — Source-grounded brief operative notes (2026-09-26)
+
+- Added a shared brief-note builder for patient-linked and standalone reports: typed, dictated, and screenshot sources drive procedure matching, quoted facts, clarification, and narrative drafts across the existing catalog and custom/mixed procedures.
+- Added explicitly approved, versioned usual-technique profiles; using routine steps in a case requires separate confirmation. Current-case facts override routine technique; historical reports are not current evidence.
+- Added authenticated backend OCR, analysis, and source-checked drafting with encrypted session/version history. Retained OCR text and warnings survive patient-report backup; full-frame images normalize to JPEG.
+- Removed silent clinical-negative defaults and unverified bundled billing-code hints from new drafts. Patient-report review tracks source changes and manual edits, with unresolved Open Items blocking finalization.
+- Native Build 78 and TestFlight submission finished. Apple processing/tester availability and physical-iPhone acceptance remain separate checks. See [release and verification details](changes/build-78-brief-operative-notes.md).
+
+## Build 77 — Correct Oliver's cloned voice (2026-09-21)
+
+- Corrected the shared ElevenLabs Oliver voice ID after report Read Back returned HTTP 404 for the unavailable voice. Patient-report readback, general dictation readback, and chat with Oliver selected now use the corrected mapping; other voices and credentials are unchanged.
+- Bumped the iOS build number to 77. EAS build and TestFlight submission finished; Apple processing/tester availability and physical-phone playback with the saved API key remain unverified.
+- Install Build 77 in place from TestFlight without deleting Echo; no OTA update is configured. See [release and verification details](changes/build-77-oliver-voice.md).
+
+## Build 76 — Authenticated patient media (2026-09-19)
+
+- Patient OCR and recorded transcription now use authenticated backend routes with server-owned OpenAI credentials; app authentication refreshes once on rejection.
+- Scanning retains the full image, converts supported iPhone formats to bounded JPEG, preserves leading-zero MRNs, and exposes permission/processing errors for review before Save.
+- Chief-complaint, operative-report, and chat recordings share the backend transcription route.
+- Build 76 and TestFlight submission finished; Apple availability and physical-phone acceptance remain unverified. See [release and verification details](changes/build-76-patient-media.md).
+
+## Builds 74–75 — New-phone clinical recovery (2026-09-19)
+
+- Added restore on launch/foreground and manual Restore saved cases, preserving local edits and device-local removals.
+- Server snapshots now merge by ID instead of deleting omitted records, with encrypted atomic storage and encrypted prior versions. Draft reports join final reports in the durable backup outbox.
+- Build 75 enriches unedited recovered placeholders from full records without replacing manual corrections; older untimestamped uploads cannot overwrite newer timestamped server records.
+- Fixed Add patient handling for missing/stale date groups and filters hiding newly added cases; added rendered-screen regression coverage.
+- Added recovery utilities for report headers and exact sent-report copies. Recovery remains partial, and managed-cloud migration is proposed, not deployed.
+- Builds 74 and 75 were submitted to TestFlight; Build 75 supersedes 74. See [recovery details and limitations](changes/build-74-new-phone-recovery.md).
+
+## Build 73 — Persistent operative-report email receipts (2026-09-17)
+
+- Server-owned, permission-restricted atomic receipt ledger, independent of clinical report sync. Records Gmail confirmation, recipients, send time, and SHA-256 report version; no duplicate report bodies stored.
+- Patient cards and report history show Sent, Not sent (new tracked reports), or Send history unknown (legacy reports). Report detail retains Sent and marks edits Updated since last email; explicit Resend/Email revision preserves history and does not finalize the report.
+- Phone cache survives restarts and refreshes on launch/foreground. Exact historical content matches acquire stable report links so later edits do not erase Sent.
+- Persisted send-intent IDs prevent duplicate sends on retry; ambiguous failures require reconciliation rather than blind retry.
+- Read-only Gmail reconciliation stages metadata-only historical receipts for idempotent import at server startup.
+- Verified with backend/client/API tests, TypeScript and iOS production bundle export. TestFlight device validation remains required after installation.
+
+
+## [Unreleased] - 2026-09-08
+
+### Fixed
+
+- Refresh server-owned OpenClaw gateway credentials on authenticated app launch.
+- Retry a gateway request once after a genuine 401/403 authentication rejection.
+- Display the gateway's actual access-denial reason instead of incorrectly blaming an expired token or ElevenLabs.
+
 All notable changes to Echo App are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/).
+
+---
+
+## [Build 72] - 2026-08-25
+
+### Fixed
+- **Operative report readback voice** — Restored the Oliver ElevenLabs cloned voice for patient operative report readback while keeping the general Echo voice controls on the standard assistant voice
+
+### Changed
+- **Build bump to 72** for the next iOS/TestFlight build
+
+---
+
+## [Build 71] - 2026-08-25
+
+### Fixed
+- **Live Voice speaker output** — Added a native iOS audio-session config plugin and `liveAudioRoute` service so realtime voice audio routes to the speaker during Live Voice sessions, then clears the override when the session stops
+
+### Changed
+- **Build bump to 71** for the next iOS/TestFlight build
+
+---
+
+## [Build 70] - 2026-08-25
+
+### Added
+- **Live Voice Echo tool bridge** — Realtime voice sessions can now call Echo through a dedicated `ask_echo` data-channel tool, letting spoken requests reach the authenticated OpenClaw gateway and return a concise spoken result
+- **Realtime token endpoint support** — Mobile Live Voice now requests an authenticated `/patients/voice/realtime/token` client secret and exchanges SDP directly with OpenAI, with the existing sync-server SDP proxy retained as fallback
+
+### Changed
+- **Build bump to 70** for the next iOS/TestFlight build
+
+---
+
+## [Build 69] - 2026-08-25
+
+### Fixed
+- **Live Voice startup** — Switched mobile Realtime startup to an ephemeral OpenAI token flow with the existing authenticated Echo backend as issuer, kept the backend SDP proxy as fallback, and waited for a complete mobile WebRTC audio offer before starting the session
+
+### Changed
+- **Build bump to 69** for the next iOS/TestFlight build
+
+---
+
+## [Build 68] - 2026-08-24
+
+### Added
+- **Native Live Voice** — Added OpenAI Realtime/WebRTC voice mode behind a new Live control on the chat screen, keeping the existing Whisper/ElevenLabs flow available for dictation-style interactions
+- **Realtime Session Proxy** — Echo sync server now exposes authenticated `/voice/realtime/session` and `/patients/voice/realtime/session` SDP proxy endpoints so the app can connect to OpenAI Realtime without exposing the OpenAI API key on-device
+
+### Changed
+- **Native Build Readiness** — Updated Expo SDK 54 patch dependencies, added the WebRTC config plugin, and kept React Native New Architecture enabled for Reanimated 4 compatibility
+- **Build bump to 68** for the next iOS/TestFlight build
+
+## [Build 67] - 2026-08-21
+
+### Added
+- **Finalized Operative Report Sync** — `patientDictationsStore` now syncs the current set of finalized patient dictations to the Mac mini sync server via new `dictationSync` retry logic. The server persists finalized reports in `dictations.json` and exposes authenticated list/detail endpoints for retrieval and backup
+- **Dedicated Dictation Sync Service** — New `src/services/dictationSync.ts` sanitizes transcript parts, queues the latest finalized payload in memory, and retries failed syncs up to 3 times
+- **Server Dictation Endpoints** — Sync server now serves both root-level and `/patients/*` dictation sync/list/detail endpoints backed by `dictations.json`
+- **Direct Operative Report Email Endpoint** — Sync server now exposes `/patients/dictations/email` and `/dictations/email`, sending report text through `gog gmail send` to the configured operative-report recipients without routing through a long-running chat request
+- **Notification Delivery Ledger** — Sync server now initializes `notification-deliveries.json` and records message sync acknowledgements, giving notification/message delivery a local audit trail alongside the existing pending-message queue
+- **Meeting Reply Cards** — New `/notify/meeting-reply` server endpoint checks Oliver's Google Calendar via `gog`, finds clean workday slots, queues a rich `meeting_reply` card, and can push a copy-ready suggested reply into chat
+- **Rich Notification Cards** — Push/message sync paths now preserve optional `card` payloads so notifications can hydrate structured UI, not just plain text
+
+### Changed
+- **Patient Dictation Store Sync Triggers** — Finalized dictations now re-sync when finalized, edited after finalization, or deleted after finalization, keeping the server copy aligned with the device
+- **Operative Report Email Sending** — Dictation screens now call `GatewayService.sendOperativeReportEmail()` instead of building an email prompt and sending it through the chat endpoint
+- **Chat Message Rendering** — Assistant messages with `meeting_reply` cards now render suggested times, checked conflicts, a reply preview, and a copy action; the message detail sheet also exposes copy reply
+- **Gateway Error Handling** — Gateway calls now share error parsing so JSON error bodies, 403s, temporary 5xx failures, and Cloudflare 524 timeouts surface clearer app messages
+- **Build bump to 67** for the next iOS/TestFlight build
+
+---
+
+## [Build 65] - 2026-03-30
+
+### Fixed
+- **Gateway Auth Scopes Header** — Added `x-openclaw-scopes: operator.write` header to gateway HTTP requests. OpenClaw 2026.3.28 enforces operator scopes on `/v1/chat/completions`, and without this header requests returned 403, breaking dictation report generation
+
+### Changed
+- **Build bump to 65** for TestFlight submission
+
+---
+
+## [Build 64] - 2026-03-20
+
+### Added
+- **Travel Time Intelligence** — Auto-detects when Oliver is in a different timezone and displays dual-time (local + home/Pacific) on meeting cards. New `timezone.ts` service handles timezone detection, offset calculation, and dual-time formatting. New `timezoneStore` persists timezone state and auto-updates on app foreground
+
+### Changed
+- **MeetingCountdown / MeetingDetail / NextMeeting** — Updated to show dual-timezone display when traveling (e.g., "2:00 PM HST / 5:00 PM PST")
+
+---
+
+## [Build 63] - 2026-03-17
+
+### Added
+- **OCR Extraction from Uploaded Images in Dictation** — When images are uploaded during dictation (OR whiteboards, patient stickers, consent forms), their text is now extracted via the gateway's vision capability before report generation. Extracted data (patient names, MRNs, dates, diagnoses) is appended to the transcript for AI use
+
+### Changed
+- **Removed CPT Codes & Work RVUs Summary from Reports** — Removed the CPT/RVU summary table at the end of operative reports; inline CPT codes in procedure listings are kept
+
+---
+
+## [Build 60] - 2026-03-12
+
+### Changed
+- **Operative Report Email — Added Recipient** — Added Rajka.Campbell@sutterhealth.org to operative report email recipients
+- **Simplified Email Subject** — Operative report email subject now uses just the date (removed procedure names) for cleaner subject lines
+
+---
+
+## [Build 59] - 2026-03-10
+
+### Added
+- **Bootstrap OpenAI + ElevenLabs Keys from Supabase** — Gateway bootstrap RPC now returns `openai_api_key` and `elevenlabs_api_key`; restores these keys after credential loss (only if currently empty, never overwrites user-set keys)
+
+---
+
+## [Build 58] - 2026-03-10
+
+### Fixed
+- **Derive WebSocket URL from Gateway URL** — Removed hardcoded `ws://localhost:8765` (nothing listens there); WebSocket URL now derived from `settingsStore.gatewayUrl` (e.g., `https://echo.oppersmedical.com` → `wss://echo.oppersmedical.com`). TLS-encrypted WebSocket works on hospital Wi-Fi (port 443)
+
+---
+
+## [Build 57] - 2026-03-10
+
+### Fixed
+- **Stop Double-Sending Messages** — Removed `noAbortPromise` that fired a second request after 30s timeout; original request now continues in background without duplication
+- **Eliminate False 'Tap to Retry'** — Added "response already arrived" guard in 3 locations (useGateway main catch, delayed request catch, Chat screen failure handler); before showing "Tap to retry", checks if an assistant response already exists for the conversation turn and suppresses error silently if so
+
+---
+
+## [Build 55] - 2026-03-10
+
+### Added
+- **Level 2 Bootstrap Token Exchange** — No secrets in binary:
+  - New `gatewayBootstrap` service fetches gateway config from Supabase RPC after authentication
+  - Supabase RPC function `get_gateway_config()` returns config only to authenticated users
+  - `app_config` table with RLS (no direct access, SECURITY DEFINER function only)
+  - Removed hardcoded obfuscated token from settingsStore (Level 1 bridge removed)
+  - App layout calls `ensureGatewayConfig()` after auth + settings hydration
+  - Migration: `supabase/migrations/004_gateway_bootstrap.sql` (deployed)
+
+---
+
+## [Build 54] - 2026-03-10
+
+### Fixed
+- **Hardened Credential Persistence** — Obfuscated gateway token fallback (XOR'd, runtime assembly) so credentials survive SecureStore loss; changed keychain accessibility to `AFTER_FIRST_UNLOCK` (prevents null reads after device reboot); post-hydration validation restores critical keys from hardcoded fallbacks with logging; applied `AFTER_FIRST_UNLOCK` to Supabase auth storage adapter
+
+---
+
+## [Build 53] - 2026-03-10
+
+### Added
+- **Read Back Play/Pause Controls** — Deferred playback with Processing → Play → Pause states:
+  - `ElevenLabsService`: new `generateAudio()` for audio-only generation, `playAudioFile()` for deferred playback, `pause()` and `resume()` methods
+  - Patient dictation Read Back now shows Processing spinner → Play button when ready → Pause/Resume during playback
+  - Haptic feedback when audio is ready
+  - State resets on dictation change
+
+---
+
+## [Build 52] - 2026-03-09
+
+### Added
+- **HTTP Long-Polling Fallback Transport** — Automatic fallback when WebSocket is blocked (e.g., hospital Wi-Fi firewalls):
+  - New `transport.ts` — transport manager that orchestrates WS + polling
+  - New `longpoll.ts` — tries `/poll` endpoint (25s long-hang), degrades to short-polling `/ping` every 10s on 404
+  - New `messageHandler.ts` — shared message handling logic extracted from WS `onmessage`
+  - Auto-switch: 3 WS failures within 60s triggers polling fallback
+  - Auto-recovery: retries WS every 5 minutes while in polling mode
+  - `websocket.ts` marked deprecated in favor of `useTransport`
+- **Network Indicator Polling Badge** — Shows yellow 'Limited' badge with swap icon when in polling mode
+- **Transport Mode in websocketStore** — New `transportMode` field (`websocket` | `polling` | `disconnected`)
+
+---
+
+## [Build 51] - 2026-03-08
+
+### Fixed
+- **Dictation: No Auto-Select Procedures** — New dictations now start with a clean procedure list instead of auto-selecting from the patient's chief complaint
+- **Dictation: Report Header Included** — AI is now instructed to include the intro header line verbatim in the generated operative report
+- **Dictation: Edit Scroll Fix** — Fixed scroll behavior in direct-edit mode by disabling inner TextInput scroll and letting the parent ScrollView handle it
+- **Dictation: Remove TBD Codes** — CPT/ICD codes not found in the reference library are now omitted entirely instead of showing "TBD" placeholders; missing codes are no longer listed as Open Items
+
+---
+
+## [Build 48] - 2026-03-06
+
+### Added
+- **Patient-Linked Operative Report Dictation** — Full dictation workflow tied to individual patients:
+  - New `patient-dictation.tsx` modal screen (1900+ lines) with complete OR dictation flow
+  - New `patientDictationsStore` — per-patient dictation persistence via AsyncStorage (draft/final status, report history)
+  - Auto-populated report header: Dr. Aalami + patient name + MRN + date of operation
+  - Date of operation picker
+  - Smart procedure pre-selection from patient's chief complaint
+  - Per-patient report history timeline
+  - Draft auto-save with 10-second debounce
+  - Quick duplicate: start new report from previous
+  - Export encounter bundle (patient + report + CPT codes)
+  - Read-back (TTS), email, and copy support
+- **Op Report Button on Patient Cards** — Quick access from patients list with draft indicator badge and "View Report" action
+
+### Fixed
+- **Patient Name Layout** — Patient name now renders on its own full-width row on cards (two layout fixes)
+
+---
+
+## [Build 47] - 2026-03-05
+
+### Improved
+- **WebSocket Auto-Reconnect** — Robust reconnection system replacing the fragile 3-attempt retry:
+  - AppState listener for instant reconnect when app returns to foreground
+  - Exponential backoff: 2s → 4s → 8s → 16s → 30s cap, retries indefinitely
+  - Ping/pong heartbeat: 25s interval with 10s pong timeout to detect zombie connections
+  - Any incoming message clears pong timeout (proves connection alive)
+  - Fixes the issue where the app would go "offline" and require a force-restart to recover
+
+### Fixed
+- **TypeScript errors** — Fixed `NodeJS.Timeout` type references to `ReturnType<typeof setTimeout>` for React Native compatibility
+
+---
+
+## [Build 46] - 2026-03-04
+
+### Added
+- **Crash Logging Service** — New `src/services/crashLog.ts` with AsyncStorage-backed crash log (max 20 entries, FIFO eviction)
+- **Global Error Handler** — `ErrorUtils` global handler in `_layout.tsx` catches unhandled JS errors and persists them via crashLog service
+- **Auth State Persistence Fix** — Supabase `onAuthStateChange` listener in root layout for reliable session restore after crash
+- **Crash Log Viewer** — New "Crash Logs" section in Settings (`explore.tsx`) with View and Clear buttons
+
+---
+
+## [Build 45] - 2026-03-02
+
+### Fixed
+- **Cold-Start Hydration Race** (Build 45) — Added a `_hydrated` gate to `settingsStore` that blocks ALL SecureStore writes until Zustand hydration completes, preventing default null state from overwriting real gateway credentials on cold start. Also updated `ConnectionSplash`, `useGateway` hook, and `_layout.tsx` to coordinate around hydration timing.
+
+---
+
+## [Build 43] - 2026-03-01
+
+### Added
+- **Operative Report Templates** (Build 40) — Full template system for OR dictation
+  - 50+ operative report templates imported from Oliver's prior reports, organized by category (aortic, carotid, peripheral, venous, dialysis access, other)
+  - Template loader with smart defaults: auto-selects relevant template based on selected procedures
+  - Build-time template compiler (`scripts/build-templates.js`) for optimized loading
+  - `src/data/templateContent.ts` and `src/data/templateLoader.ts` for runtime template access
+- **Two Edit Modes for Reports** (Build 43) — Dictation review now offers direct text editing AND AI-powered regeneration as separate actions
+- **New Dictation Button in Review** (Build 42) — After generating a report, users can start a new dictation without going back
+
+### Changed
+- **CPT/ICD-10 Codes: Local Only** (Build 40) — Removed Perplexity web search for CPT/ICD-10 codes; now uses local procedure library exclusively for faster, more reliable code lookup
+- **Dictation Bottom Bar Icons** (Build 43) — Updated to match chat tab icons (keypad-outline + image-outline) for visual consistency
+
+### Fixed
+- **TTS Auto-Play on App Open** (Build 40) — Fixed stale messages triggering TTS when app opens; now skips auto-play for messages older than the current session
+- **API Key Loss on Crash** (Build 40) — settingsStore now guards against losing API keys during crash/rehydration race conditions
+- **Upside-Down Empty State** (Build 40) — Fixed inverted empty state display on chat screen
+- **Dictation Loading States** (Build 42) — Added proper loading indicators for email sending, TTS readback, and transcription; fixed keyboard scroll behavior; prevented double readback triggers
+- **Redundant Empty State Mic** (Build 42) — Removed duplicate microphone icon from dictation empty state
+
+---
+
+## [Build 39] - 2026-02-28
+
+### Added
+- **OR Dictation Tab** (Builds #36-39) — New dedicated tab for generating structured operative reports from voice, text, and photo input
+  - Tag-based procedure picker (pill/chip UI) organized by category: Aortic, Carotid, Peripheral Arterial, Venous, Dialysis Access, Other
+  - Custom procedure tags: add via '+ Add Procedure', long-press to edit/delete, persisted via AsyncStorage
+  - CPT/ICD-10 code lookup from local procedure library (web search removed in Build 40)
+  - Full report workflow: generate → review → email/copy/read back/edit+regenerate
+  - Save reports as examples for future learning context
+  - New `dictationStore` (Zustand + AsyncStorage) for custom procedures, corrections, style preferences, saved examples
+  - New `dictationService` for report generation via OpenClaw Gateway
+  - New `vascularProcedures` data module with categorized procedure library
+- **Toast Notification on TTS Failure** (Build #35) — Shows warning toast when ElevenLabs speak() errors out, covering all 4 speak call sites
+
+### Fixed
+- **Dictation Recording Startup Errors** (Build #39) — Unload existing recording before starting new, proper iOS audio mode setup with delay
+- **Dictation Bottom Bar Clipping** (Builds #38-39) — Increased paddingBottom for tab bar clearance
+- **Dictation UI Polish** (Build #38) — Email sent confirmation state, tappable teal mic icon in empty state, removed auto-scroll after transcription
+- **Dictation Layout & UX** (Build #37) — ScrollView auto-scroll, Generate Report button repositioned, email sent indicator, verified ElevenLabs voice config
+- **Missing expo-clipboard Dependency** — Added to package.json
+- **EAS Build Fix** — Upgraded expo-task-manager to 14.0.9
 
 ---
 
@@ -33,7 +477,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Changed
+- **Chat Persistence Moved to AsyncStorage** — `chatStore` now persists transcript history in AsyncStorage instead of SecureStore, with a one-time legacy migration path from the old `echo-chat` SecureStore key
+
 ### Fixed
+- **Chat Hydration Wipe on Launch** — Added a pre-hydration write lock and queued-message flush in `chatStore` so startup state cannot overwrite stored history with `messages: []`
+- **Auth Restore Hardening** — `authStore` and root layout now handle `INITIAL_SESSION`, `SIGNED_IN`, `TOKEN_REFRESHED`, and `SIGNED_OUT` consistently, and manual token writes use `SecureStore.AFTER_FIRST_UNLOCK` for more reliable cold-start session restore
+- **Typed Patient Dictation Route Cleanup** — Standardized `/patient-dictation` navigation through typed `Href` usage to avoid Expo Router pathname type failures
 - **Keyboard Covering Image Preview** (Build #31) — Image preview now scrolls up and shrinks when keyboard opens, preventing caption input from being hidden behind the keyboard
 - **Image Send API Format** (Build #29) — Fixed OpenResponses API format: `input_image` goes inside message content array instead of top-level
 - **Background Request Reliability** — Removed abort timeout for long-running background requests; re-sends without timeout so tasks can complete indefinitely. Added fallback polling (4×30s) if the no-timeout request also fails, checking for new assistant messages before showing an error.

@@ -1,0 +1,1 @@
+{"id": "echo-task-coordination", "name": "Echo shared task coordination", "description": "Owner-private cross-channel task records and action coordination", "configSchema": {"type": "object", "additionalProperties": false, "properties": {}}}

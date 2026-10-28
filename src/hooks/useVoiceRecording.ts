@@ -1,3 +1,5 @@
+import { beginClinicalAudio } from '../services/clinicalAudioHandoff';
+import { releaseClinicalAudio } from '../services/audioOwnership';
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Audio } from 'expo-av';
 import * as Haptics from 'expo-haptics';
@@ -15,9 +17,11 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
   const [isRecording, setIsRecording] = useState(false);
   const [duration, setDuration] = useState(0);
   const [audioLevel, setAudioLevel] = useState(0);
+  const recordingStarting = useRef(false);
+  const recordingMounted = useRef(true);
   const recording = useRef<Audio.Recording | null>(null);
-  const durationInterval = useRef<NodeJS.Timeout | null>(null);
-  const meteringInterval = useRef<NodeJS.Timeout | null>(null);
+  const durationInterval = useRef<ReturnType<typeof setInterval> | null>(null);
+  const meteringInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const startRecording = useCallback(async () => {
     // Prevent double-starts
@@ -26,16 +30,12 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       return;
     }
 
+    if (recordingStarting.current || recording.current) return;
+    recordingStarting.current = true;
     try {
+      if (!await beginClinicalAudio(recording)) return;
       // Clean up any existing recording first
-      if (recording.current) {
-        try {
-          await recording.current.stopAndUnloadAsync();
-        } catch (e) {
-          // Ignore cleanup errors
-        }
-        recording.current = null;
-      }
+
 
       // Clear any existing intervals
       if (durationInterval.current) {
@@ -50,10 +50,12 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       // Request permissions
       const { status } = await Audio.requestPermissionsAsync();
       if (status !== 'granted') {
+        releaseClinicalAudio(recording);
         console.log('Audio permission not granted');
         return;
       }
 
+      if (!recordingMounted.current) { releaseClinicalAudio(recording); return; }
       // Configure audio mode
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -72,6 +74,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       );
       
       recording.current = newRecording;
+      if (!recordingMounted.current) { await newRecording.stopAndUnloadAsync(); recording.current = null; releaseClinicalAudio(recording); return; }
       setIsRecording(true);
       setDuration(0);
       setAudioLevel(0);
@@ -101,8 +104,9 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
       }, 100); // Update 10 times per second for smooth animation
 
     } catch (error) {
+      if (!recording.current) releaseClinicalAudio(recording);
       console.log('Failed to start recording:', error);
-    }
+    } finally { recordingStarting.current = false; }
   }, []);
 
   const stopRecording = useCallback(async (): Promise<string | null> => {
@@ -129,6 +133,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
 
       // Stop and get URI
       await recording.current.stopAndUnloadAsync();
+      releaseClinicalAudio(recording);
       const uri = recording.current.getURI();
       
       recording.current = null;
@@ -165,6 +170,7 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
 
       // Stop without saving
       await recording.current.stopAndUnloadAsync();
+      releaseClinicalAudio(recording);
       recording.current = null;
       setIsRecording(false);
       setDuration(0);
@@ -181,7 +187,12 @@ export function useVoiceRecording(): UseVoiceRecordingResult {
 
   // Cleanup on unmount
   useEffect(() => {
+    recordingMounted.current = true;
     return () => {
+      recordingMounted.current = false;
+      const r = recording.current;
+      if (r) void r.stopAndUnloadAsync().then(() => releaseClinicalAudio(recording)).catch(() => {});
+      else if (!recordingStarting.current) releaseClinicalAudio(recording);
       if (durationInterval.current) clearInterval(durationInterval.current);
       if (meteringInterval.current) clearInterval(meteringInterval.current);
     };

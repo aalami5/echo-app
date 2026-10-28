@@ -1,0 +1,9 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const plugin=require('./index.js');
+test('hooks require task claim; cross-channel duplicate cannot borrow another claim; terminal turn not completed',async(t)=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'echo-plugin-')),orig=os.homedir;os.homedir=()=>temp;t.after(()=>{os.homedir=orig;fs.rmSync(temp,{recursive:true,force:true});});
+ const hooks={};let factory,service,method;plugin.register({on:(n,f)=>hooks[n]=f,registerTool:f=>factory=f,registerGatewayMethod:(_n,f)=>method=f,registerService:s=>service=s,runtime:{gateway:{request:async(m)=>m==='tasks.list'?{tasks:[]}:{sessionInfo:{activeRunIds:[]}}}}});service.start();t.after(()=>service.stop());
+ const a={sessionKey:'agent:main:echo-app:home',runId:'a'},b={sessionKey:'agent:main:whatsapp:direct:+16503153236',runId:'b'};
+ hooks.before_prompt_build({},a);hooks.before_prompt_build({},b);assert.equal(hooks.before_tool_call({toolName:'exec'},a).block,true);assert.equal(hooks.before_tool_call({toolName:'exec',toolKind:'code_mode_exec'},a),undefined);
+ const ta=factory(a),tb=factory(b);const parse=r=>JSON.parse(r.content[0].text);const x=parse(await ta.execute('1',{action:'begin',key:'email:test',title:'Email test'}));assert.equal(x.canExecute,true);assert.equal(hooks.before_tool_call({toolName:'exec'},a),undefined);const y=parse(await tb.execute('2',{action:'begin',key:'email:test',title:'Again'}));assert.equal(y.canExecute,false);assert.equal(hooks.before_tool_call({toolName:'exec'},b).block,true);hooks.agent_end({runId:'a'},a);const stopped=parse(await ta.execute('3',{action:'get',id:x.task.id}));assert.equal(stopped.status,'needs_review');assert.equal(factory({sessionKey:'agent:main:whatsapp:group:123'}),null);
+});

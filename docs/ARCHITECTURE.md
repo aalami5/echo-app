@@ -2,9 +2,105 @@
 
 > Echo App System Design & Technical Overview
 
-**Last Updated:** February 25, 2026
+**Last Updated:** October 26, 2026
 
 ---
+
+## Shared owner task coordination (Build 93)
+
+`gateway/task-coordination/` adds a gateway plugin with an owner-private registry at `~/.openclaw/echo-tasks/tasks.sqlite`. SQLite WAL transactions coordinate canonical task keys, resource locks, revision checks, terminal status history and durable action receipts. This is the existing single-owner installation, not a multi-tenant authorization boundary; groups and clinical session keys are excluded.
+
+- The `echo_tasks` agent tool lists, claims, annotates, updates and explicitly reconciles work. Hooks require a running claim for non-exempt tools in allowed sessions. Exact canonical keys deduplicate; semantic matching and resource naming remain the assistant's responsibility. Action receipts are not universal exactly-once guarantees for shell, browser or provider effects.
+- Turn endings and gateway startup mark unfinished running claims `needs_review` while retaining locks. There is no timer-based retry or automatic lock stealing. Viewing records never restarts historical requests.
+- `snapshot.cjs` combines managed records with read-only native task/active-run projections from allowed owner sessions. Native completion maps to `run_finished`, not verified external success; partial retrieval reports unavailable sources. The plugin caches snapshots for five seconds.
+- Authenticated `GET /patients/assistant/tasks` forwards to gateway RPC `echo.tasks.list` (`operator.read`). Build 94 removes the native `AssistantScreen` task panel, its four-second polling and panel-only local React state; the endpoint and backend registry remain unchanged. More → Activity, startup memory/spoken recap and uncertain-send receipts are preserved. See [Build 94](changes/build94-remove-voice-task-panel.md).
+- `gateway/browser-tasks.mjs` uses the existing authenticated Talk RPC client, polling every four seconds while visible and cleaning up on session change. `scripts/install-task-panel.cjs` provides a version-checked local browser patch with backups; this is not an upstream browser feature.
+- Superchill is now a server-owned project conversation, included in task snapshots and eligible indexed startup-memory sessions. Existing private-source filtering remains in place.
+
+See [Build 93 scope and release evidence](changes/build93-shared-tasks.md). Those notes still mark deployment pending; source implementation and automated checks do not establish deployed browser behavior or physical-phone acceptance.
+
+## Voice-session recovery hotfix (October 24, 2026)
+
+`server/assistant-continuity.js` now removes the exact retained voice record on authoritative `talk.event / session.ended`, preserving the public status event. A per-conversation creation guard serializes recovery and new allocation. Expired allocations are closed only before SDP exchange; established calls do not expire with offer credentials. Failed SDP exchanges close their session; failed cleanup retains the record for reconnect reconciliation rather than allowing a competing call. Audio cleanup never replays requests or aborts accepted tasks.
+
+The deployed adapter hotfix runs from a separate isolated checkout; future backend deployment must preserve it. See [deployment, verification and rollback](changes/2026-10-24-voice-session-cleanup.md). Live audio and physical-iPhone reconnect remain unverified in that record.
+
+## Spoken startup recap (Build 91)
+
+The startup packet below also feeds `gateway/voice-recap.mjs`: a separate, read-only, out-of-band audio response (`conversation: none`, no tools, `tool_choice: none`). Policy requests 35–60 words and at most three topics. Task snapshots older than 90 seconds are unavailable for current-status claims; sensitive snippets are filtered and discussion remains historical reference, never authorization.
+
+- Native `useRealtimeVoice` sends one authenticated `POST /patients/assistant/conversations/:id/voice/:voiceId/ready` after WebRTC connects. The adapter checks conversation ownership and SDP exchange, marks readiness before awaiting the gateway, and clears the retained broker secret after forwarding. Missing/expired secrets skip the recap; client acknowledgement failures leave normal audio working without replay.
+- The gateway-owned bridge waits 750 ms after readiness and requires an idle provider. Speech, another response, continuity reset or closure suppresses the pending recap; provider VAD handles spoken interruption. The browser-owned path in `gateway/browser-recap.mjs` waits for both an open data channel and connected peer before its own 750 ms delay.
+- Per-call client readiness and durable claims prevent duplicate greetings. `data/assistant/voice-recap-state.json` in the gateway workspace keeps at most 200 call IDs/timestamps plus the last claim time, not transcripts. Existing conversation history and memory files are not rewritten; no Zustand store is added.
+- `scripts/install-voice-recap.cjs --check` validates installed bundle anchors without writes. Installation backs up and patches local Talk, bridge factory, broker and browser bootstrap bundles. Revalidate both startup-memory and recap integrations after gateway upgrades, then restart the gateway and patient-sync adapter. This is a local integration, not an upstream feature.
+
+Build 90 clients retain silent startup. Build 91 fails open to ordinary audio against servers without readiness support. See [Build 91 deployment, rollback and acceptance scope](changes/build91-spoken-recap.md); physical-phone audio acceptance is separate from automated coverage.
+
+## Voice startup continuity (Build 90)
+
+`gateway/startup-memory.mjs` prepares fresh historical reference context before provider creation for the single-owner deployment. Browser and app voice routes share the preparation function; this is gateway-side behavior, not IPA-bundled memory or a new client store.
+
+- Only the main agent and explicitly allowed personal sessions are eligible. The assistant conversation index supplies recognized project sessions; groups, unknown sessions and clinical workflow keys are excluded. Native read RPC calls retain the connecting client's authority.
+- Preparation reads recent history, task and artifact snapshots from up to four allowed sessions plus selected `MEMORY.md`/dated daily-note search hits. It filters context envelopes, secret patterns and clinical note snippets, clips text, and trims the packet against a 15,000-byte default budget. Read calls have 12-second timeout bounds; this is not an overall startup deadline.
+- The packet includes capture time, source identities and ready/partial status. Failures produce explicit limitations or unavailable guidance, never reuse an old packet. Historical requests and promises do not authorize execution or establish completion; current task/external status still requires `agent_consult` verification.
+- `scripts/install-startup-memory.cjs` patches the version-checked local OpenClaw Talk bundle and imports the repository module at runtime. It backs up the original bundle, requires a gateway restart, and must be reviewed/reapplied after OpenClaw upgrades. Roll back by restoring that bundle and restarting; this is a local integration, not an upstream feature.
+
+Recorded native-create and synthetic spoken probes validate bounded startup retrieval, not exhaustive historical recall or physical-phone acceptance. See [Build 90 operational dependency and evidence](changes/build90-startup-memory.md).
+
+## Voice lifecycle and media drafts (Builds 86–88)
+
+The Build 82 server-owned conversation model below remains in place. These builds change client lifecycle and media input, not backend production code or Zustand store implementations.
+
+- `useRealtimeVoice.ts` now exposes an app-scoped controller through `useSyncExternalStore`; screen unmount, text switching and tab navigation do not end a call. `app/_layout.tsx` stops the session on logout. Explicit Hang up releases audio independently of accepted agent tasks.
+- `plugins/withEchoAudioSession.js` emits native interruption, route-loss and media-services-reset events. The controller pauses/mutes on those events; explicit Resume audio restores reception but requires a separate unmute. `liveAudioRoute.ts` enables background audio only during the call and preserves headset routing. iOS declares audio alongside existing fetch/notification background modes.
+- Temporary WebRTC disconnection gets 20 seconds to recover; terminal failures release audio and offer a fresh explicit connection in the saved conversation, without provider re-offer or tool replay. WebRTC statistics drive audio-level presentation; background metering is skipped.
+- `clinicalAudioHandoff.ts` requires confirmed voice disconnection before clinical capture. `audioOwnership.ts` leases prevent personal voice startup during clinical recording, including pending permission/recorder acquisition. `useVoiceRecording.ts` retains ownership until late-created recorders are cleaned up.
+- `assistantMedia.ts` prepares shared Files/Photos/Camera attachments: image normalization to JPEG (maximum known dimension 2200 pixels), 6 MB per file, five files per message, and private copies under the app document directory's `assistant-drafts/`. Upload happens only on Send; each attachment ID is an upload idempotency key scoped to its conversation.
+- `AssistantScreen` persists text/attachment drafts in AsyncStorage under `echo-assistant-draft-${conversationId}`. Existing outbox/receipt reconciliation handles uncertain sends. Camera preview closes on tab departure, background or hangup, while the draft remains. Voice stays audio-only; captured still images use the existing conversation upload path, not a video stream.
+
+Internal TestFlight delivery is recorded for all three builds. Background/lock, headset/interruption recovery, camera permission and simultaneous voice/image behavior still require physical-device acceptance; browser renders and native compilation do not prove those behaviors. See [Build 86](changes/build-86-voice-first.md) and [Build 88](changes/build-88-media-navigation.md).
+
+## Current assistant continuity (Build 82)
+
+`app/(tabs)/index.tsx` now renders `src/screens/AssistantScreen.tsx`. Typed chat and Live Voice share a server-selected native OpenClaw session for Home or the selected project. OpenClaw owns canonical history, tools, accepted runs, tasks, and artifacts; `chatStore` supplies only the preserved legacy inbox in this screen.
+
+- `src/services/assistant.ts` calls authenticated, no-store `/patients/assistant` endpoints. `server/assistant-continuity.js` maps conversation IDs to server-owned session keys; `server/assistant-gateway.js` provides the native protocol-v4 RPC connection. No arbitrary RPC proxy or client-selected session key is exposed.
+- The adapter stores its conversation index, upload provenance, and submission receipts in `DATA_DIR/assistant/index.json`, attachments in `assistant/uploads/`, and archived device history in `assistant/legacy/`. These are permission-restricted files, separate from encrypted clinical persistence. Legacy history is archived, not replayed as new instructions.
+- Native history is paginated; bounded in-memory events carry an epoch/cursor so clients can reset after reconnect/restart. Stable submission IDs and a persistent phone outbox distinguish accepted requests from uncertain acknowledgements; Activity reconciles native input receipts instead of blindly repeating actions.
+- Uploads are conversation-scoped (6 MB each, up to five per submission). Artifact downloads use native artifact identity; managed gateway-relative media is relayed as base64 with a 12 MB bound, timeout, and no redirects. Arbitrary external URLs are not fetched by the adapter.
+- `useRealtimeVoice(conversationId)` creates an audio-only WebRTC offer. The adapter creates `talk.client.create` with `gateway-control-v1`, exchanges SDP through the gateway, and keeps provider credentials server-side. The phone opens no provider data channel; gateway sideband owns tools and finalized transcripts. Ending audio closes the voice session, not accepted work; stopping work separately checks the exact active run. Persisted call identity supports abandoned-call cleanup on reconnect.
+- The Memory panel reads curated workspace sources and submits changes as Home conversation requests. Cross-private recall requires protected native recall plus active-memory configuration; Build 90 adds bounded allowlisted startup retrieval (above), not exhaustive original private-transcript recall. This feature retains text, not raw call audio.
+
+No Zustand store implementations or clinical/report endpoints changed. The older chat/voice flows below describe retained legacy paths, not the Build 82 Chat tab. See [continuity requirements](live-voice-continuity.md) and [release blockers and acceptance](changes/build-82-live-voice-continuity.md); native compilation does not establish TestFlight availability or physical-phone acceptance.
+
+## Current operative drafting (Builds 79–81)
+
+Both dictation screens use `dictationService.ts` and `operativeDrafting.ts` for notes/photos → Generate draft → Edit with AI or Edit Text Directly. The older analysis/technique-confirmation UI is no longer in their live paths.
+
+1. Screenshot OCR runs up to two pages at a time, retains successful extraction immediately, and preserves page order. Failed pages stop composition without discarding successful OCR.
+2. Authenticated `/patients/operative/compose` generates a complete draft in one model call after OCR, without separate analysis or semantic-audit passes. Current notes/corrections are authoritative; historical sources are excluded. AI editing receives the displayed draft, including manual edits, and applies targeted instructions. Source/report changes prevent stale replacement.
+3. Server policy/cache version `draft-first-v3.5` retains the dictated preamble and section order, using Dr. Oliver Aalami (or the explicitly identified different surgeon) and numbered diagnosis/Procedure(s) lists. Description of Procedure remains last as unnumbered chronological prose ending with recovery/disposition. Findings summarizes key documented observations; procedural actions from any source field move into the narrative or appropriate existing sections without losing detail. Actions alone do not imply normal anatomy or successful results. Targeted format/Findings edits preserve unrelated sections and manual additions; saved reports are not automatically rewritten. Limited routine suggestions remain governed by missing-information rules, with documented exceptions and uncertainty taking precedence and suggestion provenance preserved through cosmetic edits. See [names and numbering](changes/draft-format-v3.3.md), [paragraph narrative](changes/draft-format-v3.4.md), and [focused Findings](changes/draft-format-v3.5.md).
+4. `reportPresentation.ts` separates suggestion markers into clean text and section-specific `reportReview.routineDefaults`. `ReportDraftNote` shows provenance outside the report; readback/copy/export/email exclude that note, while uncertainty markers remain. AI-edit input reattaches provenance only to matching text in its original section. Existing records are not automatically migrated; patient-report metadata uses existing backup/restore.
+
+`server/operative-jobs.js` provides `POST /patients/operative/jobs` and `GET /patients/operative/jobs/:id` for OCR, analysis, draft, compose, and profile-suggestion operations. Job IDs hash the cache version, operation, and input. Identical submissions reuse running/completed jobs; failed jobs require explicit retry. Encrypted job records under `DATA_DIR/operative-jobs/` retain completed results across restarts; interrupted running jobs become failed when recovered. The default two-job cap returns 429 when saturated. Authentication and no-store apply to submission and polling.
+
+The client uses bounded requests/reconnect retries and progress polling. The pinned model remains `gpt-5.4-2026-03-05`, with default reasoning effort `none` and 45-second provider bounds. Explicit profile writes are not automatically retried. Draft generation never finalizes or emails a report. See [Build 79](changes/build-79-operative-latency.md), [Build 80](changes/build-80-draft-first.md), and [Build 81](changes/build-81-clean-dictation.md).
+
+## Legacy source-grounded operative drafting (Build 78)
+
+Retained for older clients and optional legacy tooling; the current screens use `/compose` above. The following describes the original analysis/draft path.
+
+`BriefReportBuilder` and `dictationService.ts` use `src/services/operativeDrafting.ts` to call the authenticated patient-sync backend, rather than asking the chat gateway to generate operative reports. Chat and downstream coding/RVU workflows are unchanged.
+
+1. Full-frame screenshots normalize to JPEG; `/patients/operative/ocr` extracts text and uncertainty warnings using server-owned credentials. Missing image data or failed OCR stops analysis; retained OCR text can be reused.
+2. `/patients/operative/analyze` extracts quoted facts, procedures, review questions, and technique suggestions. Current notes and corrections are evidence; historical sources (including legacy `-copy` records) are excluded. The generated `server/report-catalog.json` covers 44 entries, including all 16 code-library procedures and named variants/aliases; custom/mixed procedures remain supported.
+3. `/patients/operative/profiles/suggest` proposes reusable technique from a saved example. `/patients/operative/profiles` requires explicit approval and optimistic version matching; profile approval is separate from confirming steps for the current case. `GET /patients/operative/catalog` returns the catalog and approved profiles.
+4. `/patients/operative/draft` creates evidence-linked statements from case facts and explicitly confirmed steps. Quote/numeric checks and a separate semantic audit remove unsupported assertions and restore unambiguous omitted facts from exact source text. Missing clinical negatives remain unknown; narrative generation does not verify billing codes.
+5. Patient-report review retains source fingerprints, facts, confirmed steps, and statement links. Source changes require regeneration or review and manual editing against the latest notes before finalization/email; direct edits mark the report manual and clear generated statement links. Finalization requires resolving Open Items and explicit review; generation never sends or finalizes automatically.
+
+`server/operative-drafting.js` mounts the routes with fail-closed bearer authentication and `Cache-Control: no-store`. Policy `brief-note-v1` defaults to server-selected `gpt-5.4-2026-03-05`, overridable with `OPERATIVE_DRAFT_MODEL`. The client refreshes authentication once on 401/403. Provider bodies/PHI are not logged.
+
+Technique profiles live in `DATA_DIR/operative-technique-profiles.json`; source sessions and generated versions live in `DATA_DIR/operative-drafting/`. Both use existing encrypted clinical preservation and version history. Existing report storage, additive restore, and email receipts remain separate and unchanged; this is not a hosting migration or complete multi-device synchronization. Source checks do not replace surgeon review. See [Build 78 release details](changes/build-78-brief-operative-notes.md).
 
 ## Overview
 
@@ -14,21 +110,22 @@ Echo App is a React Native (Expo) application that provides Oliver with a privat
 ┌─────────────────────────────────────────────────────────────────┐
 │                         ECHO APP (iOS)                          │
 │  ┌──────────────────────────────────────────────────────────┐  │
-│  │  React Native + Expo SDK 52                               │  │
+│  │  React Native + Expo SDK 54                               │  │
 │  │                                                           │  │
-│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐ │  │
-│  │  │ Chat UI     │ │ Patients    │ │ Settings            │ │  │
-│  │  │ (voice+text)│ │ (call list) │ │ (gateway, voice)    │ │  │
-│  │  └──────┬──────┘ └──────┬──────┘ └──────────┬──────────┘ │  │
-│  │         │               │                    │            │  │
-│  │  ┌──────▼───────────────▼────────────────────▼──────────┐│  │
+│  │  ┌───────────┐ ┌───────────┐ ┌───────────┐ ┌──────────┐ │  │
+│  │  │ Chat UI   │ │ Dictation │ │ Patients  │ │ Settings │ │  │
+│  │  │(voice+txt)│ │(OR reports│ │(call list)│ │(gw,voice)│ │  │
+│  │  └─────┬─────┘ └─────┬─────┘ └─────┬─────┘ └────┬─────┘ │  │
+│  │        │              │             │             │        │  │
+│  │  ┌─────▼──────────────▼─────────────▼─────────────▼─────┐│  │
 │  │  │              Zustand Stores (Persistent)              ││  │
-│  │  │  chatStore │ patientsStore │ settingsStore │ networkStore ││
+│  │  │ chatStore │ dictationStore │ patientDictationsStore   ││  │
+│  │  │ patientsStore │ settingsStore │ authStore             ││  │
 │  │  └──────────────────────┬────────────────────────────────┘│  │
 │  │                         │                                 │  │
 │  │  ┌──────────────────────▼────────────────────────────────┐│  │
-│  │  │              expo-secure-store (Keychain)              ││  │
-│  │  │              Encrypted local persistence               ││  │
+│  │  │        AsyncStorage + expo-secure-store (Keychain)     ││  │
+│  │  │     Split local persistence for transcripts / PHI      ││  │
 │  │  └────────────────────────────────────────────────────────┘│  │
 │  └──────────────────────────────────────────────────────────┘  │
 │                              │                                  │
@@ -63,12 +160,12 @@ Echo App is a React Native (Expo) application that provides Oliver with a privat
 
 | Layer | Technology | Purpose |
 |-------|------------|---------|
-| **Framework** | React Native + Expo SDK 52 | Cross-platform mobile |
+| **Framework** | React Native + Expo SDK 54 | Cross-platform mobile |
 | **Language** | TypeScript 5.x | Type safety |
 | **State** | Zustand + persist middleware | State management |
-| **Storage** | expo-secure-store | Encrypted Keychain storage |
+| **Storage** | AsyncStorage + expo-secure-store | Split local transcript storage and encrypted Keychain storage |
 | **Navigation** | Expo Router (file-based) | Tab navigation |
-| **Audio** | expo-av | Recording & playback |
+| **Audio** | expo-av + react-native-webrtc | Recording, playback, and native realtime voice |
 | **Haptics** | expo-haptics | Tactile feedback |
 | **HTTP** | fetch (native) | Gateway API calls |
 | **Push** | expo-notifications | Remote push notifications |
@@ -87,6 +184,7 @@ echo-app/
 │   │   ├── patients.tsx          # Patient tracking
 │   │   ├── today.tsx             # Calendar view
 │   │   └── explore.tsx           # Settings
+│   ├── patient-dictation.tsx      # Patient-linked OR dictation (modal)
 │   ├── login.tsx                 # Authentication
 │   ├── modal.tsx                 # Modal template
 │   └── _layout.tsx               # Root layout
@@ -105,17 +203,44 @@ echo-app/
 │   │
 │   ├── hooks/                    # Custom React hooks
 │   │   ├── useGateway.ts         # Gateway API connection
-│   │   ├── useVoiceChat.ts       # Voice recording + TTS
+│   │   ├── useVoiceChat.ts       # Whisper + ElevenLabs voice recording/TTS
+│   │   ├── useRealtimeVoice.ts   # OpenAI Realtime WebRTC voice sessions
 │   │   ├── useCalendar.ts        # Calendar integration
 │   │   ├── usePatientVoiceInput.ts  # Voice for patient forms
 │   │   ├── usePatientScan.ts     # Image scanning for patients
 │   │   └── useNotifications.ts   # Push notification setup
 │   │
+│   ├── data/                     # Static data & templates
+│   │   ├── templates/            # Operative report templates (markdown)
+│   │   │   ├── README.md         # Template format docs
+│   │   │   ├── aortic.md         # Aortic procedures
+│   │   │   ├── carotid.md        # Carotid procedures
+│   │   │   ├── peripheral.md     # Peripheral arterial
+│   │   │   ├── venous.md         # Venous procedures
+│   │   │   ├── dialysis-access.md# Dialysis access
+│   │   │   └── other.md          # Amputations, central lines, etc.
+│   │   ├── templateContent.ts    # Compiled template data
+│   │   ├── templateLoader.ts     # Runtime template selection & loading
+│   │   └── vascularProcedures.ts # Categorized procedure library + CPT/ICD-10
+│   │
+│   ├── lib/                      # Core transport & utility modules
+│   │   ├── transport.ts          # Transport manager (WS + polling orchestration)
+│   │   ├── longpoll.ts           # HTTP long-polling fallback transport
+│   │   ├── messageHandler.ts     # Shared gateway event handler
+│   │   └── websocket.ts          # WebSocket client (deprecated → transport.ts)
+│   │
 │   ├── services/                 # External service clients
+│   │   ├── crashLog.ts           # Crash logging (AsyncStorage, FIFO, max 20)
 │   │   ├── gateway.ts            # OpenClaw Gateway API
-│   │   ├── elevenlabs.ts         # Text-to-speech
+│   │   ├── gatewayBootstrap.ts   # Supabase RPC bootstrap (gateway config + API keys)
+│   │   ├── elevenlabs.ts         # Text-to-speech (+ generateAudio/playAudioFile/pause/resume)
+│   │   ├── realtimeVoice.ts      # OpenAI Realtime token/session + Echo tool bridge client
+│   │   ├── liveAudioRoute.ts     # Native Live Voice audio-session routing
 │   │   ├── whisper.ts            # Speech-to-text
+│   │   ├── timezone.ts           # Timezone detection & dual-time formatting
 │   │   ├── calendar.ts           # Google Calendar
+│   │   ├── dictationService.ts   # Source-grounded operative report pipeline
+│   │   ├── dictationSync.ts      # Draft/final dictation backup + durable retry outbox
 │   │   ├── notifications/        # Push notification service
 │   │   │   └── index.ts          # Expo push registration & handling
 │   │   └── supabase.ts           # Supabase client for push tokens
@@ -124,10 +249,11 @@ echo-app/
 │   │   ├── authStore.ts          # Authentication state
 │   │   ├── chatStore.ts          # Chat messages (persisted)
 │   │   ├── patientsStore.ts      # Patient list (persisted)
+│   │   ├── patientDictationsStore.ts # Per-patient OR dictations (AsyncStorage)
 │   │   ├── settingsStore.ts      # App settings (persisted)
 │   │   ├── calendarStore.ts      # Calendar events
 │   │   ├── networkStore.ts       # Connection state + toasts
-│   │   └── websocketStore.ts     # Legacy connection state
+│   │   └── websocketStore.ts     # WebSocket/transport connection state
 │   │
 │   └── types/
 │       └── index.ts              # TypeScript type definitions
@@ -135,6 +261,9 @@ echo-app/
 ├── assets/                       # Static assets (images, fonts)
 ├── docs/                         # Documentation (you are here)
 ├── scripts/                      # Build & utility scripts
+│
+├── plugins/                      # Expo config plugins
+│   └── withEchoAudioSession.js   # iOS speaker route native module for Live Voice
 │
 ├── app.json                      # Expo configuration
 ├── package.json                  # Dependencies
@@ -147,7 +276,7 @@ echo-app/
 
 ## Data Flow
 
-### Sending a Message
+### Legacy Sending a Message
 
 ```
 1. User taps avatar (voice) or types message
@@ -174,8 +303,8 @@ echo-app/
 6. If voice enabled: speak(response) via ElevenLabs
                     │
                     ▼
-7. Zustand persist middleware → SecureStore
-   (Messages persisted to encrypted Keychain)
+7. Zustand persist middleware → AsyncStorage
+   (Messages persisted locally after hydration-safe replay)
 ```
 
 ### Voice Input Flow
@@ -191,7 +320,7 @@ echo-app/
 3. User taps again to stop
                     │
                     ▼
-4. Audio sent to Whisper API for transcription
+4. Audio sent to authenticated /patients/media/transcribe; server calls Whisper
    Avatar state → "thinking"
                     │
                     ▼
@@ -204,6 +333,111 @@ echo-app/
                     ▼
 7. Playback complete
    Avatar state → "idle"
+```
+
+### Legacy Native Live Voice Flow (before Build 82)
+
+```
+1. User taps Live on the chat screen
+                    │
+                    ▼
+2. useRealtimeVoice prepares the Live Voice audio route,
+   requests microphone access, creates a WebRTC offer,
+   and opens the Realtime data channel
+                    │
+                    ▼
+3. App requests /patients/voice/realtime/token
+   Authorization: Bearer <gateway-token>
+                    │
+                    ▼
+4. Sync server returns an ephemeral OpenAI Realtime client secret
+                    │
+                    ▼
+5. App exchanges the SDP offer directly with OpenAI Realtime
+   (falls back to /patients/voice/realtime/session if direct exchange fails)
+                    │
+                    ▼
+6. App sets the remote description and streams two-way audio over WebRTC
+   Avatar state → "listening" while connected
+                    │
+                    ▼
+7. Realtime tool calls named ask_echo are sent to /patients/voice/bridge/ask;
+   Echo replies are returned as function_call_output and spoken by Realtime
+```
+
+### Draft and Final Dictation Backup Flow
+
+```
+1. User creates, edits, or finalizes a patient dictation
+                    │
+                    ▼
+2. patientDictationsStore updates local AsyncStorage state
+                    │
+                    ▼
+3. dictationSync.ts includes draft and final dictations
+   and strips transcript parts to sync-safe fields
+                    │
+                    ▼
+4. POST /patients/dictations/sync
+   (server also mirrors root-level /dictations/* routes)
+   Authorization: Bearer <gateway-token>
+                    │
+                    ▼
+5. Mac mini sync server merges dictations by ID and timestamp
+   into encrypted dictations.json, preserving omitted records and prior versions
+                    │
+                    ▼
+6. On failure, a durable AsyncStorage outbox preserves the latest payload
+   and retries up to 3 times in-process, then again on next app launch
+```
+
+### Clinical Restore and Preservation (Builds 74–75)
+
+`clinicalRestore.ts` waits for patient/report store hydration, fetches authenticated `/patients/list` and `/patients/dictations/list`, validates both datasets, then merges missing records. Root layout runs restore → backup → receipt refresh after successful bootstrap, on foreground, and every five minutes; Patients also offers manual restore.
+
+`server/clinical-preservation.js` merges uploads by ID, rejects older timestamped revisions, rebuilds call-day references, and writes encrypted files atomically with fsync and owner-only permissions. Prior versions live in `clinical-history/`. The key is selected by `CLINICAL_KEY_FILE` or `.clinical-storage-key` beside the data; missing keys fail closed for existing ciphertext. Empty phone uploads do not erase backups or queued report payloads.
+
+### Patient Media Processing (Build 76)
+
+`clinicalMedia.ts` sends gateway-authenticated requests to `/patients/media/scan` and `/patients/media/transcribe`, refreshing gateway authentication once after 401/403. `server/clinical-media.js` holds provider credentials and calls GPT-4o for structured patient-label extraction or Whisper for recorded speech. Provider authentication failures surface as service errors, not app-login failures.
+
+OCR accepts validated JPEG/PNG; the client normalizes supported iPhone images to bounded JPEG and removes temporary conversions. Transcription accepts one audio file up to 25 MiB. Upload limits, provider/client timeouts, no-store responses, and sanitized errors bound processing. Extracted fields require user review before saving. This does not replace the separate general chat-image or Live Voice flows.
+
+### Operative Report Email Flow
+
+1. Dictation screens call `sendReportWithReceipt()` with a stable report ID and a persisted per-version request ID.
+2. `GatewayService.sendOperativeReportEmail()` posts to `/patients/dictations/email` with gateway bearer authentication.
+3. The sync server records pending intent in `DATA_DIR/operative-email-receipts.json` before sending via `gog gmail send`. Confirmed Gmail message IDs become receipts; retries reuse existing receipts, while ambiguous failures block further sends for the report pending reconciliation.
+4. The app merges confirmed receipts into its AsyncStorage cache. Sending does not finalize a report. Explicit Resend/Email revision retains prior history.
+5. Receipt refresh runs on authenticated launch, foreground, and a five-minute interval. `GET /patients/email-receipts` fetches history; `POST /patients/email-receipts/link` binds exact historical content hashes to stable patient report IDs. Both also have root-level aliases, require authentication, and return `Cache-Control: no-store`.
+
+The server-owned ledger is independent of device-supplied dictation snapshots, with atomic replacement, fsync, and owner-only file permissions. It stores delivery metadata and normalized SHA-256 report hashes, not report bodies. Client refresh failures retain cached history. Sent means Gmail accepted the message, not recipient delivery or read confirmation.
+
+Historical receipts can be staged with `scripts/reconcile-operative-email-history.cjs` and imported idempotently at server startup. See [Build 73 email receipts](changes/build-73-email-receipts.md) for reconciliation and release details.
+
+### Meeting Reply Card Flow
+
+```
+1. OpenClaw posts a scheduling request to /notify/meeting-reply
+                    │
+                    ▼
+2. Sync server validates the requested window, duration, and workday bounds
+                    │
+                    ▼
+3. Server calls gog calendar events for Oliver's configured calendar account
+                    │
+                    ▼
+4. Busy events are converted into conflict blocks and clean slots are suggested
+                    │
+                    ▼
+5. Server builds a meeting_reply RichCard with reply text, slots, and conflicts
+                    │
+                    ▼
+6. Card is queued in pending-messages.json and optionally sent via Expo push
+                    │
+                    ▼
+7. Echo App hydrates the card from push/server sync and renders copy-ready UI
+   in both ChatMessage and the message detail sheet
 ```
 
 ---
@@ -237,7 +471,10 @@ echo-app/
 
 | Store | Storage | Encryption | Contents |
 |-------|---------|------------|----------|
-| `chatStore` | SecureStore | ✅ Keychain | Last 100 messages |
+| `chatStore` | AsyncStorage | ❌ | Last 100 messages |
+| `dictationStore` | AsyncStorage | ❌ | Learned templates, examples, custom procedures |
+| `patientDictationsStore` | AsyncStorage | ❌ local store, drafts/finals backed up over HTTPS | Per-patient draft/final dictations |
+| `emailReceiptsStore` | AsyncStorage | ❌ | Confirmed email receipt cache; server ledger is authoritative |
 | `patientsStore` | SecureStore | ✅ Keychain | Patient list, call days |
 | `settingsStore` | SecureStore | ✅ Keychain | API keys, preferences |
 
@@ -250,29 +487,41 @@ echo-app/
 
 ### Persistence Implementation
 
-All persisted stores use the same pattern:
+Echo App now uses two persistence tiers:
+
+- **AsyncStorage** for chat transcripts (`chatStore`) where payload size grows over time and secret storage is not required
+- **SecureStore** for secrets and sensitive local data (`settingsStore`, patient-related stores, auth token writes)
+
+`chatStore` also includes a one-time migration path from the legacy SecureStore-backed `echo-chat` key into AsyncStorage, plus a pre-hydration write lock so startup state cannot overwrite stored history before hydration completes.
 
 ```typescript
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 
-const secureStorage = {
-  getItem: async (name) => SecureStore.getItemAsync(name),
-  setItem: async (name, value) => SecureStore.setItemAsync(name, value),
-  removeItem: async (name) => SecureStore.deleteItemAsync(name),
-};
+const chatStorage = {
+  getItem: async (name) => {
+    const value = await AsyncStorage.getItem(name);
+    if (value) return value;
 
-export const useStore = create(
-  persist(
-    (set) => ({ /* state and actions */ }),
-    {
-      name: 'store-key',
-      storage: createJSONStorage(() => secureStorage),
-      partialize: (state) => ({ /* what to persist */ }),
+    const legacyValue = await SecureStore.getItemAsync(name);
+    if (legacyValue) {
+      await AsyncStorage.setItem(name, legacyValue);
+      await SecureStore.deleteItemAsync(name);
+      return legacyValue;
     }
-  )
-);
+
+    return null;
+  },
+  setItem: async (name, value) => {
+    await AsyncStorage.setItem(name, value);
+  },
+  removeItem: async (name) => {
+    await AsyncStorage.removeItem(name);
+    await SecureStore.deleteItemAsync(name);
+  },
+};
 ```
 
 ---
@@ -283,50 +532,93 @@ export const useStore = create(
 
 | Data Type | Protection |
 |-----------|------------|
-| Chat messages | SecureStore (Keychain encryption) |
+| Chat messages | Native OpenClaw canonical history for Build 82; legacy inbox and recoverable outbox in device AsyncStorage |
 | Patient PHI | SecureStore (Keychain encryption) |
 | API keys | SecureStore (Keychain encryption) |
 | Gateway token | SecureStore (Keychain encryption) |
+| Auth tokens | SecureStore with `AFTER_FIRST_UNLOCK` accessibility |
 
 ### Network Security
 
 - All traffic over HTTPS via Cloudflare Tunnel
 - Gateway URL: `https://echo.oppersmedical.com`
 - Bearer token authentication for API calls
-- **Baked-in Credentials** (Build 22): Gateway URL and token embedded in build
-  - Eliminates need for manual configuration on fresh install
-  - Settings still allow override for development
+- OpenAI Realtime WebRTC sessions prefer authenticated token endpoints (`/voice/realtime/token` and `/patients/voice/realtime/token`) that return ephemeral client secrets, keeping the OpenAI API key on the sync server while allowing direct SDP exchange with OpenAI
+- Authenticated SDP proxy endpoints (`/voice/realtime/session` and `/patients/voice/realtime/session`) remain available as fallback
+- Legacy Live Voice tool requests go through authenticated bridge endpoints (`/voice/bridge/ask` and `/patients/voice/bridge/ask`) rather than exposing OpenClaw gateway credentials beyond the app's existing bearer token
+- **Gateway Bootstrap (Build 55):** No secrets in binary — gateway config and API keys fetched from Supabase RPC after authentication
+  - `get_gateway_config()` RPC with SECURITY DEFINER + RLS
+  - Replaces baked-in obfuscated credentials (Level 1 bridge removed)
+  - Also bootstraps OpenAI and ElevenLabs keys if missing (Build 59)
+  - Gateway URL and token are refreshed on every authenticated app launch so rotated server credentials replace stale SecureStore values
+  - A gateway request rejected with 401/403 refreshes the server-owned credentials and retries once; repeated rejection is surfaced with the gateway's access-denial reason
+- **Credential Hardening (Build 54):** Keychain accessibility set to `AFTER_FIRST_UNLOCK`; obfuscated XOR fallback survives SecureStore loss
+- **WebSocket URL Derivation (Build 58):** WS URL derived from gateway URL (no hardcoded endpoints); uses `wss://` for TLS on hospital Wi-Fi
 
 ### PHI Considerations
 
-Patient data is stored **locally only** by design:
-- Never sent to OpenClaw Gateway
-- Never synced to cloud
-- Export feature produces local CSV only
-- Follows HIPAA data minimization principles
+- Patient lists remain local-first in SecureStore and are backed up to the Mac mini over authenticated HTTPS; patient-linked draft/final reports use local AsyncStorage and server backup.
+- Server clinical files and prior versions use AES-256-GCM. Host-local history is not offsite backup; the recovery key needs independent protected backup.
+- Patient-label OCR and recorded speech are processed by OpenAI through authenticated backend routes. These routes process uploads in memory and do not log media, transcripts, or provider response bodies.
+- Export produces local CSV. See [the proposed cloud migration](clinical-cloud-migration-plan.md); no managed-cloud clinical deployment is implied.
 
 ---
 
 ## Key Design Decisions
 
-### 1. HTTP API vs WebSocket
+### 1. HTTP API + Multi-Transport Push (WS → Polling Fallback)
 
-**Chose:** HTTP API (OpenAI-compatible `/v1/chat/completions`)
+**Chose:** HTTP API for chat completions, with adaptive push transport (WebSocket primary, long-polling fallback)
+
+**HTTP (`/v1/chat/completions`):**
+- OpenAI-compatible endpoint for sending messages
+- Works through Cloudflare Tunnel without issues
+- Simple request/response model
+
+**Transport Manager (`src/lib/transport.ts`) — Build 52:**
+- Orchestrates WebSocket (primary) and long-polling (fallback) transports
+- Auto-switch: 3 consecutive WS failures within 60s triggers polling mode
+- Auto-recovery: retries WS every 5 minutes while polling, upgrades seamlessly
+- Shared `messageHandler.ts` for consistent event processing across both transports
+- Exposes `transportMode` via `websocketStore` for UI feedback
+
+**WebSocket (`src/lib/websocket.ts`) — deprecated in favor of transport.ts:**
+- Real-time push for incoming messages, calendar events, patient data
+- Robust auto-reconnect with exponential backoff (2s → 30s cap, retries forever)
+- Ping/pong heartbeat every 25s with 10s pong timeout for zombie connection detection
+- AppState-aware: instant reconnect when app returns to foreground
+- Any incoming message resets pong timeout (proves connection alive)
+
+**Long-Polling (`src/lib/longpoll.ts`) — Build 52:**
+- Fallback for restrictive networks (hospital Wi-Fi that blocks WebSocket)
+- Tries `/poll` endpoint with 25s long-hang; degrades to `/ping` short-polling every 10s on 404
+- Same message handling pipeline as WebSocket via shared `messageHandler.ts`
+
+### Native WebRTC Voice
+
+**Chose:** Keep the original Whisper + ElevenLabs path for dictation-style voice, and add OpenAI Realtime over WebRTC for live two-way conversation.
 
 **Why:**
-- Simpler to implement and debug
-- Works through Cloudflare Tunnel without issues
-- Streaming not critical for our use case
-- Gateway already exposes this endpoint
+- Native WebRTC gives lower-latency voice interactions than record/transcribe/respond/playback
+- The app still avoids storing the OpenAI API key on-device by requesting ephemeral Realtime client secrets from the authenticated Echo sync server; the older server-side SDP proxy remains a fallback path
+- Realtime data-channel function calls named `ask_echo` bridge spoken requests to the OpenClaw gateway through the sync server, then return the result to Realtime as tool output
+- iOS speaker routing is handled by the `withEchoAudioSession` config plugin and `liveAudioRoute` service, which force the `.playAndRecord` voice chat category to speaker while Live Voice is active
+- The Live control is isolated behind `useRealtimeVoice`, leaving the existing dictation and TTS code paths intact
+- Expo SDK 54, `react-native-webrtc`, the WebRTC config plugin, the Echo audio-session config plugin, and React Native New Architecture are part of the native build requirements
 
 ### 2. SecureStore vs AsyncStorage
 
-**Chose:** SecureStore (expo-secure-store)
+**Chose:** Split storage by data type
 
-**Why:**
+**AsyncStorage for chat transcripts:**
+- Better fit for growing conversation history
+- Avoids SecureStore size brittleness for large transcript payloads
+- Keeps chat local without treating transcripts like secrets
+
+**SecureStore for secrets + PHI:**
 - Hardware-backed encryption on iOS (Keychain)
-- Required for storing PHI (patient data)
-- Survives app reinstalls (Keychain backup)
+- Required for storing patient data and credentials
+- Auth token writes use `AFTER_FIRST_UNLOCK` for more reliable cold-start restore
 
 ### 3. Zustand vs Redux/Context
 
@@ -338,15 +630,13 @@ Patient data is stored **locally only** by design:
 - Works well with React Native
 - Simple async actions
 
-### 4. Local Patient Storage
+### 4. Local-First Clinical Data with Additive Recovery
 
-**Chose:** On-device only, no cloud sync
+**Chose:** Retain local editing while backing up patient lists and draft/final reports to the Mac mini.
 
-**Why:**
-- PHI security requirements
-- Avoids HIPAA-compliant infrastructure complexity
-- Export to CSV for backup
-- Keychain backup provides some redundancy
+- Missing snapshot records are not deletions; server merges preserve records from other phones.
+- Restore fills missing records without replacing local edits, except that an unedited reconstructed patient placeholder can be enriched from a full record.
+- Device-local removal lists suppress restoration on that device, not on a new installation. This is additive recovery, not full multi-device conflict resolution.
 
 ### 5. Inverted FlatList for Chat
 
@@ -369,6 +659,12 @@ Patient data is stored **locally only** by design:
 - Failed connections handled gracefully with retry
 
 **History:** Builds 17-22 experimented with a "breathing crystal ball" splash screen during connection, but user testing showed it felt slower than necessary.
+
+### 7. Hydration-Gated Writes (Build 45)
+
+**Problem:** On cold start, Zustand initializes stores with default (null) state before hydration from SecureStore completes. Any store listener or side-effect that triggers a write during this window overwrites real credentials with nulls.
+
+**Solution:** A module-level `_hydrated` flag in `settingsStore` blocks all `secureStorage.setItem` calls until `onRehydrateStorage` fires. `_layout.tsx`, `ConnectionSplash`, and `useGateway` all coordinate around this flag to avoid acting on pre-hydration state.
 
 ---
 
@@ -432,8 +728,13 @@ The sync server (`server/index.js`) includes endpoints:
 - `POST /notify/meeting` — Send meeting reminder
 - `POST /notify/message` — Send message preview (also queues for sync)
 - `POST /notify/brief` — Send daily brief
+- `POST /notify/meeting-reply` — Generate a calendar-checked scheduling reply and queue a `meeting_reply` rich card
 - `GET /messages/pending` — Get queued messages for sync (Build 25)
-- `POST /messages/ack` — Acknowledge synced messages (Build 25)
+- `POST /messages/ack` — Acknowledge synced messages and record an `acked` event in `notification-deliveries.json` (Build 25 / Build 67 ledger)
+- `POST /dictations/sync` and `POST /patients/dictations/sync` — Merge draft/final operative reports into encrypted `dictations.json`
+- `POST /dictations/email` and `POST /patients/dictations/email` — Send operative report text through the configured Gmail account via `gog`
+- `GET /dictations/list` / `GET /dictations/:id` — Root-level draft/final dictation retrieval
+- `GET /patients/dictations/list` / `GET /patients/dictations/:id` — Cloudflare-tunneled draft/final dictation retrieval
 
 Uses `expo-server-sdk` for push delivery.
 
@@ -470,6 +771,8 @@ Push notifications can fail (device offline, iOS limits, etc). Build 25 adds ser
          │                         │ <───────────────────────│
          │                         │                         │
 ```
+
+The server keeps two local notification artifacts: `pending-messages.json` for delivery and `notification-deliveries.json` for receipt events such as app acknowledgements. Queued messages may include rich-card payloads; Build 67 uses this for `meeting_reply` cards, sends a compact card through APNs, and preserves the full card in the server queue so missed-notification sync can still render the full structured card.
 
 This ensures messages appear in chat even if:
 - Push notification is delayed or dropped

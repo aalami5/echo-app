@@ -11,7 +11,9 @@ const ExpoSecureStoreAdapter = {
     return await SecureStore.getItemAsync(key);
   },
   setItem: async (key: string, value: string) => {
-    await SecureStore.setItemAsync(key, value);
+    await SecureStore.setItemAsync(key, value, {
+      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK,
+    });
   },
   removeItem: async (key: string) => {
     await SecureStore.deleteItemAsync(key);

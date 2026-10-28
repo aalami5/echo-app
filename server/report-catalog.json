@@ -1,0 +1,442 @@
+[
+  {
+    "id": "evar",
+    "name": "EVAR",
+    "category": "aortic",
+    "steps": [
+      "Bilateral groin access",
+      "Guidewire and catheter placement",
+      "Aortography",
+      "Main body deployment",
+      "Contralateral limb cannulation and deployment",
+      "Completion angiography",
+      "Hemostasis and closure"
+    ]
+  },
+  {
+    "id": "tevar",
+    "name": "TEVAR",
+    "category": "aortic",
+    "steps": [
+      "Femoral artery access",
+      "Guidewire traversal of aortic arch",
+      "Aortography",
+      "Device deployment",
+      "Completion aortography",
+      "Femoral closure"
+    ]
+  },
+  {
+    "id": "open_aaa",
+    "name": "Open AAA Repair",
+    "category": "aortic",
+    "steps": [
+      "Midline laparotomy",
+      "Retroperitoneal dissection and aortic exposure",
+      "Proximal and distal control",
+      "Heparinization",
+      "Aortotomy and thrombus evacuation",
+      "Graft anastomosis",
+      "De-clamping and flow assessment",
+      "Hemostasis and closure"
+    ]
+  },
+  {
+    "id": "cea",
+    "name": "Carotid Endarterectomy (CEA)",
+    "category": "carotid",
+    "steps": [
+      "Oblique neck incision along SCM",
+      "Exposure of common, internal, and external carotid arteries",
+      "Systemic heparinization",
+      "Carotid cross-clamp",
+      "Arteriotomy",
+      "Endarterectomy with plaque removal",
+      "Patch angioplasty",
+      "Restoration of flow",
+      "Hemostasis and layered closure"
+    ]
+  },
+  {
+    "id": "cas",
+    "name": "Carotid Artery Stenting (CAS)",
+    "category": "carotid",
+    "steps": [
+      "Femoral artery access",
+      "Selective carotid catheterization",
+      "Baseline angiography",
+      "Embolic protection device deployment",
+      "Stent deployment",
+      "Completion angiography",
+      "Femoral closure"
+    ]
+  },
+  {
+    "id": "fem_pop_bypass",
+    "name": "Femoral-Popliteal Bypass",
+    "category": "peripheral_arterial",
+    "steps": [
+      "Groin incision — expose CFA, profunda, SFA",
+      "Distal incision — expose popliteal artery",
+      "Vein harvest or select prosthetic conduit",
+      "Tunnel creation",
+      "Heparinization",
+      "Distal anastomosis",
+      "Proximal anastomosis",
+      "Completion arteriography",
+      "Hemostasis and closure"
+    ]
+  },
+  {
+    "id": "lower_extremity_angioplasty",
+    "name": "Lower Extremity Angioplasty/Stenting",
+    "category": "peripheral_arterial",
+    "steps": [
+      "Arterial access",
+      "Diagnostic angiography",
+      "Wire traversal of lesion",
+      "Balloon angioplasty ± atherectomy",
+      "Stent placement if needed",
+      "Completion angiography",
+      "Hemostasis and closure"
+    ]
+  },
+  {
+    "id": "thrombectomy_embolectomy",
+    "name": "Thrombectomy / Embolectomy",
+    "category": "peripheral_arterial",
+    "steps": [
+      "Expose target artery",
+      "Systemic heparinization",
+      "Arteriotomy",
+      "Fogarty balloon catheter thrombectomy",
+      "Back-bleeding and flushing",
+      "Completion arteriography",
+      "Arteriotomy closure",
+      "Hemostasis and wound closure"
+    ]
+  },
+  {
+    "id": "fem_fem_bypass",
+    "name": "Femoral-Femoral Bypass",
+    "category": "peripheral_arterial",
+    "steps": [
+      "Bilateral groin incisions",
+      "Create subcutaneous suprapubic tunnel",
+      "Heparinization",
+      "Donor side anastomosis",
+      "Graft tunneling",
+      "Recipient side anastomosis",
+      "Restore flow, check pulses",
+      "Hemostasis and closure"
+    ]
+  },
+  {
+    "id": "ivc_filter",
+    "name": "IVC Filter Placement/Retrieval",
+    "category": "venous",
+    "steps": [
+      "Jugular or femoral venous access",
+      "IVC venography",
+      "Filter deployment at infrarenal IVC",
+      "Completion venography",
+      "Access site closure"
+    ]
+  },
+  {
+    "id": "av_fistula",
+    "name": "AV Fistula Creation",
+    "category": "dialysis_access",
+    "steps": [
+      "Arm incision — expose target artery and vein",
+      "Vein mobilization",
+      "Heparinization",
+      "Arteriotomy",
+      "Anastomosis",
+      "Assess thrill and bruit",
+      "Hemostasis and closure"
+    ]
+  },
+  {
+    "id": "av_graft",
+    "name": "AV Graft Placement",
+    "category": "dialysis_access",
+    "steps": [
+      "Arm incision(s)",
+      "Tunnel creation for graft",
+      "Heparinization",
+      "Venous anastomosis",
+      "Arterial anastomosis",
+      "Assess thrill/bruit",
+      "Hemostasis and closure"
+    ]
+  },
+  {
+    "id": "dialysis_access_thrombectomy",
+    "name": "Dialysis Access Thrombectomy",
+    "category": "dialysis_access",
+    "steps": [
+      "Incision over fistula/graft",
+      "Thrombectomy with Fogarty catheter",
+      "Assess inflow and outflow",
+      "Revision if needed",
+      "Completion fistulography",
+      "Closure"
+    ]
+  },
+  {
+    "id": "amputation_bka",
+    "name": "Below-Knee Amputation (BKA)",
+    "category": "other",
+    "steps": [
+      "Skin incision (fish-mouth or posterior flap)",
+      "Anterior muscle group division",
+      "Tibial and fibular osteotomy",
+      "Posterior muscle group division",
+      "Vessel ligation",
+      "Nerve transection",
+      "Bone smoothing",
+      "Myodesis/myoplasty and flap closure",
+      "Drain placement and dressing"
+    ]
+  },
+  {
+    "id": "amputation_aka",
+    "name": "Above-Knee Amputation (AKA)",
+    "category": "other",
+    "steps": [
+      "Skin incision at distal thigh",
+      "Anterior muscle group division",
+      "Femoral osteotomy",
+      "SFA ligation",
+      "Sciatic nerve division",
+      "Posterior flap creation",
+      "Bone smoothing",
+      "Myodesis and flap closure",
+      "Drain placement and dressing"
+    ]
+  },
+  {
+    "id": "wound_debridement",
+    "name": "Wound Debridement",
+    "category": "other",
+    "steps": [
+      "Wound assessment and measurement",
+      "Sharp debridement of necrotic tissue",
+      "Irrigation",
+      "Wound culture if indicated",
+      "Dressing application"
+    ]
+  },
+  {
+    "id": "sample-aortic_templates-16",
+    "name": "EVAR (Endovascular Aneurysm Repair)",
+    "canonicalName": "EVAR",
+    "category": "aortic",
+    "steps": [
+      "Bilateral groin access",
+      "Guidewire and catheter placement",
+      "Aortography",
+      "Main body deployment",
+      "Contralateral limb cannulation and deployment",
+      "Completion angiography",
+      "Hemostasis and closure"
+    ]
+  },
+  {
+    "id": "sample-aortic_templates-17",
+    "name": "TEVAR (Thoracic Endovascular Aortic Repair)",
+    "canonicalName": "TEVAR",
+    "category": "aortic",
+    "steps": [
+      "Femoral artery access",
+      "Guidewire traversal of aortic arch",
+      "Aortography",
+      "Device deployment",
+      "Completion aortography",
+      "Femoral closure"
+    ]
+  },
+  {
+    "id": "sample-peripheral_templates-18",
+    "name": "Common Femoral Artery Endarterectomy with Iliac Intervention",
+    "canonicalName": "Common Femoral Artery Endarterectomy with Iliac Intervention",
+    "category": "peripheral",
+    "steps": []
+  },
+  {
+    "id": "sample-peripheral_templates-19",
+    "name": "Lower Extremity Angioplasty / Stenting",
+    "canonicalName": "Lower Extremity Angioplasty / Stenting",
+    "category": "peripheral",
+    "steps": []
+  },
+  {
+    "id": "sample-peripheral_templates-20",
+    "name": "Radial Artery Pseudoaneurysm Repair",
+    "canonicalName": "Radial Artery Pseudoaneurysm Repair",
+    "category": "peripheral",
+    "steps": []
+  },
+  {
+    "id": "sample-peripheral_templates-21",
+    "name": "Combined Peripheral Procedures",
+    "canonicalName": "Combined Peripheral Procedures",
+    "category": "peripheral",
+    "steps": []
+  },
+  {
+    "id": "sample-venous_templates-22",
+    "name": "Varicose Vein Treatment - GSV Closure + Microphlebectomies",
+    "canonicalName": "Varicose Vein Treatment - GSV Closure + Microphlebectomies",
+    "category": "venous",
+    "steps": []
+  },
+  {
+    "id": "sample-venous_templates-23",
+    "name": "Pulmonary Embolism Thrombectomy",
+    "canonicalName": "Pulmonary Embolism Thrombectomy",
+    "category": "venous",
+    "steps": []
+  },
+  {
+    "id": "sample-venous_templates-24",
+    "name": "PICC Line Placement",
+    "canonicalName": "PICC Line Placement",
+    "category": "venous",
+    "steps": []
+  },
+  {
+    "id": "sample-venous_templates-25",
+    "name": "IVC Filter Placement",
+    "canonicalName": "IVC Filter Placement",
+    "category": "venous",
+    "steps": []
+  },
+  {
+    "id": "sample-venous_templates-26",
+    "name": "DVT Treatment with IVC Filter and Thrombolysis",
+    "canonicalName": "DVT Treatment with IVC Filter and Thrombolysis",
+    "category": "venous",
+    "steps": []
+  },
+  {
+    "id": "sample-venous_templates-27",
+    "name": "Small Saphenous Vein Treatment",
+    "canonicalName": "Small Saphenous Vein Treatment",
+    "category": "venous",
+    "steps": []
+  },
+  {
+    "id": "sample-venous_templates-28",
+    "name": "Deep Vein Thrombosis - Suction Thrombectomy",
+    "canonicalName": "Deep Vein Thrombosis - Suction Thrombectomy",
+    "category": "venous",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-29",
+    "name": "Tunneled Dialysis Catheter Placement",
+    "canonicalName": "Tunneled Dialysis Catheter Placement",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-30",
+    "name": "AV Fistula Aneurysm Excision and Revision",
+    "canonicalName": "AV Fistula Aneurysm Excision and Revision",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-31",
+    "name": "Infected AV Fistula Ligation and Exploration",
+    "canonicalName": "Infected AV Fistula Ligation and Exploration",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-32",
+    "name": "AV Graft Declotting / Thrombectomy",
+    "canonicalName": "AV Graft Declotting / Thrombectomy",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-33",
+    "name": "Temporary to Tunneled Dialysis Catheter Exchange",
+    "canonicalName": "Temporary to Tunneled Dialysis Catheter Exchange",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-34",
+    "name": "Temporary Dialysis Catheter Placement",
+    "canonicalName": "Temporary Dialysis Catheter Placement",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-35",
+    "name": "Tunneled Dialysis Catheter Removal",
+    "canonicalName": "Tunneled Dialysis Catheter Removal",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-36",
+    "name": "Femoral Temporary Dialysis Catheter Placement",
+    "canonicalName": "Femoral Temporary Dialysis Catheter Placement",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-37",
+    "name": "Femoral Tunneled Dialysis Catheter Placement",
+    "canonicalName": "Femoral Tunneled Dialysis Catheter Placement",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-38",
+    "name": "Right IJ Tunneled Dialysis Catheter Placement",
+    "canonicalName": "Right IJ Tunneled Dialysis Catheter Placement",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-39",
+    "name": "Left IJ Tunneled Dialysis Catheter Placement",
+    "canonicalName": "Left IJ Tunneled Dialysis Catheter Placement",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-dialysis_access_templates-40",
+    "name": "Dialysis Access Thrombectomy / Revision",
+    "canonicalName": "Dialysis Access Thrombectomy / Revision",
+    "category": "dialysis_access",
+    "steps": []
+  },
+  {
+    "id": "sample-other_templates-41",
+    "name": "Central Line Placement",
+    "canonicalName": "Central Line Placement",
+    "category": "other",
+    "steps": []
+  },
+  {
+    "id": "sample-other_templates-42",
+    "name": "Port-A-Cath Placement",
+    "canonicalName": "Port-A-Cath Placement",
+    "category": "other",
+    "steps": []
+  },
+  {
+    "id": "sample-other_templates-43",
+    "name": "Temporal Artery Biopsy",
+    "canonicalName": "Temporal Artery Biopsy",
+    "category": "other",
+    "steps": []
+  }
+]

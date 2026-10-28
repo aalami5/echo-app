@@ -1,3 +1,4 @@
+import type { EmailReceipt } from '../utils/emailReceiptStatus';
 /**
  * OpenClaw Gateway API Service
  * 
@@ -10,6 +11,7 @@
 
 import { AppState } from 'react-native';
 import { getCachedDevicePushToken } from './notifications';
+import { refreshGatewayConfig } from './gatewayBootstrap';
 
 // Request timeout in milliseconds (3 minutes - allows long responses)
 const REQUEST_TIMEOUT_MS = 180000;
@@ -91,6 +93,61 @@ interface OpenResponsesResponse {
   };
 }
 
+function parseGatewayError(errorText: string): string | null {
+  const trimmed = errorText.trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  try {
+    const errorJson = JSON.parse(trimmed);
+    const errorValue = errorJson.error;
+    const message =
+      errorValue?.message ||
+      errorJson.message ||
+      (typeof errorValue === 'string' ? errorValue : null);
+    return typeof message === 'string' && message.trim() ? message.trim() : null;
+  } catch {
+    return trimmed;
+  }
+}
+
+function getGatewayErrorMessage(status: number, errorText: string): string {
+  const serverMessage = parseGatewayError(errorText);
+
+  if (status === 401) {
+    return serverMessage || 'Gateway authentication failed. Echo refreshed its connection; please try again.';
+  }
+  if (status === 403) {
+    return serverMessage
+      ? `Gateway access denied: ${serverMessage}`
+      : 'Gateway access denied. Please try again or contact support.';
+  }
+  if (status === 502 || status === 503 || status === 504) {
+    return 'Gateway temporarily unavailable. Please try again.';
+  }
+  if (status === 524) {
+    return 'Gateway timed out while waiting for the server. The request may still finish in the background.';
+  }
+
+  if (serverMessage) {
+    return serverMessage;
+  }
+
+  return `Gateway error: ${status}`;
+}
+
+class GatewayHttpError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly responseBody: string
+  ) {
+    super(getGatewayErrorMessage(status, responseBody));
+    this.name = 'GatewayHttpError';
+  }
+}
+
 /**
  * Create a fetch request with timeout using AbortController
  * Pass timeoutMs = 0 to disable timeout (no abort).
@@ -153,8 +210,6 @@ export class GatewayService {
     imageMimeType?: string,
     noTimeout?: boolean
   ): Promise<string> {
-    const { baseUrl: rawUrl, token, agentId, userId } = this.config;
-    const baseUrl = rawUrl.trim().replace(/\/+$/, ''); // Normalize URL
     const devicePushToken = await getCachedDevicePushToken();
     const appState = AppState.currentState;
     const timeoutMs = noTimeout ? 0 : REQUEST_TIMEOUT_MS;
@@ -162,7 +217,52 @@ export class GatewayService {
     console.log('[Gateway] Sending message:', content.slice(0, 100), noTimeout ? '(no timeout)' : '');
     console.log('[Gateway] Has image:', !!imageBase64, 'type:', imageMimeType || 'none');
     
-    // Validate config before sending
+    const send = async (): Promise<string> => {
+      const { baseUrl: rawUrl, token, agentId, userId } = this.config;
+      const baseUrl = rawUrl.trim().replace(/\/+$/, '');
+
+      if (!baseUrl) throw new Error('Gateway URL not configured');
+      if (!token) throw new Error('Gateway token not configured');
+
+      if (imageBase64 && imageMimeType) {
+        return this.sendMessageWithImage(baseUrl, token, agentId!, userId!, content, imageBase64, imageMimeType, devicePushToken, appState, timeoutMs);
+      }
+
+      return this.sendMessageTextOnly(baseUrl, token, agentId!, userId!, content, history, devicePushToken, appState, timeoutMs);
+    };
+
+    try {
+      return await send();
+    } catch (error) {
+      if (!(error instanceof GatewayHttpError) || (error.status !== 401 && error.status !== 403)) {
+        throw error;
+      }
+
+      console.warn(`[Gateway] Authentication rejected (${error.status}); refreshing gateway config once`);
+      const refreshed = await refreshGatewayConfig();
+      if (!refreshed) {
+        throw error;
+      }
+
+      this.updateConfig({ baseUrl: refreshed.url, token: refreshed.token });
+      return send();
+    }
+  }
+
+  /**
+   * Send an operative report through the Echo sync server's direct Gmail endpoint.
+   * This avoids using a long-running agent chat request for a deterministic send.
+   */
+  async sendOperativeReportEmail(report: string, subject?: string, delivery?: { reportId: string; requestId: string; resend: boolean }): Promise<{
+    receipt?: EmailReceipt;
+    success: boolean;
+    messageId?: string | null;
+    recipients?: string[];
+    subject?: string;
+  }> {
+    const { baseUrl: rawUrl, token } = this.config;
+    const baseUrl = rawUrl.trim().replace(/\/+$/, '');
+
     if (!baseUrl) {
       throw new Error('Gateway URL not configured');
     }
@@ -170,13 +270,26 @@ export class GatewayService {
       throw new Error('Gateway token not configured');
     }
 
-    // Use OpenResponses API for images (it properly supports them)
-    if (imageBase64 && imageMimeType) {
-      return this.sendMessageWithImage(baseUrl, token, agentId!, userId!, content, imageBase64, imageMimeType, devicePushToken, appState, timeoutMs);
+    const response = await fetchWithTimeout(
+      `${baseUrl}/patients/dictations/email`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ report, subject, ...delivery }),
+      },
+      60000
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('[Gateway] Operative report email error:', response.status, errorText);
+      throw new GatewayHttpError(response.status, errorText);
     }
-    
-    // Use OpenAI Chat Completions API for text-only (simpler response format)
-    return this.sendMessageTextOnly(baseUrl, token, agentId!, userId!, content, history, devicePushToken, appState, timeoutMs);
+
+    return response.json();
   }
 
   /**
@@ -226,6 +339,7 @@ export class GatewayService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'x-openclaw-scopes': 'operator.write',
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
           'x-openclaw-agent-id': agentId,
           'X-App-State': appState || 'unknown',
@@ -244,24 +358,7 @@ export class GatewayService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Gateway] OpenResponses API error:', response.status, errorText);
-      
-      if (response.status === 401) {
-        throw new Error('Invalid gateway token. Please check your settings.');
-      } else if (response.status === 403) {
-        throw new Error('Access denied. Token may be expired.');
-      } else if (response.status === 400) {
-        // Parse error for more details
-        try {
-          const errorJson = JSON.parse(errorText);
-          throw new Error(errorJson.error?.message || `Bad request: ${errorText}`);
-        } catch {
-          throw new Error(`Bad request: ${errorText}`);
-        }
-      } else if (response.status === 502 || response.status === 503 || response.status === 504) {
-        throw new Error('Gateway temporarily unavailable. Please try again.');
-      } else {
-        throw new Error(`Gateway error: ${response.status}`);
-      }
+      throw new GatewayHttpError(response.status, errorText);
     }
 
     const result: OpenResponsesResponse = await response.json();
@@ -323,6 +420,7 @@ export class GatewayService {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
+          'x-openclaw-scopes': 'operator.write',
           'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
           'X-App-State': appState || 'unknown',
           ...(devicePushToken ? { 'X-APNS-Token': devicePushToken } : {}),
@@ -340,16 +438,7 @@ export class GatewayService {
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[Gateway] Chat Completions API error:', response.status, errorText);
-      
-      if (response.status === 401) {
-        throw new Error('Invalid gateway token. Please check your settings.');
-      } else if (response.status === 403) {
-        throw new Error('Access denied. Token may be expired.');
-      } else if (response.status === 502 || response.status === 503 || response.status === 504) {
-        throw new Error('Gateway temporarily unavailable. Please try again.');
-      } else {
-        throw new Error(`Gateway error: ${response.status}`);
-      }
+      throw new GatewayHttpError(response.status, errorText);
     }
 
     const result: ChatCompletionResponse = await response.json();

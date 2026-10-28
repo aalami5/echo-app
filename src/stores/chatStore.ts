@@ -1,18 +1,20 @@
 /**
  * Chat Store
- * 
+ *
  * Stores conversation history with persistence.
- * Uses expo-secure-store for encrypted local storage.
- * Messages survive app crashes and restarts.
+ * Uses AsyncStorage for durable local history storage.
+ * Secrets belong in SecureStore; chat transcripts do not.
  */
 
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import type { ChatState, Message, AvatarState } from '../types';
 
 // Maximum messages to persist (prevent storage bloat)
 const MAX_PERSISTED_MESSAGES = 100;
+const CHAT_STORAGE_KEY = 'echo-chat';
 
 interface ChatStore extends ChatState {
   addMessage: (message: Message) => void;
@@ -20,30 +22,49 @@ interface ChatStore extends ChatState {
   setAvatarState: (state: AvatarState) => void;
   setConnected: (connected: boolean) => void;
   clearMessages: () => void;
+  hasHydrated: boolean;
 }
 
-// Custom storage adapter using SecureStore for persistence
-const secureStorage = {
+// AsyncStorage is the primary store for chat history.
+// We still read the old SecureStore key once so existing users keep their history.
+const chatStorage = {
   getItem: async (name: string): Promise<string | null> => {
     try {
-      return await SecureStore.getItemAsync(name);
+      const value = await AsyncStorage.getItem(name);
+      if (value) return value;
+
+      const legacyValue = await SecureStore.getItemAsync(name);
+      if (legacyValue) {
+        console.log('[Chat] Migrating legacy chat history from SecureStore to AsyncStorage');
+        await AsyncStorage.setItem(name, legacyValue);
+        await SecureStore.deleteItemAsync(name).catch(() => {});
+        return legacyValue;
+      }
+
+      return null;
     } catch (e) {
-      console.log('[Chat] SecureStore get error:', e);
+      console.log('[Chat] Storage get error:', e);
       return null;
     }
   },
   setItem: async (name: string, value: string): Promise<void> => {
     try {
-      await SecureStore.setItemAsync(name, value);
+      if (!_hydrated) {
+        console.warn('[Chat] Blocked chat write before hydration complete');
+        return;
+      }
+
+      await AsyncStorage.setItem(name, value);
     } catch (e) {
-      console.log('[Chat] SecureStore set error:', e);
+      console.log('[Chat] Storage set error:', e);
     }
   },
   removeItem: async (name: string): Promise<void> => {
     try {
-      await SecureStore.deleteItemAsync(name);
+      await AsyncStorage.removeItem(name);
+      await SecureStore.deleteItemAsync(name).catch(() => {});
     } catch (e) {
-      console.log('[Chat] SecureStore remove error:', e);
+      console.log('[Chat] Storage remove error:', e);
     }
   },
 };
@@ -58,10 +79,11 @@ export const useChatStore = create<ChatStore>()(
       messages: [],
       isConnected: false,
       avatarState: 'idle',
+      hasHydrated: false,
 
       addMessage: (message) => {
         if (!_hydrated) {
-          // Store is still hydrating from SecureStore — queue the message
+          // Store is still hydrating from local storage — queue the message
           // so it doesn't get overwritten when hydration completes
           console.log('[Chat] Store not hydrated yet, queuing message:', message.id);
           _preHydrationQueue.push(message);
@@ -91,14 +113,17 @@ export const useChatStore = create<ChatStore>()(
       clearMessages: () => set({ messages: [] }),
     }),
     {
-      name: 'echo-chat',
-      storage: createJSONStorage(() => secureStorage),
+      name: CHAT_STORAGE_KEY,
+      storage: createJSONStorage(() => chatStorage),
       // Only persist messages, not ephemeral connection state
       partialize: (state) => ({
         messages: state.messages,
       }),
       onRehydrateStorage: () => (state) => {
         _hydrated = true;
+        useChatStore.setState({ hasHydrated: true });
+        console.log(`[Chat] Hydration complete with ${state?.messages?.length || 0} stored messages`);
+
         // Flush any messages that arrived before hydration
         if (_preHydrationQueue.length > 0 && state) {
           console.log(`[Chat] Hydration complete, flushing ${_preHydrationQueue.length} queued messages`);

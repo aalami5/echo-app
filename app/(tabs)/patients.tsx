@@ -1,3 +1,6 @@
+import { restoreClinicalData, useClinicalRestoreStatus } from '../../src/services/clinicalRestore';
+import { useEmailReceiptsStore } from '../../src/stores/emailReceiptsStore';
+import { emailReceiptStatus } from '../../src/utils/emailReceiptStatus';
 /**
  * Patients Tab
  * 
@@ -28,6 +31,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
+import { useRouter, type Href } from 'expo-router';
 import { colors, spacing, borderRadius, typography, shadows } from '../../src/constants/theme';
 import { 
   usePatientsStore, 
@@ -36,6 +40,8 @@ import {
   Patient,
   CallDay 
 } from '../../src/stores/patientsStore';
+import { usePatientDictationsStore } from '../../src/stores/patientDictationsStore';
+import { PROCEDURE_TEMPLATES } from '../../src/data/vascularProcedures';
 import { usePatientVoiceInput } from '../../src/hooks/usePatientVoiceInput';
 import { usePatientScan, ScannedPatientData } from '../../src/hooks/usePatientScan';
 
@@ -43,6 +49,7 @@ import { usePatientScan, ScannedPatientData } from '../../src/hooks/usePatientSc
 const HOSPITAL_ORDER: Hospital[] = ['SEQ', 'ECH', 'SMCMC', 'Mills', 'OTHER'];
 
 export default function PatientsScreen() {
+  const router = useRouter();
   const {
     patients,
     callDays,
@@ -64,6 +71,13 @@ export default function PatientsScreen() {
     getCommonComplaints,
     reorganizePatientsByTimeSeen,
   } = usePatientsStore();
+
+  const {
+    dictations,
+    getDictationsForPatient,
+    createDictation,
+    updateDictation,
+  } = usePatientDictationsStore();
   
   // Voice input for chief complaint
   const {
@@ -89,6 +103,13 @@ export default function PatientsScreen() {
     clearScan,
   } = usePatientScan();
   
+  // Scanning closes the picker dialog before the request; show failures here,
+  // not only inside the now-hidden scan dialog.
+  useEffect(() => {
+    if (scanError) Alert.alert('Could not scan patient', scanError);
+  }, [scanError]);
+
+  const restoreStatus = useClinicalRestoreStatus();
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingPatient, setEditingPatient] = useState<Patient | null>(null);
@@ -120,10 +141,7 @@ export default function PatientsScreen() {
   // Animation refs
   const searchBarHeight = useRef(new Animated.Value(0)).current;
   
-  // Reorganize patients by their timeSeen on mount
-  useEffect(() => {
-    reorganizePatientsByTimeSeen();
-  }, []);
+  // Date groups are authoritative; never rewrite/upload an empty installation on mount.
   
   // Show pending patient modal when new patient arrives from WhatsApp
   useEffect(() => {
@@ -161,8 +179,17 @@ export default function PatientsScreen() {
       return;
     }
     
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    addPatient(newPatient);
+    try {
+      const patientId = addPatient(newPatient);
+      const saved = usePatientsStore.getState().patients[patientId];
+      setExpandedCallDays(prev => new Set([...prev, saved.callDayId]));
+      setSearchQuery('');
+      setIsSearching(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    } catch {
+      Alert.alert('Patient not saved', 'Your form is still here. Please try again; if the problem persists, contact support.');
+      return;
+    }
     
     // Reset form
     setNewPatient({
@@ -387,23 +414,122 @@ export default function PatientsScreen() {
     const newId = createCallDay();
     setExpandedCallDays(prev => new Set([...prev, newId]));
   }, [createCallDay]);
+
+  const getSuggestedProcedures = useCallback((chiefComplaint: string) => {
+    const text = chiefComplaint.toLowerCase();
+    const categories = new Set<string>();
+    if (/\b(aaa|aneurysm|aortic)\b/.test(text)) categories.add('aortic');
+    if (/\bcarotid\b/.test(text)) categories.add('carotid');
+    if (/\b(pad|claudication|ischemia)\b/.test(text)) categories.add('peripheral_arterial');
+    if (/\b(dialysis|fistula|graft)\b/.test(text)) categories.add('dialysis_access');
+    if (/\b(dvt|varicose)\b/.test(text)) categories.add('venous');
+    if (categories.size === 0) return [];
+    return PROCEDURE_TEMPLATES
+      .filter((proc) => categories.has(proc.category))
+      .map((proc) => proc.name);
+  }, []);
+
+  const handleStartNewDictation = useCallback((patient: Patient) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const dictationId = createDictation(patient.id);
+    const suggested = patient.chiefComplaint ? getSuggestedProcedures(patient.chiefComplaint) : [];
+    if (suggested.length > 0) {
+      updateDictation(dictationId, { selectedProcedures: suggested });
+    }
+    router.push(({
+      pathname: '/patient-dictation',
+      params: { patientId: patient.id, dictationId, mode: 'new' },
+    }) as unknown as Href);
+  }, [createDictation, getSuggestedProcedures, router, updateDictation]);
+
+  const handleContinueDictation = useCallback((patientId: string, dictationId: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push(({
+      pathname: '/patient-dictation',
+      params: { patientId, dictationId, mode: 'continue' },
+    }) as unknown as Href);
+  }, [router]);
+
+  const handleViewReport = useCallback((patientId: string, dictationId?: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    router.push(({
+      pathname: '/patient-dictation',
+      params: { patientId, dictationId: dictationId || undefined, mode: 'view' },
+    }) as unknown as Href);
+  }, [router]);
   
   // Render patient row - tap to edit, long press to delete
-  const renderPatient = useCallback((patient: Patient, showHospital = false) => (
-    <TouchableOpacity
-      key={patient.id}
-      style={styles.patientRow}
-      onPress={() => handleEditPatient(patient)}
-      onLongPress={() => handleDeletePatient(patient)}
-      delayLongPress={500}
-    >
-      <View style={styles.patientInfo}>
-        <View style={styles.patientNameRow}>
-          <Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text>
+  const emailReceipts = useEmailReceiptsStore((s) => s.receipts);
+  const renderPatient = useCallback((patient: Patient, showHospital = false) => {
+    const patientDictations = getDictationsForPatient(patient.id);
+    const drafts = patientDictations.filter((d) => d.status === 'draft');
+    const finals = patientDictations.filter((d) => d.status === 'final');
+    const latestDraft = drafts[0];
+    const latestFinal = finals[0];
+    const hasDraft = drafts.length > 0;
+    const finalCount = finals.length;
+    const reports = patientDictations.filter((d) => d.generatedReport);
+    const states = reports.map((d) => emailReceiptStatus(emailReceipts, d.id, d.generatedReport, d.emailTrackingEnabled));
+    const sentCount = states.filter((s) => s.sent).length;
+    const emailLabel = reports.length === 1 ? states[0].label : `${sentCount} of ${reports.length} emailed${states.some((s) => s.updated) ? ' · Updates not emailed' : ''}${states.some((s) => !s.sent && s.label === 'Send history unknown') ? ' · Some history unknown' : ''}`;
+
+    let actionLabel = 'Op Report';
+    let actionIcon: React.ComponentProps<typeof Ionicons>['name'] = 'mic';
+    let actionStyle = styles.opReportButton;
+    let actionTextStyle = styles.opReportButtonText;
+    let actionIconColor = colors.textInverse;
+    let onAction = () => handleStartNewDictation(patient);
+
+    if (hasDraft && latestDraft) {
+      actionLabel = 'Continue Report';
+      actionIcon = 'time-outline';
+      actionStyle = styles.opReportButtonDraft;
+      actionTextStyle = styles.opReportButtonTextDraft;
+      onAction = () => handleContinueDictation(patient.id, latestDraft.id);
+    } else if (finalCount > 0 && latestFinal) {
+      actionLabel = 'View Report';
+      actionIcon = 'document-text-outline';
+      actionStyle = styles.opReportButtonView;
+      actionTextStyle = styles.opReportButtonTextView;
+      actionIconColor = colors.primary;
+      onAction = () => {
+        if (finalCount === 1) handleViewReport(patient.id, latestFinal.id);
+        else handleViewReport(patient.id);
+      };
+    }
+
+    return (
+      <TouchableOpacity
+        key={patient.id}
+        style={styles.patientRow}
+        onPress={() => handleEditPatient(patient)}
+        onLongPress={() => handleDeletePatient(patient)}
+        delayLongPress={500}
+      >
+        {/* Name on its own full-width line */}
+        <Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text>
+        {/* Badges + action row below name */}
+        <View style={styles.patientBadgeRow}>
           {patient.room && (
             <Text style={styles.patientRoom}>{patient.room}</Text>
           )}
+          <TouchableOpacity style={actionStyle} onPress={onAction}>
+            {hasDraft && <View style={styles.draftDot} />}
+            <Ionicons name={actionIcon} size={14} color={actionIconColor} />
+            <Text style={actionTextStyle}>{actionLabel}</Text>
+            {finalCount > 1 && !hasDraft && (
+              <View style={styles.countBadge}>
+                <Text style={styles.countBadgeText}>{finalCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <View style={{ flex: 1 }} />
+          <View style={styles.patientEditIcon}>
+            <Ionicons name="pencil" size={16} color={colors.textTertiary} />
+          </View>
         </View>
+        {reports.length > 0 && <Text style={{ color: sentCount ? '#4ade80' : colors.textTertiary, fontSize: 12, marginVertical: 6 }}>{emailLabel}</Text>}
+        {/* Details below badges */}
         <View style={styles.patientDetails}>
           <Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>
           {patient.dob && <Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}
@@ -414,12 +540,9 @@ export default function PatientsScreen() {
         {showHospital && (
           <Text style={styles.patientHospital}>{HOSPITAL_NAMES[patient.hospital]}</Text>
         )}
-      </View>
-      <View style={styles.patientEditIcon}>
-        <Ionicons name="pencil" size={16} color={colors.textTertiary} />
-      </View>
-    </TouchableOpacity>
-  ), [handleEditPatient, handleDeletePatient]);
+      </TouchableOpacity>
+    );
+  }, [dictations, emailReceipts, getDictationsForPatient, handleContinueDictation, handleDeletePatient, handleEditPatient, handleStartNewDictation, handleViewReport]);
   
   // Render hospital section
   const renderHospitalSection = useCallback((callDayId: string, hospital: Hospital) => {
@@ -578,6 +701,19 @@ export default function PatientsScreen() {
         </View>
       </Animated.View>
       
+      <View style={{paddingHorizontal:spacing.lg,paddingBottom:spacing.sm}}>
+        <TouchableOpacity accessibilityRole="button" disabled={restoreStatus.busy}
+          onPress={() => restoreClinicalData().catch(() => {})}>
+          <Text style={{color:colors.primary}}>{restoreStatus.busy ? 'Restoring saved cases…' : 'Restore saved cases'}</Text>
+        </TouchableOpacity>
+        {!!restoreStatus.error && <Text style={{color:colors.warning,marginTop:6}}>{restoreStatus.error}</Text>}
+        {!!restoreStatus.lastRestored && !restoreStatus.error && <Text style={{color:colors.textSecondary,marginTop:6}}>Saved cases checked. Existing local work is preserved.</Text>}
+      </View>
+      {Object.values(patients).some(p => p.recoveredFromReport) && (
+        <Text style={{color:colors.warning,paddingHorizontal:spacing.lg,paddingBottom:spacing.sm}}>
+          Some entries were recovered from saved report headers. Hospital, room, and original visit details may be missing; reports are unchanged.
+        </Text>
+      )}
       {/* Content */}
       <ScrollView 
         style={styles.content}
@@ -604,8 +740,11 @@ export default function PatientsScreen() {
                 <Ionicons name="people-outline" size={48} color={colors.textTertiary} />
                 <Text style={styles.emptyStateTitle}>No patients yet</Text>
                 <Text style={styles.emptyStateSubtitle}>
-                  Tap + to add your first patient
+                  New phone? Restore saved cases above, or add a patient below.
                 </Text>
+                <TouchableOpacity accessibilityRole="button" onPress={() => setShowAddModal(true)} style={{padding:spacing.lg}}>
+                  <Text style={{color:colors.primary,fontWeight:'600'}}>+ Add patient</Text>
+                </TouchableOpacity>
               </View>
             ) : (
               callDayOrder.map(id => renderCallDay(id))
@@ -617,6 +756,8 @@ export default function PatientsScreen() {
       {/* FAB - Quick Add */}
       <TouchableOpacity 
         style={styles.fab}
+        accessibilityLabel="Add patient"
+        accessibilityRole="button"
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
           setShowAddModal(true);
@@ -1468,27 +1609,90 @@ const styles = StyleSheet.create({
     color: colors.textTertiary,
   },
   patientRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: 'column',
     backgroundColor: colors.surfaceElevated,
     borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
-  patientInfo: {
-    flex: 1,
-    marginRight: spacing.sm,
+  patientBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    marginTop: 6,
+    marginBottom: 4,
   },
   patientEditIcon: {
     paddingTop: 2,
     paddingLeft: spacing.xs,
   },
-  patientName: {
-    fontSize: typography.base,
+  opReportButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+  },
+  opReportButtonText: {
+    fontSize: typography.xs,
     fontWeight: typography.semibold,
+    color: colors.textInverse,
+  },
+  opReportButtonDraft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.warning,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+  },
+  opReportButtonTextDraft: {
+    fontSize: typography.xs,
+    fontWeight: typography.semibold,
+    color: colors.textInverse,
+  },
+  opReportButtonView: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.primaryMuted,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: borderRadius.full,
+  },
+  opReportButtonTextView: {
+    fontSize: typography.xs,
+    fontWeight: typography.semibold,
+    color: colors.primary,
+  },
+  draftDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.warning,
+  },
+  countBadge: {
+    backgroundColor: colors.primarySubtle,
+    borderRadius: borderRadius.full,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginLeft: 2,
+  },
+  countBadgeText: {
+    fontSize: typography.xs,
+    color: colors.primary,
+    fontWeight: typography.semibold,
+  },
+  patientName: {
+    fontSize: typography.lg,
+    fontWeight: typography.bold,
     color: colors.textPrimary,
-    flex: 1,
-    flexShrink: 1,
   },
   patientDetails: {
     flexDirection: 'row',
@@ -1557,6 +1761,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.lg,
+    zIndex: 10,
+    elevation: 10,
   },
   modalContainer: {
     flex: 1,
@@ -1742,11 +1948,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
   // Patient row with room
-  patientNameRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
-  },
+  // patientNameRow removed — name now gets full top row
   patientRoom: {
     fontSize: typography.sm,
     fontWeight: typography.medium,

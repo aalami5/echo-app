@@ -26,18 +26,31 @@ export interface Message {
 }
 
 export interface RichCard {
-  type: 'calendar' | 'email' | 'task' | 'link' | 'custom';
+  type: 'calendar' | 'email' | 'task' | 'link' | 'meeting_reply' | 'custom';
   title: string;
   subtitle?: string;
   body?: string;
   actions?: CardAction[];
-  data?: Record<string, unknown>;
+  data?: Record<string, unknown> & {
+    replyText?: string;
+    windowLabel?: string;
+    durationMinutes?: number;
+    suggestions?: MeetingReplySlot[];
+    conflictSummary?: string[];
+    timeZone?: string;
+  };
 }
 
 export interface CardAction {
   label: string;
   action: string;
   style?: 'default' | 'primary' | 'destructive';
+}
+
+export interface MeetingReplySlot {
+  start: string;
+  end: string;
+  label: string;
 }
 
 export interface AuthState {

@@ -12,6 +12,15 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { colors, spacing, borderRadius, typography } from '../constants/theme';
 import { CalendarEvent } from '../stores/calendarStore';
+import { useTimezoneStore } from '../stores/timezoneStore';
+import {
+  formatLocalTime,
+  formatHomeTime,
+  getTimezoneAbbreviation,
+  formatDateInZone,
+  formatCurrentTimeInZone,
+  HOME_TIMEZONE,
+} from '../services/timezone';
 import { MeetingDetail } from './MeetingDetail';
 
 interface MeetingCountdownProps {
@@ -42,11 +51,14 @@ function getCountdown(targetTime: Date): CountdownValues {
   return { hours, minutes, seconds, isPast: false, isImminent };
 }
 
-function formatTime(date: Date): string {
+function formatTime(date: Date, deviceTimezone?: string): string {
+  if (deviceTimezone) {
+    return formatLocalTime(date, deviceTimezone);
+  }
   return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 }
 
-function MeetingItem({ meeting, onPress }: { meeting: CalendarEvent; onPress: () => void }) {
+function MeetingItem({ meeting, onPress, isTraveling, deviceTimezone }: { meeting: CalendarEvent; onPress: () => void; isTraveling: boolean; deviceTimezone: string }) {
   const startTime = meeting.startTime instanceof Date ? meeting.startTime : new Date(meeting.startTime);
   const [countdown, setCountdown] = useState<CountdownValues>(getCountdown(startTime));
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -108,8 +120,14 @@ function MeetingItem({ meeting, onPress }: { meeting: CalendarEvent; onPress: ()
           </Text>
           <View style={styles.meetingMeta}>
             <Text style={styles.meetingTime}>
-              {formatTime(startTime)}
+              {formatTime(startTime, isTraveling ? deviceTimezone : undefined)}
+              {isTraveling ? ` ${getTimezoneAbbreviation(deviceTimezone, startTime)}` : ''}
             </Text>
+            {isTraveling && (
+              <Text style={styles.meetingHomeTime}>
+                ({formatHomeTime(startTime)} {getTimezoneAbbreviation(HOME_TIMEZONE, startTime)})
+              </Text>
+            )}
             {meeting.location && (
               <>
                 <Text style={styles.metaSeparator}>•</Text>
@@ -159,6 +177,7 @@ function MeetingItem({ meeting, onPress }: { meeting: CalendarEvent; onPress: ()
 }
 
 export function MeetingCountdown({ meetings }: MeetingCountdownProps) {
+  const { isTraveling, deviceTimezone } = useTimezoneStore();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [showDetail, setShowDetail] = useState(false);
@@ -191,27 +210,45 @@ export function MeetingCountdown({ meetings }: MeetingCountdownProps) {
   );
   
   const formatDate = (date: Date) => {
+    if (isTraveling) {
+      return formatDateInZone(date, deviceTimezone);
+    }
     return date.toLocaleDateString('en-US', {
       weekday: 'long',
       month: 'long',
       day: 'numeric',
     });
   };
-  
+
   const formatCurrentTime = (date: Date) => {
-    return date.toLocaleTimeString([], { 
-      hour: 'numeric', 
+    if (isTraveling) {
+      return formatCurrentTimeInZone(date, deviceTimezone);
+    }
+    return date.toLocaleTimeString([], {
+      hour: 'numeric',
       minute: '2-digit',
       second: '2-digit'
     });
+  };
+
+  const getDateLabel = (date: Date) => {
+    const base = formatDate(date);
+    if (!isTraveling) return base;
+    const abbr = getTimezoneAbbreviation(deviceTimezone, date);
+    return `${base} · ${abbr}`;
   };
   
   if (sortedMeetings.length === 0) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Text style={styles.dateText}>{formatDate(currentTime)}</Text>
+          <Text style={styles.dateText}>{getDateLabel(currentTime)}</Text>
           <Text style={styles.timeText}>{formatCurrentTime(currentTime)}</Text>
+          {isTraveling && (
+            <Text style={styles.homeClockText}>
+              🏠 {formatDateInZone(currentTime, HOME_TIMEZONE)} {formatCurrentTimeInZone(currentTime, HOME_TIMEZONE)} {getTimezoneAbbreviation(HOME_TIMEZONE, currentTime)}
+            </Text>
+          )}
         </View>
         <View style={styles.emptyState}>
           <View style={styles.emptyIconContainer}>
@@ -228,16 +265,23 @@ export function MeetingCountdown({ meetings }: MeetingCountdownProps) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.dateText}>{formatDate(currentTime)}</Text>
+        <Text style={styles.dateText}>{getDateLabel(currentTime)}</Text>
         <Text style={styles.timeText}>{formatCurrentTime(currentTime)}</Text>
+        {isTraveling && (
+          <Text style={styles.homeClockText}>
+            🏠 {formatDateInZone(currentTime, HOME_TIMEZONE)} {formatCurrentTimeInZone(currentTime, HOME_TIMEZONE)} {getTimezoneAbbreviation(HOME_TIMEZONE, currentTime)}
+          </Text>
+        )}
       </View>
-      
+
       <View style={styles.meetingsList}>
         {sortedMeetings.slice(0, 5).map((meeting) => (
-          <MeetingItem 
-            key={meeting.id} 
-            meeting={meeting} 
+          <MeetingItem
+            key={meeting.id}
+            meeting={meeting}
             onPress={() => handleMeetingPress(meeting)}
+            isTraveling={isTraveling}
+            deviceTimezone={deviceTimezone}
           />
         ))}
         {sortedMeetings.length > 5 && (
@@ -316,6 +360,18 @@ const styles = StyleSheet.create({
   meetingTime: {
     fontSize: typography.sm,
     color: colors.textSecondary,
+  },
+  meetingHomeTime: {
+    fontSize: typography.xs,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+    marginLeft: spacing.xs,
+  },
+  homeClockText: {
+    fontSize: typography.xs,
+    color: colors.textTertiary,
+    fontStyle: 'italic',
+    marginTop: spacing.xs,
   },
   metaSeparator: {
     fontSize: typography.sm,
