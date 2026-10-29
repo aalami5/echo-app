@@ -1,3 +1,4 @@
+import { requireClinicalRecovery } from './startupRecovery';
 import { create } from 'zustand';
 import { usePatientsStore } from '../stores/patientsStore';
 import { usePatientDictationsStore } from '../stores/patientDictationsStore';
@@ -11,6 +12,7 @@ let inFlight: Promise<void> | null = null;
 // Restore only records missing locally. Existing phone content is never replaced.
 // Deliberate local removals remain hidden on that device; server history survives.
 export function restoreClinicalData(): Promise<void> {
+  try { requireClinicalRecovery(); } catch (error) { return Promise.reject(error); }
   if (inFlight) return inFlight;
   inFlight = (async () => {
     useClinicalRestoreStatus.setState({busy:true,error:null});
@@ -49,6 +51,7 @@ export function restoreClinicalData(): Promise<void> {
 }
 
 export async function backupClinicalData(): Promise<void> {
+  requireClinicalRecovery();
   const {patients,callDays,callDayOrder}=usePatientsStore.getState();
   const results=await Promise.all([
     syncPatients({patients,callDays,callDayOrder}),

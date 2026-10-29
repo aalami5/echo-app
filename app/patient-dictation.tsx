@@ -1,3 +1,5 @@
+import { AUTOMATIC_RECOVERY_PAUSED } from '../src/services/startupRecovery';
+import { RecoveryPaused } from '../src/components/RecoveryPaused';
 import { beginClinicalAudio } from '../src/services/clinicalAudioHandoff';
 import { releaseClinicalAudio } from '../src/services/audioOwnership';
 import { sourceFingerprint } from '../src/services/operativeDrafting';
@@ -74,6 +76,9 @@ const extractCptCodes = (report: string): string[] => {
 };
 
 export default function PatientDictationScreen() {
+  return AUTOMATIC_RECOVERY_PAUSED ? <RecoveryPaused /> : <PatientDictationScreenBody />;
+}
+function PatientDictationScreenBody() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams<{ patientId?: string; dictationId?: string; mode?: ScreenMode }>();

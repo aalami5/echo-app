@@ -1,3 +1,4 @@
+import { AUTOMATIC_RECOVERY_PAUSED, RECOVERY_PAUSED_MESSAGE } from './startupRecovery';
 /**
  * Operative Report Sync Service
  *
@@ -131,6 +132,7 @@ const queuePayload = async (payload: DictationSyncPayload): Promise<void> => {
 export const syncFinalizedDictations = async (
   dictations: Record<string, PatientDictation>
 ): Promise<{ success: boolean; error?: string }> => {
+  if (AUTOMATIC_RECOVERY_PAUSED) return {success:false,error:RECOVERY_PAUSED_MESSAGE};
   await loadOutbox();
   const payload = buildFinalizedDictationsPayload(dictations);
   const dictationCount = Object.keys(payload.dictations).length;
@@ -251,6 +253,7 @@ const performSync = async (): Promise<{ success: boolean; error?: string }> => {
  * Force retry any pending sync
  */
 export const retryPendingDictationSync = async (): Promise<{ success: boolean; error?: string }> => {
+  if (AUTOMATIC_RECOVERY_PAUSED) return {success:false,error:RECOVERY_PAUSED_MESSAGE};
   await loadOutbox();
   if (pendingOutbox) {
     retryCount = 0;

@@ -1,3 +1,4 @@
+import { AUTOMATIC_RECOVERY_PAUSED } from './startupRecovery';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useEmailReceiptsStore } from '../stores/emailReceiptsStore';
 import { useSettingsStore } from '../stores/settingsStore';
@@ -7,6 +8,7 @@ import type { GatewayService } from './gateway';
 
 let refreshInFlight: Promise<void> | null = null;
 export function refreshEmailReceipts(): Promise<void> {
+  if (AUTOMATIC_RECOVERY_PAUSED) return Promise.resolve(); // Existing receipts remain untouched.
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
     const { gatewayUrl, gatewayToken } = useSettingsStore.getState();

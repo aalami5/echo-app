@@ -1,3 +1,4 @@
+import { AUTOMATIC_RECOVERY_PAUSED } from '../services/startupRecovery';
 /**
  * Chat Store
  *
@@ -29,6 +30,7 @@ interface ChatStore extends ChatState {
 // We still read the old SecureStore key once so existing users keep their history.
 const chatStorage = {
   getItem: async (name: string): Promise<string | null> => {
+    if (AUTOMATIC_RECOVERY_PAUSED) throw new Error('Earlier phone history is paused; original data is preserved.');
     try {
       const value = await AsyncStorage.getItem(name);
       if (value) return value;
@@ -48,6 +50,7 @@ const chatStorage = {
     }
   },
   setItem: async (name: string, value: string): Promise<void> => {
+    if (AUTOMATIC_RECOVERY_PAUSED) return;
     try {
       if (!_hydrated) {
         console.warn('[Chat] Blocked chat write before hydration complete');
@@ -60,6 +63,7 @@ const chatStorage = {
     }
   },
   removeItem: async (name: string): Promise<void> => {
+    if (AUTOMATIC_RECOVERY_PAUSED) return;
     try {
       await AsyncStorage.removeItem(name);
       await SecureStore.deleteItemAsync(name).catch(() => {});
@@ -82,6 +86,7 @@ export const useChatStore = create<ChatStore>()(
       hasHydrated: false,
 
       addMessage: (message) => {
+        if (AUTOMATIC_RECOVERY_PAUSED) return; // Legacy notification cache only; never rewrite original history.
         if (!_hydrated) {
           // Store is still hydrating from local storage — queue the message
           // so it doesn't get overwritten when hydration completes
@@ -114,12 +119,14 @@ export const useChatStore = create<ChatStore>()(
     }),
     {
       name: CHAT_STORAGE_KEY,
+      skipHydration: AUTOMATIC_RECOVERY_PAUSED,
       storage: createJSONStorage(() => chatStorage),
       // Only persist messages, not ephemeral connection state
       partialize: (state) => ({
         messages: state.messages,
       }),
-      onRehydrateStorage: () => (state) => {
+      onRehydrateStorage: () => (state, error) => {
+        if (AUTOMATIC_RECOVERY_PAUSED || error) return;
         _hydrated = true;
         useChatStore.setState({ hasHydrated: true });
         console.log(`[Chat] Hydration complete with ${state?.messages?.length || 0} stored messages`);
@@ -155,6 +162,7 @@ export const useChatStore = create<ChatStore>()(
  * Use this before any notification sync that reads messages.
  */
 export function waitForHydration(timeoutMs: number = 5000): Promise<void> {
+  if (AUTOMATIC_RECOVERY_PAUSED) return Promise.resolve();
   if (_hydrated) return Promise.resolve();
   return new Promise((resolve) => {
     const start = Date.now();

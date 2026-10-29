@@ -1,3 +1,4 @@
+import { AUTOMATIC_RECOVERY_PAUSED } from '../src/services/startupRecovery';
 import { ApprovalCenter } from '../src/components/ApprovalCenter';
 import { liveVoiceSession } from '../src/hooks/useRealtimeVoice';
 import { markStartup } from '../src/services/startupDiagnostics';
@@ -175,7 +176,7 @@ function RootLayoutNav() {
     // cannot remain indefinitely in SecureStore.
     ensureGatewayConfig(true).then((ok) => {
       if (!ok) console.warn('[Layout] Gateway bootstrap failed — will retry next launch');
-      else {
+      else if (!AUTOMATIC_RECOVERY_PAUSED) {
         restoreClinicalData().then(() => backupClinicalData()).then(() => refreshEmailReceipts()).catch(() => {});
       }
     });
@@ -183,6 +184,7 @@ function RootLayoutNav() {
 
   // Refresh durable delivery history on launch/foreground, preserving offline cache.
   useEffect(() => {
+    if (AUTOMATIC_RECOVERY_PAUSED) return;
     if (!isAuthenticated || !settingsHydrated) return;
     const refresh = () => { restoreClinicalData().then(() => backupClinicalData()).then(() => refreshEmailReceipts()).catch(() => {}); };
     refresh();
@@ -193,6 +195,7 @@ function RootLayoutNav() {
 
   // Resume operative-report sync after app restart once credentials/settings are available.
   useEffect(() => {
+    if (AUTOMATIC_RECOVERY_PAUSED) return;
     if (!isAuthenticated || !settingsHydrated) return;
     retryPendingDictationSync().catch((e) => {
       console.warn('[Layout] Pending dictation sync retry failed', e);

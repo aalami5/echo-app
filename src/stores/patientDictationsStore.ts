@@ -1,3 +1,4 @@
+import { AUTOMATIC_RECOVERY_PAUSED, requireClinicalRecovery } from '../services/startupRecovery';
 /**
  * Patient Dictations Store — per-patient OR dictations persisted in AsyncStorage.
  */
@@ -75,7 +76,12 @@ const syncFinals = (dictations: Record<string, PatientDictation>) => {
 
 export const usePatientDictationsStore = create<PatientDictationsState>()(
   persist(
-    (set, get) => ({
+    (persistSet, get) => {
+      const set: typeof persistSet = (...args: any[]) => {
+        requireClinicalRecovery();
+        return (persistSet as any)(...args);
+      };
+      return ({
       removedReportIds: [],
       restoreMissing: (reports) => {
         const state=get();
@@ -175,10 +181,16 @@ export const usePatientDictationsStore = create<PatientDictationsState>()(
 
         syncFinals(get().dictations);
       },
-    }),
+    });
+    },
     {
       name: 'patient-dictations-store',
-      storage: createJSONStorage(() => AsyncStorage),
+      skipHydration: AUTOMATIC_RECOVERY_PAUSED,
+      storage: createJSONStorage(() => ({
+        getItem: async (key: string) => { requireClinicalRecovery(); return AsyncStorage.getItem(key); },
+        setItem: async (key: string, value: string) => { requireClinicalRecovery(); await AsyncStorage.setItem(key, value); },
+        removeItem: async (key: string) => { requireClinicalRecovery(); await AsyncStorage.removeItem(key); },
+      })),
     }
   )
 );

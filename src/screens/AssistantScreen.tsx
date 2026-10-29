@@ -1,3 +1,4 @@
+import { AUTOMATIC_RECOVERY_PAUSED } from '../services/startupRecovery';
 import { VoiceCallView, VoiceIconButton, voicePresentation } from '../components/VoiceCallView';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, NativeModules, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
@@ -36,6 +37,9 @@ export default function AssistantScreen() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [historyMore, setHistoryMore] = useState(false);
+  const historyRequested = useRef(!AUTOMATIC_RECOVERY_PAUSED);
+  const [historyPaused, setHistoryPaused] = useState(AUTOMATIC_RECOVERY_PAUSED);
+  const resumeHistory = () => { historyRequested.current = true; setHistoryPaused(false); };
   const [historyCount, setHistoryCount] = useState(0);
   const [activity, setActivity] = useState<any>({ tasks: [], artifacts: [], session: {} });
   const [stream, setStream] = useState<Record<string, string>>({});
@@ -88,7 +92,7 @@ export default function AssistantScreen() {
     refreshing.current = true; const id = selected.current;
     try {
       const [h, a, e, q] = await Promise.all([
-        assistantApi(`/conversations/${id}/history`), assistantApi(`/conversations/${id}/activity`),
+        (historyRequested.current ? assistantApi(`/conversations/${id}/history`) : Promise.resolve({messages:[]})), assistantApi(`/conversations/${id}/activity`),
         assistantApi(`/conversations/${id}/events?epoch=${cursor.current.epoch}&after=${cursor.current.after}`), loadSubmissions(),
       ]);
       if (!alive.current || selected.current !== id) return;
@@ -110,7 +114,7 @@ export default function AssistantScreen() {
         pending.state = 'accepted'; pending.receipt = accepted.get(pending.id); await saveSubmission(pending);
       }
       setActivity(a); setOutbox(q.filter(x => x.conversationId === id && x.state !== 'accepted'));
-      void tailCache.save(id, tail).catch(() => {});
+      if (!AUTOMATIC_RECOVERY_PAUSED) void tailCache.save(id, tail).catch(() => {});
       cursor.current = { epoch: e.epoch, after: e.cursor };
       for (const event of e.events || []) {
         if (!event.voice || event.at < liveVoiceSession.getSnapshot().startedAt) continue;
@@ -153,7 +157,7 @@ export default function AssistantScreen() {
     historyPosition.current = { nextOffset: 0, total: 0, hasMore: false };
     const id = conversationId;
     let cacheReadActive = true;
-    void tailCache.read(id).then(cached => {
+    if (!AUTOMATIC_RECOVERY_PAUSED) void tailCache.read(id).then(cached => {
       if (cacheReadActive && selected.current === id) setMessages(old => old.length ? old : cached);
     }).catch(() => {});
     void refresh(true);
@@ -162,7 +166,7 @@ export default function AssistantScreen() {
     return () => { cacheReadActive = false; clearInterval(timer); sub.remove(); };
   }, [conversationId, ready, refresh, tailCache]);
   useEffect(() => {
-    if (!ready || !legacyHydrated || !legacy.length) return;
+    if (AUTOMATIC_RECOVERY_PAUSED || !ready || !legacyHydrated || !legacy.length) return;
     // Snapshot the legacy cache once, retaining the existing on-device copy.
     void (async () => {
       const marker = await AsyncStorage.getItem('echo-assistant-legacy-archived-v1'); if (marker) return;
@@ -246,6 +250,7 @@ export default function AssistantScreen() {
     setAttachments(old => old.filter(a => a.id !== id)); void removeLocalAttachments(removed);
   };
   const send = async (retry?: Submission) => {
+    resumeHistory(); // Explicit sending resumes the active conversation; never on launch.
     if (!draftReady || sendLock.current || mediaLock.current || uploading || (!retry && !text.trim() && !attachments.length)) return;
     sendLock.current = true; setSending(true); setError(null); setMediaError(null);
     let item: Submission | undefined = retry;
@@ -272,6 +277,7 @@ export default function AssistantScreen() {
     } finally { sendLock.current = false; setSending(false); setUploading(false); setUploadProgress(''); }
   };
   const loadEarlier = async () => {
+    resumeHistory();
     if (loadingEarlier.current || refreshing.current) return;
     loadingEarlier.current = true;
     try {
@@ -311,7 +317,7 @@ export default function AssistantScreen() {
   const active = activity.session?.hasActiveRun;
   const callActive = voice.isActive;
   const voiceState = voicePresentation(voice, !!active || voiceNotice === 'Echo is working on your request.');
-  useEffect(() => { setVoiceCaption(''); }, [voice.startedAt]);
+  useEffect(() => { setVoiceCaption(''); if (voice.isActive) resumeHistory(); }, [voice.startedAt, voice.isActive]);
   const caption = callActive ? voiceCaption : undefined;
   const attachmentTray = <AssistantAttachmentTray files={attachments} disabled={mediaBusy} onRemove={removeAttachment}/>;
   const mediaControls = <View style={s.mediaMenu}>
@@ -345,6 +351,7 @@ export default function AssistantScreen() {
       <Text style={s.subtle}>{callActive ? 'Live Voice' : 'Live Voice'} ›</Text>
     </TouchableOpacity>
     {(mediaError || error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || mediaError || error || voiceNotice}</Text>}
+    {historyPaused && <View><Text style={s.subtle}>Safe start: earlier messages are not loaded automatically. Saved phone history remains untouched.</Text><Button title="Load recent conversation" onPress={() => { resumeHistory(); void refresh(true); }} /></View>}
     {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={reconnect} /></View>}
     </ScrollView>
     {cameraPanel || <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
@@ -392,7 +399,7 @@ export default function AssistantScreen() {
             {(activity.submissions || []).map((r: any) => <View key={r.id} style={s.message}><Text style={s.subtle}>Request {r.id.slice(-8)} · {r.state === 'accepted' ? 'Accepted by Echo (not proof of completion)' : 'Acknowledgement uncertain; do not send a duplicate action'}</Text></View>)}
             <Text style={s.subtle}>This view uses actual session and task status. Accepted work can continue while the app is closed. Scheduled responsibilities remain managed by Echo; ask to review or change them.</Text>
           </>}
-          {sheet === 'legacy' && <><Text style={s.subtle}>Notifications and earlier chats are preserved here. They are not replayed as new requests. Previously unsaved voice conversations cannot be recovered.</Text>{legacy.map(m => <View key={m.id} style={s.message}><Text style={s.role}>{m.role === 'user' ? 'You' : 'Echo'}</Text><MessageText text={m.content}/></View>)}</>}
+          {sheet === 'legacy' && <><Text style={s.subtle}>{AUTOMATIC_RECOVERY_PAUSED ? 'Earlier phone history is preserved but loading it is paused in safe-start mode. No messages or send receipts have been deleted.' : 'Notifications and earlier chats are preserved here. They are not replayed as new requests. Previously unsaved voice conversations cannot be recovered.'}</Text>{legacy.map(m => <View key={m.id} style={s.message}><Text style={s.role}>{m.role === 'user' ? 'You' : 'Echo'}</Text><MessageText text={m.content}/></View>)}</>}
           {sheet === 'memory' && <>
             <Text style={s.body}>Relevant private conversations can inform your replies automatically. Group conversations and patient/report storage are separate. Voice conversations save text, not raw audio.</Text>
             <TextInput style={[s.input, { minHeight: 90 }]} multiline value={memoryText} onChangeText={setMemoryText} placeholder="A fact to remember, correct, or forget…" placeholderTextColor={colors.textTertiary}/>

@@ -1,3 +1,5 @@
+import { AUTOMATIC_RECOVERY_PAUSED } from '../../src/services/startupRecovery';
+import { RecoveryPaused } from '../../src/components/RecoveryPaused';
 import { restoreClinicalData, useClinicalRestoreStatus } from '../../src/services/clinicalRestore';
 import { useEmailReceiptsStore } from '../../src/stores/emailReceiptsStore';
 import { emailReceiptStatus } from '../../src/utils/emailReceiptStatus';
@@ -49,6 +51,9 @@ import { usePatientScan, ScannedPatientData } from '../../src/hooks/usePatientSc
 const HOSPITAL_ORDER: Hospital[] = ['SEQ', 'ECH', 'SMCMC', 'Mills', 'OTHER'];
 
 export default function PatientsScreen() {
+  return AUTOMATIC_RECOVERY_PAUSED ? <RecoveryPaused /> : <PatientsScreenBody />;
+}
+function PatientsScreenBody() {
   const router = useRouter();
   const {
     patients,
