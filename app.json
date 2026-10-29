@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.oppersmedical.echo",
-      "buildNumber": "95",
+      "buildNumber": "96",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSMicrophoneUsageDescription": "Echo needs microphone access for voice conversations",
@@ -63,7 +63,8 @@
           "cameraPermission": "Echo uses your camera to preview and capture photos you choose to share.",
           "recordAudioAndroid": false
         }
-      ]
+      ],
+      "./plugins/withEchoDiagnostics"
     ],
     "experiments": {
       "typedRoutes": true

@@ -1,4 +1,5 @@
 import { liveVoiceSession } from '../src/hooks/useRealtimeVoice';
+import { markStartup } from '../src/services/startupDiagnostics';
 import { AppState } from 'react-native';
 import { restoreClinicalData, backupClinicalData } from '../src/services/clinicalRestore';
 import { refreshEmailReceipts } from '../src/services/emailReceipts';
@@ -51,16 +52,19 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (loaded) {
+      markStartup('fonts_ready');
       SplashScreen.hideAsync();
     }
   }, [loaded]);
 
   useEffect(() => {
+    markStartup('root_mounted');
     const errorUtils = (global as any)?.ErrorUtils;
     if (!errorUtils?.getGlobalHandler || !errorUtils?.setGlobalHandler) return;
 
     const defaultHandler = errorUtils.getGlobalHandler();
     const handler = (err: unknown, isFatal?: boolean) => {
+      markStartup(isFatal ? 'js_fatal' : 'js_unhandled');
       if (err instanceof Error) {
         logCrash(err, isFatal ? 'fatal' : 'unhandled');
       } else {
@@ -100,9 +104,11 @@ function RootLayoutNav() {
   const [settingsHydrated, setSettingsHydrated] = useState(false);
   useEffect(() => {
     if (useSettingsStore.persist.hasHydrated()) {
+      markStartup('settings_hydrated');
       setSettingsHydrated(true);
     } else {
       const unsub = useSettingsStore.persist.onFinishHydration(() => {
+        markStartup('settings_hydrated');
         setSettingsHydrated(true);
         unsub();
       });
@@ -115,6 +121,7 @@ function RootLayoutNav() {
 
   // Load stored auth on app start
   useEffect(() => {
+    markStartup('auth_load_requested');
     loadStoredAuth();
   }, []);
 
