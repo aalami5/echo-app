@@ -1,6 +1,6 @@
 import { VoiceCallView, VoiceIconButton, voicePresentation } from '../components/VoiceCallView';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, NativeModules, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused } from '@react-navigation/native';
@@ -17,6 +17,7 @@ import { useChatStore } from '../stores/chatStore';
 import { useRealtimeVoice, liveVoiceSession } from '../hooks/useRealtimeVoice';
 import { ChatViewport } from '../components/ChatViewport';
 import { assistantApi, AssistantMessage, Conversation, loadSubmissions, newSubmissionId, Submission, submit, visibleHistory, saveSubmission } from '../services/assistant';
+import { createPreviewStorage } from '../services/previewStorage';
 import { createConversationTailCache } from '../services/conversationTailCache';
 
 const SELECTED = 'echo-assistant-conversation-v1';
@@ -74,7 +75,9 @@ export default function AssistantScreen() {
   const cursor = useRef({ epoch: '', after: 0 });
   const refreshing = useRef(false);
   const loadingEarlier = useRef(false);
-  const [tailCache] = useState(() => createConversationTailCache(AsyncStorage));
+  const [tailCache] = useState(() => createConversationTailCache(createPreviewStorage(AsyncStorage, key => Platform.OS === 'ios'
+    ? NativeModules?.EchoDiagnosticBridge?.canReadPreview?.(key) ?? Promise.resolve(false)
+    : Promise.resolve(true))));
   const historyPosition = useRef({ nextOffset: 0, total: 0, hasMore: false });
   const voice = useRealtimeVoice(conversationId);
   const legacy = useChatStore(st => st.messages);

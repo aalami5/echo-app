@@ -5,14 +5,14 @@ module.exports = function withEchoDiagnostics(config) {
   config = withDangerousMod(config, ['ios', async c => {
     const root = path.join(c.modRequest.platformProjectRoot, c.modRequest.projectName);
     fs.mkdirSync(root, { recursive: true });
-    for (const file of ['EchoDiagnostics.swift', 'EchoDiagnosticBridge.swift', 'EchoDiagnosticBridge.m']) {
+    for (const file of ['EchoDiagnostics.swift', 'EchoDiagnosticBridge.swift', 'EchoDiagnosticBridge.m', 'EchoStorageMetadata.swift']) {
       fs.copyFileSync(path.join(__dirname, 'diagnostics', file), path.join(root, file));
     }
     return c;
   }]);
   config = withXcodeProject(config, c => {
     const name = c.modRequest.projectName;
-    for (const file of ['EchoDiagnostics.swift', 'EchoDiagnosticBridge.swift', 'EchoDiagnosticBridge.m']) {
+    for (const file of ['EchoDiagnostics.swift', 'EchoDiagnosticBridge.swift', 'EchoDiagnosticBridge.m', 'EchoStorageMetadata.swift']) {
       const source = `${name}/${file}`;
       if (!c.modResults.hasFile(source)) c.modResults.addSourceFile(source, undefined, c.modResults.findPBXGroupKey({ name }));
     }

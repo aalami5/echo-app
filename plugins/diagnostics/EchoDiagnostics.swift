@@ -3,12 +3,13 @@ import UIKit
 import MetricKit
 import Darwin
 
-// Diagnostic-only build: never reads clinical stores, messages, credentials or URLs.
+// Diagnostics read storage file sizes only, never messages, credentials or clinical contents.
 final class EchoDiagnostics: NSObject, MXMetricManagerSubscriber {
   static let shared = EchoDiagnostics()
   private let queue = DispatchQueue(label: "echo.diagnostics", qos: .utility)
   private var timer: DispatchSourceTimer?
   private var samples = 0
+  private var storageEvents = 0
   private let folder = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("EchoDiagnostics", isDirectory: true)
 
   func start() {
@@ -33,6 +34,7 @@ final class EchoDiagnostics: NSObject, MXMetricManagerSubscriber {
 
   func beginApp() {
     record("react_start_requested")
+    queue.async { self.write("storage_inventory", metadata: EchoStorageMetadata.inventory()) }
     // A bounded trail: at most 60 small samples, independent of AsyncStorage.
     let source = DispatchSource.makeTimerSource(queue: queue)
     source.schedule(deadline: .now(), repeating: 1)
@@ -47,7 +49,14 @@ final class EchoDiagnostics: NSObject, MXMetricManagerSubscriber {
   }
 
   func record(_ phase: String) { queue.async { self.write(phase) } }
-  private func write(_ phase: String) {
+  func storageRead(_ category: String, phase: String, length: Double) {
+    queue.async {
+      guard self.storageEvents < 80 else { return }
+      self.storageEvents += 1
+      self.write("storage_read", metadata: ["category": category, "stage": phase, "valueChars": length])
+    }
+  }
+  private func write(_ phase: String, metadata: [String: Any] = [:]) {
     var info = mach_task_basic_info()
     var count = mach_msg_type_number_t(MemoryLayout<mach_task_basic_info>.size / MemoryLayout<natural_t>.size)
     let result = withUnsafeMutablePointer(to: &info) { pointer in
@@ -55,7 +64,8 @@ final class EchoDiagnostics: NSObject, MXMetricManagerSubscriber {
         task_info(mach_task_self_, task_flavor_t(MACH_TASK_BASIC_INFO), $0, &count)
       }
     }
-    let row: [String: Any] = ["phase": phase, "time": ISO8601DateFormatter().string(from: Date()), "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown", "residentBytes": result == KERN_SUCCESS ? info.resident_size : 0]
+    var row: [String: Any] = ["phase": phase, "time": ISO8601DateFormatter().string(from: Date()), "build": Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown", "residentBytes": result == KERN_SUCCESS ? info.resident_size : 0]
+    for (key, value) in metadata { row[key] = value }
     guard var data = try? JSONSerialization.data(withJSONObject: row) else { return }
     data.append(10)
     let file = folder.appendingPathComponent("startup.jsonl")
