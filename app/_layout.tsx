@@ -1,3 +1,4 @@
+import { ApprovalCenter } from '../src/components/ApprovalCenter';
 import { liveVoiceSession } from '../src/hooks/useRealtimeVoice';
 import { markStartup } from '../src/services/startupDiagnostics';
 import { AppState } from 'react-native';
@@ -220,6 +221,7 @@ function RootLayoutNav() {
         <Stack.Screen name="login" options={{ presentation: 'modal' }} />
         <Stack.Screen name="patient-dictation" options={{ presentation: 'modal' }} />
       </Stack>
+      <ApprovalCenter />
     </ThemeProvider>
   );
 }

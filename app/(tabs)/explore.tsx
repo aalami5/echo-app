@@ -1,3 +1,4 @@
+import { useApprovalUiStore } from '../../src/stores/approvalUiStore';
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -192,6 +193,9 @@ export default function SettingsScreen() {
       >
         <Text style={styles.title}>Settings</Text>
 
+        <View style={styles.section}><Text style={styles.sectionTitle}>AUTOMATIONS</Text><View style={styles.card}>
+          <SettingsRow icon="shield-checkmark-outline" label="Permissions & Morning Brief" onPress={() => useApprovalUiStore.getState().open()} />
+        </View></View>
         {/* Connection Status Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>CONNECTION</Text>
