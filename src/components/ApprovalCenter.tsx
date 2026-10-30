@@ -103,7 +103,18 @@ function OwnerApprovals({ owner, url, token }: { owner: string; url: string; tok
     <Modal visible={visible && active} transparent animationType="slide" onRequestClose={close}>
       <View style={s.backdrop}>
         <View accessibilityViewIsModal style={[s.sheet, { paddingBottom: Math.max(16, insets.bottom) }]}>
-          <View style={s.heading}><Text accessibilityRole="header" style={s.title}>Permissions & briefs</Text>{button('Not now', close)}</View>
+          <View style={s.heading}>
+            <Text accessibilityRole="header" style={s.title}>Permissions & briefs</Text>
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Done"
+              accessibilityHint="Closes permissions and returns to the previous screen without changing permissions or disconnecting your call."
+              onPress={close}
+              style={[s.button, s.primary, s.doneButton]}
+            >
+              <Text style={[s.buttonText, s.primaryText]}>Done</Text>
+            </TouchableOpacity>
+          </View>
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={s.content}>
             <Text style={s.body}>Your voice call stays connected. Closing this sheet never approves a request.</Text>
             {!!error && <Text accessibilityRole="alert" style={s.error}>{error}</Text>}
@@ -170,6 +181,7 @@ const s = StyleSheet.create({
   backdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: '#0009' },
   sheet: { maxHeight: '88%', backgroundColor: colors.background, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 18, paddingTop: 18 },
   heading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 },
+  doneButton: { minWidth: 72, flexShrink: 0 },
   content: { paddingBottom: 20, gap: 12 }, title: { color: colors.textPrimary, fontSize: 20, fontWeight: '700', flexShrink: 1 },
   subtitle: { color: colors.textPrimary, fontSize: 17, fontWeight: '600' }, body: { color: colors.textSecondary, fontSize: 15, lineHeight: 22 },
   error: { color: '#fca5a5', fontSize: 15, lineHeight: 22 }, label: { color: colors.textSecondary, marginTop: 8, marginBottom: 4 },

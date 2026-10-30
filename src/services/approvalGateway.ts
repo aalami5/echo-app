@@ -50,7 +50,13 @@ export class ApprovalGateway {
           } catch (error) { clearTimeout(timeout); reject(error); socket.close(); }
         } else if (frame.type === 'res' && frame.id === 'hello') {
           clearTimeout(timeout);
-          if (!frame.ok) { reject(new Error(frame.error?.message || 'Approve this Echo device in the trusted dashboard, then reconnect.')); socket.close(); return; }
+          if (!frame.ok) {
+            const message = frame.error?.message || 'Approve this Echo device in the trusted dashboard, then reconnect.';
+            reject(new Error(/pairing required/i.test(message)
+              ? 'Pairing required. Open your trusted OpenClaw dashboard → Devices, review Echo owner approvals matching the device ID below, then reconnect here.'
+              : message));
+            socket.close(); return;
+          }
           this.scopes = frame.payload?.auth?.scopes || []; this.methods = frame.payload?.features?.methods || [];
           if (!this.scopes.includes('operator.approvals') || !this.methods.includes('approval.resolve')) {
             reject(new Error('This device does not have approval authority. Pair it in the trusted dashboard.')); socket.close(); return;
@@ -66,9 +72,13 @@ export class ApprovalGateway {
       socket.onclose = () => {
         clearTimeout(timeout);
         if (socket !== this.socket) return;
+        const wasReady = this.ready;
         this.ready = false;
         for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error('Connection lost. Refresh status before trying again.')); }
-        this.pending.clear(); reject(new Error('Approval connection closed.')); this.onChange();
+        this.pending.clear(); reject(new Error('Approval connection closed.'));
+        // A rejected handshake already supplies its specific error. A later close
+        // must not overwrite pairing/auth guidance with a generic disconnect.
+        if (wasReady) this.onChange();
       };
       socket.onerror = () => { clearTimeout(timeout); reject(new Error('Approval connection unavailable.')); socket.close(); };
     });
