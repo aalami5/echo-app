@@ -5,6 +5,8 @@ import { ActivityIndicator, Alert, AppState, FlatList, Linking, Modal, NativeMod
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useIsFocused } from '@react-navigation/native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { briefMessageText, linkedBriefId, OPENED_BRIEF_KEY } from '../services/briefNotification';
 import * as ImagePicker from 'expo-image-picker';
 import { AssistantCamera } from '../components/AssistantCamera';
 import { AssistantAttachmentTray } from '../components/AssistantAttachmentTray';
@@ -32,6 +34,11 @@ function MessageText({ text }: { text: string }) {
   return <Text selectable style={s.body}>{parts.map((p, i) => /^https?:\/\//.test(p) ? <Text key={i} style={s.link} onPress={() => { void Linking.openURL(p); }}>{p}</Text> : p)}</Text>;
 }
 export default function AssistantScreen() {
+  const params = useLocalSearchParams<{ briefMessageId?: string }>();
+  const router = useRouter();
+  const requestedBrief = linkedBriefId({ conversationId: 'home', chatMessageId: params.briefMessageId });
+  const [linkedBrief, setLinkedBrief] = useState<{ id: string; content: string } | null>(null);
+  const [briefError, setBriefError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
   const [conversationId, setConversationId] = useState('home');
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -84,6 +91,21 @@ export default function AssistantScreen() {
     : Promise.resolve(true))));
   const historyPosition = useRef({ nextOffset: 0, total: 0, hasMore: false });
   const voice = useRealtimeVoice(conversationId);
+  useEffect(() => {
+    if (!ready || !requestedBrief) return;
+    let cancelled = false;
+    setLinkedBrief(null); setBriefError(null); setVoiceView(false);
+    // Read exactly one server-owned message. Keep any active call and the
+    // selected conversation unchanged; this never hydrates the legacy cache.
+    void assistantApi(`/conversations/home/messages/${encodeURIComponent(requestedBrief)}`).then(result => {
+      const content = briefMessageText(result);
+      if (!cancelled) {
+        setLinkedBrief({ id: requestedBrief, content });
+        void AsyncStorage.setItem(OPENED_BRIEF_KEY, requestedBrief).catch(() => {});
+      }
+    }).catch(e => { if (!cancelled) setBriefError(e.message); });
+    return () => { cancelled = true; };
+  }, [ready, requestedBrief]);
   const legacy = useChatStore(st => st.messages);
   const legacyHydrated = useChatStore(st => st.hasHydrated);
   const title = conversations.find(c => c.id === conversationId)?.title || 'Home';
@@ -351,6 +373,7 @@ export default function AssistantScreen() {
       <Text style={s.subtle}>{callActive ? 'Live Voice' : 'Live Voice'} ›</Text>
     </TouchableOpacity>
     {(mediaError || error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || mediaError || error || voiceNotice}</Text>}
+    {requestedBrief && <View style={{ maxHeight: 320 }}><View style={s.row}><Text style={[s.role, {flex: 1}]}>Saved in Home · Morning brief</Text><Button title="Close" onPress={() => router.setParams({briefMessageId: undefined})}/></View><ScrollView>{linkedBrief ? <MessageText text={linkedBrief.content}/> : <Text style={s.subtle}>{briefError || 'Loading saved brief…'}</Text>}</ScrollView></View>}
     {historyPaused && <View><Text style={s.subtle}>Safe start: earlier messages are not loaded automatically. Saved phone history remains untouched.</Text><Button title="Load recent conversation" onPress={() => { resumeHistory(); void refresh(true); }} /></View>}
     {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={reconnect} /></View>}
     </ScrollView>

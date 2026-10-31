@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Notifications from 'expo-notifications';
 import {
   registerForPushNotifications,
@@ -22,6 +23,7 @@ import {
 } from '../services/notifications';
 import { useChatStore, waitForHydration } from '../stores/chatStore';
 import { useSettingsStore } from '../stores/settingsStore';
+import { linkedBriefId, OPENED_BRIEF_KEY } from '../services/briefNotification';
 
 /**
  * Sync missed notifications from notification center into chat
@@ -200,6 +202,13 @@ export function useNotifications() {
   const router = useRouter();
 
   useEffect(() => {
+    // Linked briefs must work in safe-start mode, where legacy hydration is
+    // deliberately paused. Do not await or restore that oversized store.
+    const openLinkedBrief = (messageId: string) => router.push({ pathname: '/', params: { briefMessageId: messageId } });
+    void Notifications.getLastNotificationResponseAsync().then(async response => {
+      const id = linkedBriefId(response?.notification.request.content.data);
+      if (id && await AsyncStorage.getItem(OPENED_BRIEF_KEY) !== id) openLinkedBrief(id);
+    }).catch(() => {});
     // Register for push notifications
     registerForPushNotifications().then((token) => {
       if (token) {
@@ -313,7 +322,8 @@ export function useNotifications() {
       () => {
         console.log('Daily brief notification tapped');
         router.push('/');
-      }
+      },
+      openLinkedBrief
     );
 
     return () => {

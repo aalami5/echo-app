@@ -9,6 +9,7 @@
  */
 
 import * as Notifications from 'expo-notifications';
+import { linkedBriefId } from './briefNotification';
 import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -207,10 +208,13 @@ export function setupNotificationReceivedHandler(
 export function setupNotificationResponseHandler(
   onMeetingTap: (eventId: string) => void,
   onMessageTap: (messageData?: { id: string; content: string; timestamp: string; card?: RichCard }) => void,
-  onBriefTap: () => void
+  onBriefTap: () => void,
+  onLinkedBriefTap?: (messageId: string) => void
 ): Notifications.EventSubscription {
   return Notifications.addNotificationResponseReceivedListener((response) => {
     const data = response.notification.request.content.data as unknown as NotificationData;
+    const linked = linkedBriefId(data);
+    if (linked && onLinkedBriefTap) { onLinkedBriefTap(linked); return; }
     
     // Acknowledge meeting notifications when tapped
     if (data.type === 'meeting' && data.eventId) {
