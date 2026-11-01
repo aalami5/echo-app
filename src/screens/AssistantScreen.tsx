@@ -15,6 +15,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { colors } from '../constants/theme';
 import { useChatStore } from '../stores/chatStore';
 import { useRealtimeVoice, liveVoiceSession } from '../hooks/useRealtimeVoice';
@@ -61,6 +62,7 @@ export default function AssistantScreen() {
   const [cameraOpen, setCameraOpen] = useState(false);
   const [foreground, setForeground] = useState(AppState.currentState === 'active');
   const [uploadProgress, setUploadProgress] = useState('');
+  const [attachmentReceipt, setAttachmentReceipt] = useState<{ conversationId: string; count: number; total: number; runId?: string; stage: 'received' | 'reviewing' | 'ready' | 'review_failed' | 'not_confirmed' } | null>(null);
   const mediaLock = useRef(false);
   const sendLock = useRef(false);
   const focused = useIsFocused();
@@ -136,9 +138,19 @@ export default function AssistantScreen() {
         pending.state = 'accepted'; pending.receipt = accepted.get(pending.id); await saveSubmission(pending);
       }
       setActivity(a); setOutbox(q.filter(x => x.conversationId === id && x.state !== 'accepted'));
+      setAttachmentReceipt(old => {
+        if (!old?.runId || old.conversationId !== id) return old;
+        const submission = (a.submissions || []).find((r: any) => r.id === old.runId);
+        if (submission?.analysisStatus === 'completed') return { ...old, stage: 'ready' };
+        if (submission?.analysisStatus === 'failed') return { ...old, stage: 'review_failed' };
+        return old;
+      });
       if (!AUTOMATIC_RECOVERY_PAUSED) void tailCache.save(id, tail).catch(() => {});
       cursor.current = { epoch: e.epoch, after: e.cursor };
       for (const event of e.events || []) {
+        if (!event.voice && event.runId && ['final', 'error', 'aborted'].includes(event.state)) {
+          setAttachmentReceipt(old => old && old.runId === event.runId && old.conversationId === id ? { ...old, stage: event.state === 'final' ? 'ready' : 'review_failed' } : old);
+        }
         if (!event.voice || event.at < liveVoiceSession.getSnapshot().startedAt) continue;
         if (event.state === 'output.text.done' && event.text) setVoiceCaption(event.text);
         if (event.state === 'error') setVoiceNotice(event.error);
@@ -281,11 +293,18 @@ export default function AssistantScreen() {
     try {
       if (!item) {
         setUploading(files.length > 0);
-        const ids = await uploadAttachments(conversationId, files, (done, total) => setUploadProgress(total ? `Uploading ${done}/${total}…` : ''));
+        if (files.length) setAttachmentReceipt(null);
+        const ids = await uploadAttachments(conversationId, files, (done, total) => {
+          setUploadProgress(total ? (done ? `Received ${done}/${total}` : 'Uploading…') : '');
+          if (done > 0) setAttachmentReceipt({ conversationId, count: done, total, stage: 'received' });
+          if (done > 0 && done === total) void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+        });
         setUploading(false);
         item = { id: newSubmissionId(), conversationId, message: text.trim() || 'Please review the attached files.', attachmentIds: ids, mode: 'steer', state: 'pending' };
+        if (ids.length) setAttachmentReceipt({ conversationId, count: ids.length, total: ids.length, runId: item.id, stage: 'received' });
       }
       await submit(item);
+      if (item.attachmentIds.length) setAttachmentReceipt(old => old?.runId === item!.id && old.stage !== 'ready' && old.stage !== 'review_failed' ? { ...old, stage: 'reviewing' } : old);
       if (!retry) clearDraft();
       await refresh();
     } catch (e: any) {
@@ -294,6 +313,7 @@ export default function AssistantScreen() {
         const saved = await loadSubmissions();
         if (!retry && saved.some(i => i.id === item!.id)) clearDraft();
         setOutbox(saved.filter(i => i.conversationId === conversationId && i.state !== 'accepted'));
+        setAttachmentReceipt(old => old?.runId === item!.id && old.stage !== 'ready' ? { ...old, stage: 'not_confirmed' } : old);
       }
       setMediaError(e.message);
     } finally { sendLock.current = false; setSending(false); setUploading(false); setUploadProgress(''); }
@@ -342,6 +362,11 @@ export default function AssistantScreen() {
   useEffect(() => { setVoiceCaption(''); if (voice.isActive) resumeHistory(); }, [voice.startedAt, voice.isActive]);
   const caption = callActive ? voiceCaption : undefined;
   const attachmentTray = <AssistantAttachmentTray files={attachments} disabled={mediaBusy} onRemove={removeAttachment}/>;
+  const shownReceipt = attachmentReceipt?.conversationId === conversationId ? attachmentReceipt : null;
+  const receiptLabel = shownReceipt ? `Received ${shownReceipt.count}${shownReceipt.count < shownReceipt.total ? ` of ${shownReceipt.total}` : ''} ${shownReceipt.count === 1 ? 'attachment' : 'attachments'} · ${
+    shownReceipt.stage === 'ready' ? 'Review ready' : shownReceipt.stage === 'reviewing' ? 'Review requested' : shownReceipt.stage === 'review_failed' ? 'Review interrupted' : shownReceipt.stage === 'not_confirmed' ? 'Review not confirmed' : 'Saved by Echo'
+  }` : '';
+  const receiptContent = shownReceipt && <View accessibilityLiveRegion="polite" style={{ paddingVertical: 8 }}><Text style={{ color: colors.primary, fontSize: 14 }}>{receiptLabel}</Text>{shownReceipt.stage === 'ready' && voiceView && <Button title="View review in Chat" onPress={() => setVoiceView(false)}/>}</View>;
   const mediaControls = <View style={s.mediaMenu}>
     <Text style={s.subtle}>Add to Echo · {title}</Text>
     <View style={s.mediaIcons}>
@@ -353,6 +378,7 @@ export default function AssistantScreen() {
   </View>;
   const cameraPanel = cameraOpen && focused && foreground ? <AssistantCamera busy={mediaPicking} onCapture={capturePhoto} onClose={() => setCameraOpen(false)}/> : undefined;
   const voiceDraft = <>
+    {receiptContent}
     {mediaMenu && mediaControls}
     {attachmentTray}
     {mediaPicking && <Text style={s.subtle}>Preparing attachment…</Text>}
@@ -373,6 +399,7 @@ export default function AssistantScreen() {
       <Text style={s.subtle}>{callActive ? 'Live Voice' : 'Live Voice'} ›</Text>
     </TouchableOpacity>
     {(mediaError || error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || mediaError || error || voiceNotice}</Text>}
+    {receiptContent}
     {requestedBrief && <View style={{ maxHeight: 320 }}><View style={s.row}><Text style={[s.role, {flex: 1}]}>Saved in Home · Morning brief</Text><Button title="Close" onPress={() => router.setParams({briefMessageId: undefined})}/></View><ScrollView>{linkedBrief ? <MessageText text={linkedBrief.content}/> : <Text style={s.subtle}>{briefError || 'Loading saved brief…'}</Text>}</ScrollView></View>}
     {historyPaused && <View><Text style={s.subtle}>Safe start: earlier messages are not loaded automatically. Saved phone history remains untouched.</Text><Button title="Load recent conversation" onPress={() => { resumeHistory(); void refresh(true); }} /></View>}
     {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={reconnect} /></View>}

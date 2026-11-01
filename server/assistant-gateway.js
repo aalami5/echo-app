@@ -8,6 +8,7 @@ class AssistantGateway extends EventEmitter {
   constructor({ url, token, WebSocketImpl = globalThis.WebSocket }) {
     super(); this.url = url.replace(/^http/, 'ws'); this.token = token;
     this.WebSocketImpl = WebSocketImpl; this.pending = new Map(); this.generation = 0;
+    this.methods = new Set();
   }
   async connect() {
     if (this.ready) return;
@@ -29,6 +30,7 @@ class AssistantGateway extends EventEmitter {
         } else if (m.id === helloId && m.type === 'res') {
           clearTimeout(timer);
           if (!m.ok) { reject(new Error(m.error?.message || 'Assistant connection rejected')); socket.close(); return; }
+          this.methods = new Set(m.payload?.features?.methods || []);
           this.ready = true; this.generation++; this.emit('connected', this.generation); resolve();
         } else if (m.type === 'res') {
           const p = this.pending.get(m.id); if (!p) return;
@@ -39,13 +41,14 @@ class AssistantGateway extends EventEmitter {
       };
       socket.onerror = () => { clearTimeout(timer); reject(new Error('Assistant connection unavailable')); };
       socket.onclose = () => {
-        clearTimeout(timer); this.ready = false; this.connecting = null;
+        clearTimeout(timer); this.ready = false; this.connecting = null; this.methods.clear();
         for (const p of this.pending.values()) { clearTimeout(p.timer); p.reject(new Error('Connection lost; check status before retrying')); }
         this.pending.clear(); reject(new Error('Assistant disconnected')); this.emit('disconnected');
       };
     });
     try { await this.connecting; } catch (e) { this.connecting = null; throw e; }
   }
+  supportsMethod(method) { return this.ready && this.methods.has(method); }
   async call(method, params = {}, timeoutMs = 30000) {
     await this.connect();
     return new Promise((resolve, reject) => {

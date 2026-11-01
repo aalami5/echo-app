@@ -4,6 +4,7 @@ import { assistantApi, newSubmissionId } from './assistant';
 
 export const MAX_ATTACHMENTS = 5;
 export const MAX_ATTACHMENT_BYTES = 6 * 1024 * 1024;
+export const MAX_TOTAL_ATTACHMENT_BYTES = 18 * 1024 * 1024;
 export type AssistantAttachment = { id: string; fileName: string; uri: string; mimeType: string; size: number; image: boolean };
 export async function prepareAttachment(asset: { uri: string; name?: string | null; mimeType?: string | null; size?: number; width?: number; height?: number }, image = false): Promise<AssistantAttachment> {
   const id = newSubmissionId();
@@ -29,6 +30,13 @@ export async function prepareAttachment(asset: { uri: string; name?: string | nu
 }
 export async function uploadAttachments(conversationId: string, files: AssistantAttachment[], progress: (done: number, total: number) => void) {
   if (files.length > MAX_ATTACHMENTS) throw new Error('Attach up to five files per message.');
+  let totalBytes = 0;
+  for (const file of files) {
+    const info = await FileSystem.getInfoAsync(file.uri);
+    if (!info.exists || !info.size || info.size > MAX_ATTACHMENT_BYTES) throw new Error(`${file.fileName} is unavailable or exceeds 6 MB. Remove it and select it again.`);
+    totalBytes += info.size;
+  }
+  if (totalBytes > MAX_TOTAL_ATTACHMENT_BYTES) throw new Error('These attachments exceed 18 MB combined. Send them in smaller batches.');
   const ids: string[] = [];
   progress(0, files.length);
   for (const file of files) {

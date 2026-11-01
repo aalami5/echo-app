@@ -26,6 +26,12 @@ test('uploads remain scoped, stable retry keys survive lost acknowledgments; rej
 test('cleanup cannot delete unrelated clinical or source files',async()=>{
  deletes=[];await media.removeLocalAttachments([{uri:'file:///clinical/report.pdf'},{uri:'file:///private/assistant-drafts/a.jpg'}]);assert.deepEqual(deletes,['file:///private/assistant-drafts/a.jpg']);
 });
+test('oversized combined batch is rejected before reading or uploading any content',async()=>{
+ calls=[];size=6*1024*1024;
+ const files=Array.from({length:4},(_,i)=>({id:`file${i}`,uri:`file:///draft${i}`,fileName:`file${i}.pdf`,mimeType:'application/pdf'}));
+ await assert.rejects(media.uploadAttachments('home',files,()=>{}),/18 MB combined/);
+ assert.equal(calls.length,0);size=100;
+});
 test('live camera capture requires review and explicit Add; retake sends nothing',async()=>{
  let ui,added=0;await act(async()=>{ui=create(React.createElement(AssistantCamera,{busy:false,onCapture:async()=>{added++;},onClose(){}}));});
  const button=label=>ui.root.findAllByType('Button').find(b=>b.props.accessibilityLabel===label);

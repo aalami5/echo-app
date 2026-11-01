@@ -32,6 +32,32 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
   const save = () => atomicWrite(indexFile, state);
   const events = []; let seq = 0; const epoch = randomUUID();
   const subscriptions = new Map(); const voices = new Map(); const ensuring = new Map(); const creatingVoice = new Set();
+  // Silent, call-bound receipts/results. Never send another chat turn or put
+  // provider control credentials on the phone. Failures don't undo admission.
+  const notifyAttachments = (conversationId, id, stage, files, result) => {
+    for (const [voiceSessionId, v] of voices) {
+      if (v.conversationId !== conversationId || !v.exchanged || !v.contextSecret) continue;
+      v.attachmentNotices ||= new Set();
+      const key = `${id}:${stage}`;
+      if (v.attachmentNotices.has(key)) continue;
+      v.attachmentNotices.add(key);
+      v.contextQueue = (v.contextQueue || Promise.resolve()).then(async () => {
+        if (voices.get(voiceSessionId) !== v) return;
+        try {
+          const response = await fetchVoice(`${gatewayUrl}/plugins/openai/realtime/calls`, {
+            method: 'POST', headers: { Authorization: `Bearer ${v.contextSecret}`, 'Content-Type': 'application/vnd.echo.attachment-context+json' },
+            body: JSON.stringify({ voiceSessionId, id, stage, files: files.map(f => ({ name: f.fileName, mimeType: f.mimeType })), ...(result ? { result: result.slice(0, 12000) } : {}) }),
+            redirect: 'error', signal: AbortSignal.timeout(5500),
+          });
+          await response.body?.cancel();
+          events.push({ sequence: ++seq, conversationId, at: Date.now(), state: 'attachment.voice', receiptId: id, stage, delivered: response.ok });
+        } catch {
+          events.push({ sequence: ++seq, conversationId, at: Date.now(), state: 'attachment.voice', receiptId: id, stage, delivered: false });
+        }
+        if (events.length > 500) events.shift();
+      });
+    }
+  };
   const prefix = '/patients/assistant';
   app.use(prefix, (req, res, next) => {
     const supplied = String(req.headers.authorization || '').replace(/^Bearer /, '');
@@ -85,6 +111,14 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
       const text = publicText(p.message);
       const entry = { sequence: ++seq, conversationId: c.id, runId: p.runId, state: p.state, text, error: p.errorMessage, at: Date.now() };
       events.push(entry); if (events.length > 500) events.shift();
+      const submission = state.submissions[p.runId];
+      if (submission?.conversationId === c.id && submission.attachmentIds?.length && ['final', 'error', 'aborted'].includes(p.state)) {
+        const files = submission.attachmentIds.map(id => state.uploads[id]).filter(Boolean);
+        if (files.length) {
+          submission.analysisStatus = p.state === 'final' ? 'completed' : 'failed'; save();
+          notifyAttachments(c.id, p.runId, submission.analysisStatus, files, p.state === 'final' ? text : undefined);
+        }
+      }
     }
   });
   route('get', '/tasks', async (_req, res) => {
@@ -135,7 +169,9 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
       fs.writeFileSync(file, bytes, { mode: 0o600 });
       state.uploads[idempotencyKey] = { id: idempotencyKey, conversationId, fileName, mimeType: String(mimeType || 'application/octet-stream').slice(0, 120), sizeBytes: bytes.length, hash: fingerprint, file, status: 'uploaded' }; save();
     }
-    const { file, hash: ignored, ...upload } = state.uploads[idempotencyKey]; res.json(upload);
+    const { file, hash: ignored, ...upload } = state.uploads[idempotencyKey];
+    notifyAttachments(conversationId, idempotencyKey, 'received', [upload]);
+    res.json(upload);
   });
   const send = async (id, body) => {
     const c = await ensure(id); const text = typeof body.message === 'string' ? body.message.trim() : '';
@@ -143,6 +179,8 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
     if (!/^[a-zA-Z0-9_-]{8,100}$/.test(body.idempotencyKey || '')) bad('Missing stable submission identity');
     const uploads = (body.attachmentIds || []).map(id => state.uploads[id] || bad('Attachment not found', 404));
     if (uploads.length > 5 || uploads.some(u => u.conversationId !== c.id)) bad('Attachment is not part of this conversation', 403);
+    // Base64 adds one third; keep the complete frame below the gateway's 25 MB limit.
+    if (uploads.reduce((sum, u) => sum + u.sizeBytes, 0) > 18 * 1024 * 1024) bad('Attachments exceed 18 MB combined; send a smaller batch', 413);
     const requestHash = hash(JSON.stringify({ id, text, files: uploads.map(u => u.hash), mode: body.mode || 'steer' }));
     const old = state.submissions[body.idempotencyKey];
     if (old) {
@@ -154,10 +192,12 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
     const attachments = uploads.map(u => ({ type: u.mimeType.startsWith('image/') ? 'image' : 'file', mimeType: u.mimeType, fileName: u.fileName, content: fs.readFileSync(u.file).toString('base64'), sizeBytes: u.sizeBytes }));
     const project = PROJECTS[c.project];
     const preface = project?.wiki ? `[Echo app project: ${project.title}. Current reference: ${project.wiki}. Use relevant current sources; this reference is not a new task.]\n\n` : '';
-    state.submissions[body.idempotencyKey] = { conversationId: id, hash: requestHash, acceptedAt: Date.now(), state: 'sending' }; save();
+    state.submissions[body.idempotencyKey] = { conversationId: id, hash: requestHash, attachmentIds: uploads.map(u => u.id), acceptedAt: Date.now(), state: 'sending' }; save();
     try {
       const receipt = await rpc.call('chat.send', { sessionKey: c.key, message: preface + text, idempotencyKey: body.idempotencyKey, queueMode: body.mode === 'followup' ? 'followup' : 'steer', attachments, deliver: false }, 45000);
-      state.submissions[body.idempotencyKey].receipt = receipt; state.submissions[body.idempotencyKey].state = 'accepted'; save(); return receipt;
+      state.submissions[body.idempotencyKey].receipt = receipt; state.submissions[body.idempotencyKey].state = 'accepted'; save();
+      if (uploads.length && !state.submissions[body.idempotencyKey].analysisStatus) notifyAttachments(id, body.idempotencyKey, 'accepted', uploads);
+      return receipt;
     } catch (e) {
       state.submissions[body.idempotencyKey].state = 'uncertain'; save(); throw e;
     }
@@ -166,9 +206,12 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
   route('get', '/conversations/:id/activity', async (req, res) => {
     const c = await ensure(req.params.id);
     const outstanding = Object.entries(state.submissions).filter(([,s]) => s.conversationId === c.id && s.state !== 'accepted').slice(-50).map(([id]) => id);
+    // Optional legacy task tracking must not break chat/voice activity on
+    // gateways that no longer advertise tasks.list. Never widen auth scopes.
+    const tasksAvailable = rpc.supportsMethod?.('tasks.list') === true;
     const [history, tasks, artifacts] = await Promise.all([
       rpc.call('chat.history', { sessionKey: c.key, limit: 1, ...(outstanding.length ? { inputRunIds: outstanding } : {}) }),
-      rpc.call('tasks.list', { sessionKey: c.key, limit: 50 }),
+      tasksAvailable ? rpc.call('tasks.list', { sessionKey: c.key, limit: 50 }) : Promise.resolve({ tasks: [] }),
       rpc.call('artifacts.list', { sessionKey: c.key }),
     ]);
     let changed = false;
@@ -177,8 +220,8 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
       if (saved?.conversationId === c.id && saved.state !== 'accepted') { saved.state = 'accepted'; saved.receipt = { runId: r.runId, status: r.state }; changed = true; }
     }
     if (changed) save();
-    const submissions = Object.entries(state.submissions).filter(([, s]) => s.conversationId === c.id).slice(-30).map(([id, s]) => ({ id, state: s.state, acceptedAt: s.acceptedAt, receipt: s.receipt }));
-    res.json({ session: history.sessionInfo, tasks: tasks.tasks, artifacts: artifacts.artifacts, submissions });
+    const submissions = Object.entries(state.submissions).filter(([, s]) => s.conversationId === c.id).slice(-30).map(([id, s]) => ({ id, state: s.state, acceptedAt: s.acceptedAt, receipt: s.receipt, analysisStatus: s.analysisStatus, attachmentCount: s.attachmentIds?.length || 0 }));
+    res.json({ session: history.sessionInfo, tasks: tasks.tasks, tasksStatus: tasksAvailable ? 'available' : 'unsupported', artifacts: artifacts.artifacts, submissions });
   });
   route('post', '/conversations/:id/stop', async (req, res) => {
     const c = await ensure(req.params.id);
@@ -232,7 +275,7 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
       if (voice.voiceSessionId) await rpc.call('talk.client.close', { sessionKey: c.key, voiceSessionId: voice.voiceSessionId });
       bad('Gateway-controlled Live Voice is not available');
     }
-    voices.set(voice.voiceSessionId, { conversationId: c.id, key: c.key, secret: voice.clientSecret, expiresAt: now() + 60000, exchanged: false });
+    voices.set(voice.voiceSessionId, { conversationId: c.id, key: c.key, secret: voice.clientSecret, contextSecret: voice.clientSecret, expiresAt: now() + 60000, exchanged: false });
     res.json({ voiceSessionId: voice.voiceSessionId, control: 'gateway', expiresAt: now() + 60000 });
     } finally { creatingVoice.delete(c.id); }
   });

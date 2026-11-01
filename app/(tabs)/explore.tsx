@@ -18,7 +18,7 @@ import { useRouter } from 'expo-router';
 import * as Haptics from 'expo-haptics';
 import Constants from 'expo-constants';
 import { useAuthStore } from '../../src/stores/authStore';
-import { useChatStore } from '../../src/stores/chatStore';
+import { useAssistantConnection } from '../../src/hooks/useAssistantConnection';
 import { useSettingsStore, TextScale } from '../../src/stores/settingsStore';
 import { useCalendar } from '../../src/hooks/useCalendar';
 import { useCalendarStore } from '../../src/stores/calendarStore';
@@ -34,7 +34,6 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuthStore();
-  const { isConnected } = useChatStore();
   const { 
     openaiApiKey, 
     elevenlabsApiKey, 
@@ -62,7 +61,7 @@ export default function SettingsScreen() {
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
   const [crashLogCount, setCrashLogCount] = useState(0);
 
-  const connectionStatus: ConnectionStatus = isConnected ? 'connected' : 'disconnected';
+  const { connectionStatus, checkConnection } = useAssistantConnection(gatewayUrl, gatewayToken);
 
   const refreshCrashLogs = async () => {
     const logs = await getCrashLogs();
@@ -209,7 +208,7 @@ export default function SettingsScreen() {
                 </View>
               </View>
               {connectionStatus === 'disconnected' && (
-                <TouchableOpacity style={styles.retryButton} activeOpacity={0.7}>
+                <TouchableOpacity style={styles.retryButton} activeOpacity={0.7} accessibilityRole="button" accessibilityLabel="Retry Echo Gateway connection" onPress={() => { void checkConnection(); }}>
                   <Text style={styles.retryButtonText}>Retry</Text>
                 </TouchableOpacity>
               )}

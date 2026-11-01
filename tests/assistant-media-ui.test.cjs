@@ -1,6 +1,6 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('fs'),ts=require('typescript'),Module=require('module');
 const React=require('react'),{create,act}=require('react-test-renderer');global.IS_REACT_ACT_ENVIRONMENT=true;
-const load=Module._load;let focused=true,photos=0,files=0,uploads=[],submissions=[],stops=0,failUpload=false;
+const load=Module._load;let focused=true,photos=0,files=0,uploads=[],submissions=[],stops=0,failUpload=false,haptics=0,holdSubmit=null;
 const storage=new Map(),appListeners=new Set();const voice={status:'connected',isActive:true,isConnected:true,isSupported:true,muted:false,speaking:false,level:0,startedAt:1,stop:()=>stops++,start(){},resume(){},toggleMute(){}};
 const animation=()=>({start(){},stop(){}});
 Module._load=function(id,...args){
@@ -11,14 +11,16 @@ Module._load=function(id,...args){
  if(id==='expo-image-picker')return {launchImageLibraryAsync:async()=>{photos++;return {canceled:false,assets:[{uri:'file:///photo',width:100,height:100,fileName:'Picture.jpg'}]}}};
  if(id==='expo-document-picker')return {getDocumentAsync:async()=>{files++;return {canceled:true}}};
  if(id==='expo-file-system/legacy')return {documentDirectory:'file:///private/'};
+ if(id==='expo-router')return {useLocalSearchParams:()=>({}),useRouter:()=>({replace(){}})};
+ if(id==='expo-haptics')return {NotificationFeedbackType:{Success:'success'},notificationAsync:async()=>{haptics++;}};
  if(id.startsWith('expo-'))return {};
  if(id.includes('@expo/vector-icons'))return {__esModule:true,default:'Icon'};
  if(id.endsWith('/ChatViewport'))return {ChatViewport:({children})=>React.createElement('Viewport',null,children)};
  if(id.endsWith('/AssistantCamera'))return {AssistantCamera:'CameraPanel'};
  if(id.endsWith('/chatStore'))return {useChatStore:fn=>fn({messages:[],hasHydrated:true})};
  if(id.endsWith('/useRealtimeVoice'))return {useRealtimeVoice:()=>voice,liveVoiceSession:{getSnapshot:()=>voice}};
- if(id.endsWith('/services/assistantMedia'))return {MAX_ATTACHMENTS:5,prepareAttachment:async()=>({id:'photo1',fileName:'Picture.jpg',uri:'file:///private/assistant-drafts/photo1',image:true}),removeLocalAttachments:async()=>{},uploadAttachments:async(id,files)=>{uploads.push({id,files});if(failUpload)throw Error('Offline; retry');return files.map(f=>f.id)}};
- if(id.endsWith('/services/assistant'))return {newSubmissionId:()=>`message${submissions.length}`,loadSubmissions:async()=>[],saveSubmission:async()=>{},submit:async x=>submissions.push(x),visibleHistory:()=>[],assistantApi:async path=>path==='/bootstrap'?{conversations:[{id:'home',title:'Home'}]}:path.endsWith('/activity')?{session:{},tasks:[],artifacts:[]}:path.includes('/events')?{events:[],epoch:'e',cursor:0}:{messages:[]}};
+ if(id.endsWith('/services/assistantMedia'))return {MAX_ATTACHMENTS:5,prepareAttachment:async()=>({id:'photo1',fileName:'Picture.jpg',uri:'file:///private/assistant-drafts/photo1',image:true}),removeLocalAttachments:async()=>{},uploadAttachments:async(id,files,progress)=>{uploads.push({id,files});progress(0,files.length);if(failUpload)throw Error('Offline; retry');progress(files.length,files.length);return files.map(f=>f.id)}};
+ if(id.endsWith('/services/assistant'))return {newSubmissionId:()=>`message${submissions.length}`,loadSubmissions:async()=>[],saveSubmission:async()=>{},submit:async x=>{submissions.push(x);if(holdSubmit)await holdSubmit;},visibleHistory:()=>[],assistantApi:async path=>path==='/bootstrap'?{conversations:[{id:'home',title:'Home'}]}:path.endsWith('/activity')?{session:{},tasks:[],artifacts:[]}:path.includes('/events')?{events:[],epoch:'e',cursor:0}:{messages:[]}};
  return load.call(this,id,...args);
 };
 for(const ext of ['.ts','.tsx'])require.extensions[ext]=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText,f);
@@ -58,5 +60,19 @@ test('voice plus menu offers all sources; Files cancellation and menu cancellati
  assert.equal(ui.root.findAllByType('Button').some(b=>b.props.accessibilityLabel==='Files'),false);
  await press(ui,'Add attachment');await press(ui,'Cancel');
  assert.equal(stops,before.stops);assert.equal(uploads.length,before.uploads);assert.equal(submissions.length,before.submissions);
+ await act(async()=>ui.unmount());
+});
+test('upload confirmation is visible and haptic before review admission, without claiming analysis is finished',async()=>{
+ storage.clear(); const before=haptics; let ui,release;
+ holdSubmit=new Promise(resolve=>{release=resolve;});
+ await act(async()=>{ui=create(React.createElement(Screen));});
+ await press(ui,'Add attachment');await press(ui,'Photo Library');
+ let sending;
+ await act(async()=>{sending=ui.root.findAllByType('Button').find(b=>b.props.accessibilityLabel==='Send to Echo').props.onPress();await new Promise(r=>setImmediate(r));});
+ const texts=()=>ui.root.findAllByType('Text').map(t=>t.children.filter(x=>typeof x==='string').join('')).join('\n');
+ assert.match(texts(),/Received 1 attachment · Saved by Echo/);
+ assert.doesNotMatch(texts(),/Review ready/);assert.equal(haptics,before+1);
+ await act(async()=>{release();await new Promise(r=>setImmediate(r));});holdSubmit=null;
+ assert.match(texts(),/Received 1 attachment · Review requested/);
  await act(async()=>ui.unmount());
 });

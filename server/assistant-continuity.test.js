@@ -7,6 +7,7 @@ const { installAssistantContinuity } = require('./assistant-continuity');
 class FakeGateway extends EventEmitter {
   constructor() { super(); this.generation = 1; this.calls = []; this.sent = 0; this.history = []; this.failSend = false; this.active = []; }
   async connect() {}
+  supportsMethod(method) { return method === 'tasks.list'; }
   close() {}
   async call(method, params) {
     this.calls.push({ method, params });
@@ -117,6 +118,57 @@ test('uncertain request is reconciled from native input custody without resubmis
   const call=rpc.call.bind(rpc);rpc.call=async(method,params)=>method==='chat.history'?{messages:[],sessionInfo:{},inputReceipts:[{runId:'request_custody',state:'consumed',consumedByEventId:'one'}]}:call(method,params);
   const a=await request('/conversations/home/activity');assert.equal(a.status,200);
   assert.equal(a.data.submissions[0].state,'accepted');assert.equal(instance.state.submissions.request_custody.receipt.runId,'request_custody');assert.equal(rpc.sent,1);
+});
+test('unsupported legacy task listing does not break authenticated activity or trigger admin requests', async t => {
+  const rpc = new FakeGateway(); rpc.supportsMethod = () => false;
+  const original = rpc.call.bind(rpc);
+  rpc.call = async (method, params) => {
+    assert.notEqual(method, 'tasks.list', 'unsupported RPC must not be sent');
+    return original(method, params);
+  };
+  const { request } = await fixture(t, rpc);
+  const result = await request('/conversations/home/activity');
+  assert.equal(result.status, 200);
+  assert.equal(result.data.tasksStatus, 'unsupported');
+  assert.deepEqual(result.data.tasks, []);
+  assert.ok(result.data.session);
+  assert.equal(rpc.sent, 0);
+});
+test('advertised task method failures remain visible rather than being treated as an empty list', async t => {
+  const rpc = new FakeGateway(); const original = rpc.call.bind(rpc);
+  rpc.call = async (method, params) => {
+    if (method === 'tasks.list') throw Error('task service unavailable');
+    return original(method, params);
+  };
+  const { request } = await fixture(t, rpc);
+  assert.equal((await request('/conversations/home/activity')).status, 503);
+});
+test('upload receipt reaches only its active voice call before any analysis; completion follows without a second send', async t => {
+  const upstream = [];
+  const { request, rpc } = await fixture(t, new FakeGateway(), { fetchVoice: async (url, options) => {
+    upstream.push({ url, options });
+    return new Response(options.headers['Content-Type'] === 'application/sdp' ? 'v=0\r\n' : '{}');
+  } });
+  await request('/conversations/home/voice', {});
+  await request('/conversations/home/voice/voice-one/offer', { sdp: 'v=0\r\n' });
+  await request('/conversations/home/voice/voice-one/ready', {});
+  const upload = await request('/uploads', { conversationId: 'home', idempotencyKey: 'receipt_upload1', name: 'receipt.jpg', mimeType: 'image/jpeg', content: Buffer.from('synthetic').toString('base64') });
+  assert.equal(upload.status, 200); assert.equal(rpc.sent, 0);
+  await new Promise(r => setImmediate(r));
+  const notices = () => upstream.filter(x => x.options.headers['Content-Type'] === 'application/vnd.echo.attachment-context+json').map(x => JSON.parse(x.options.body));
+  assert.equal(notices().length, 1); assert.equal(notices()[0].stage, 'received');
+  assert.equal(notices()[0].voiceSessionId, 'voice-one');
+  const foreign = await request('/uploads', { conversationId: 'expenses', idempotencyKey: 'receipt_other1', name: 'other.txt', content: Buffer.from('test').toString('base64') });
+  assert.equal(foreign.status, 200); await new Promise(r => setImmediate(r)); assert.equal(notices().length, 1);
+  await request('/conversations/home/send', { message: 'Review attached', idempotencyKey: 'receipt_send1', attachmentIds: [upload.data.id] });
+  rpc.emit('event', { event: 'chat', payload: { sessionKey: 'agent:main:echo-app:home', runId: 'receipt_send1', state: 'final', message: { role: 'assistant', content: 'The photo contains a teal square.' } } });
+  await new Promise(r => setImmediate(r));
+  assert.deepEqual(notices().map(x => x.stage), ['received', 'accepted', 'completed']);
+  assert.equal(notices().at(-1).result, 'The photo contains a teal square.'); assert.equal(rpc.sent, 1);
+  const activity = await request('/conversations/home/activity'); assert.equal(activity.data.submissions.at(-1).analysisStatus, 'completed');
+  await request('/conversations/home/voice/voice-one/close', {});
+  await request('/uploads', { conversationId: 'home', idempotencyKey: 'receipt_after1', name: 'closed.txt', content: Buffer.from('test').toString('base64') });
+  await new Promise(r => setImmediate(r)); assert.equal(notices().length, 3);
 });
 test('concurrent startup uses the protocol key and subscribes once per connection', async t=>{
  const {rpc,request}=await fixture(t);rpc.calls=[];rpc.generation++;
