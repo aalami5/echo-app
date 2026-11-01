@@ -18,7 +18,9 @@ export function cleanAttachmentContext(value, voiceSessionId) {
 }
 
 export function attachVoiceAttachmentContext(bridge, request) {
-  if (request.agentId !== 'main' || !request.echoVoiceSessionId || request.clientControl?.owner !== 'gateway') return;
+  // Factory receives the original request with gatewayControl. clientControl
+  // is added only to the broker copy, not the request captured by createBridge.
+  if (request.agentId !== 'main' || !request.echoVoiceSessionId || !request.gatewayControl) return;
   const receipts = new Map(); const pending = new Map();
   const handle = bridge.handleEvent.bind(bridge);
   bridge.handleEvent = (event, ...args) => {

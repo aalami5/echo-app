@@ -9,7 +9,7 @@ function setup(ack = true) {
     events.push(event);
     queueMicrotask(() => this.handleEvent(ack ? { type: 'conversation.item.added', item: { id: event.item.id } } : { type: 'error', error: { event_id: event.event_id } }));
   } };
-  const controller = attachVoiceAttachmentContext(bridge, { agentId: 'main', echoVoiceSessionId: 'voice-one', clientControl: { owner: 'gateway' } });
+  const controller = attachVoiceAttachmentContext(bridge, { agentId: 'main', echoVoiceSessionId: 'voice-one', gatewayControl: {} });
   return { bridge, controller, events };
 }
 test('receipt is silent reference context, acknowledged by provider, and at-most-once', async () => {
@@ -32,6 +32,7 @@ test('analysis arrives as a separate completed result; file text cannot become p
 });
 test('foreign calls and malformed receipts are rejected without context injection', async () => {
   const { controller, events } = setup();
+  assert.equal(attachVoiceAttachmentContext({}, { agentId: 'main', echoVoiceSessionId: 'voice-one', clientControl: { owner: 'gateway' } }), undefined);
   await assert.rejects(controller.receive({ ...payload, voiceSessionId: 'another-call' }), /Wrong voice session/);
   await assert.rejects(controller.receive({ ...payload, stage: 'execute' }), /Invalid stage/);
   await assert.rejects(controller.receive({ ...payload, files: [] }), /Invalid files/);
