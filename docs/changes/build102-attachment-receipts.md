@@ -52,3 +52,24 @@ response/tool invocation, deduplication, call/conversation isolation, closed
 calls, retained drafts, combined size limits, and Settings Retry. Native build,
 signed package, Apple internal availability, live provider acknowledgment,
 and physical-phone receipt/audio behavior are separate checks.
+
+### Local worktree export check
+
+When this worktree uses a symlinked `node_modules`, Expo Router can resolve
+the dependency owner's app root and export a valid bundle without this app's
+screens. Set `EXPO_ROUTER_APP_ROOT` to this checkout's absolute `app` directory
+for the local export command, clear Metro's cache, and verify expected UI
+markers in the resulting Hermes bundle. Do not commit that machine-specific
+path or apply it to EAS. The independently downloaded cloud IPA must contain
+the same expected markers; a successful export exit alone is insufficient.
+
+### Verified release evidence
+
+- App source cb2a023, Echo 1.0.0 (102), com.oppersmedical.echo.
+- EAS 60666c6a-c6ed-4b49-9906-2ec6327d664e compiled successfully; signed IPA
+  identity, code signature, receipt/Retry UI and retained safe-start markers passed.
+- Gateway-only follow-up cf4f30b matches the original factory request's
+  `gatewayControl`; `clientControl` exists only on the separate broker copy.
+- Isolated live provider acknowledged received/completed context, suppressed a
+  duplicate receipt, and started zero responses. This is not physical-phone proof.
+- Detailed deployment state: workspace `data/echo-attachment102/STATUS.md`.
