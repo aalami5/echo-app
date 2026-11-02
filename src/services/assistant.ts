@@ -39,8 +39,10 @@ export function visibleHistory(rows: any[]): AssistantMessage[] {
     if (!['user', 'assistant'].includes(m.role) || m.channel === 'analysis') return [];
     const content = typeof m.content === 'string' ? m.content : (m.content || []).filter((p: any) => p.type === 'text' || p.type === 'output_text').map((p: any) => p.text || '').join('\n');
     if (!content.trim() || /^(NO_REPLY|HEARTBEAT_OK)$/.test(content.trim())) return [];
+    const date = new Date(m.timestamp || row.timestamp || 0);
+    const timestamp = (m.timestamp || row.timestamp) && !Number.isNaN(date.valueOf()) ? date.toISOString() : undefined;
     // Native transcript IDs, never content-based deduplication (repeated speech is valid).
-    return [{ id: row.__openclaw?.id || m.__openclaw?.id || row.id || row.messageId || m.id || `history-${index}`, role: m.role, content, timestamp: m.timestamp || row.timestamp }];
+    return [{ id: row.__openclaw?.id || m.__openclaw?.id || row.id || row.messageId || m.id || `history-${index}`, role: m.role, content, timestamp }];
   });
 }
 const OUTBOX = 'echo-assistant-outbox-v1';

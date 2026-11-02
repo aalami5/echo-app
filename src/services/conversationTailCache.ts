@@ -41,7 +41,8 @@ function encode(messages: AssistantMessage[]): string | null {
   return raw.length <= MAX_TAIL_CHARS ? raw : null;
 }
 
-export function createConversationTailCache(storage: Storage) {
+export function createConversationTailCache(storage: Storage, namespace = '') {
+  const cacheKey = (id: string) => keyFor(namespace + id);
   const entries = new Map<string, Entry>();
   const getEntry = (id: string): Entry | undefined => {
     let entry = entries.get(id);
@@ -62,7 +63,7 @@ export function createConversationTailCache(storage: Storage) {
   return {
     async read(id: string): Promise<AssistantMessage[]> {
       const entry = getEntry(id), revision = entry?.revision;
-      const raw = await storage.getItem(keyFor(id));
+      const raw = await storage.getItem(cacheKey(id));
       // Keep an oversized/invalid legacy file untouched; fetch authoritative history.
       if (!raw || raw.length > MAX_TAIL_CHARS) return [];
       let messages: unknown;
@@ -87,7 +88,7 @@ export function createConversationTailCache(storage: Storage) {
           entry.pending = undefined;
           if (value === entry.persisted) continue;
           try {
-            await storage.setItem(keyFor(id), value);
+            await storage.setItem(cacheKey(id), value);
             entry.persisted = value; // Failed writes must remain retryable.
           } catch (error) {
             if (entry.pending === undefined) entry.pending = value;

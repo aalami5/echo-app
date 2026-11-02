@@ -11,6 +11,7 @@ Module._load=function(id,...args){
  if(id==='expo-image-picker')return {launchImageLibraryAsync:async()=>{photos++;return {canceled:false,assets:[{uri:'file:///photo',width:100,height:100,fileName:'Picture.jpg'}]}}};
  if(id==='expo-document-picker')return {getDocumentAsync:async()=>{files++;return {canceled:true}}};
  if(id==='expo-file-system/legacy')return {documentDirectory:'file:///private/'};
+ if(id==='expo-router')return {useLocalSearchParams:()=>({}),useRouter:()=>({push(){},setParams(){}})};
  if(id.startsWith('expo-'))return {};
  if(id.includes('@expo/vector-icons'))return {__esModule:true,default:'Icon'};
  if(id.endsWith('/ChatViewport'))return {ChatViewport:({children})=>React.createElement('Viewport',null,children)};
@@ -24,20 +25,17 @@ Module._load=function(id,...args){
 for(const ext of ['.ts','.tsx'])require.extensions[ext]=(m,f)=>m._compile(ts.transpileModule(fs.readFileSync(f,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText,f);
 const Screen=require('../src/screens/AssistantScreen.tsx').default;Module._load=load;
 
-test('safe start never requests old conversation history or writes its cache across 100 refreshes',async()=>{
+test('launch and foreground load bounded Home history into a fresh cache without touching retained originals',async()=>{
  let ui;await act(async()=>{ui=create(React.createElement(Screen));});
  const interval=[...intervals.values()].find(x=>x.ms===1800);assert.ok(interval);
- const initial=writes.filter(x=>x.key==='echo-assistant-tail-home').length;
  for(let i=0;i<100;i++) await act(async()=>{await interval.fn();});
- const cacheWrites=writes.filter(x=>x.key==='echo-assistant-tail-home');
- assert.equal(initial,0);assert.equal(cacheWrites.length,0);
- assert.equal(apiCalls.filter(p=>p.includes('/history')).length,0);
- assert.ok(apiCalls.includes('/bootstrap'));
- const voiceView=ui.root.findByType(require('../src/components/VoiceCallView.tsx').VoiceCallView);
- await act(async()=>voiceView.props.onText());
- const historyButton=ui.root.findAllByType('Button').find(x=>x.props.accessibilityLabel==='Load recent conversation');
- assert.ok(historyButton);await act(async()=>historyButton.props.onPress());
- assert.equal(apiCalls.filter(p=>p.includes('/history')).length,1);
  assert.equal(writes.filter(x=>x.key==='echo-assistant-tail-home').length,0);
+ assert.equal(writes.filter(x=>x.key==='echo-assistant-tail-v103-home').length,1);
+ assert.ok(apiCalls.filter(p=>p.includes('/history')).length>=100);
+ assert.ok(apiCalls.includes('/bootstrap'));
+ const flat=ui.root.findByType('FlatList');assert.ok(flat.props.data.length<=100);
+ assert.ok(JSON.stringify(flat.props.data).length<=64*1024);
+ assert.equal(stops,0);
+ const before=apiCalls.length;for(const fn of appListeners)await act(async()=>fn('active'));assert.ok(apiCalls.length>before);
  await act(async()=>ui.unmount());global.setInterval=nativeInterval;global.clearInterval=nativeClear;
 });

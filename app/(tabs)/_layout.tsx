@@ -60,6 +60,7 @@ export default function TabLayout() {
         name="dictation"
         options={{
           title: 'Dictate',
+          href: null,
           tabBarIcon: ({ color, focused }) => (
             <TabBarIcon 
               name={focused ? 'mic' : 'mic-outline'} 

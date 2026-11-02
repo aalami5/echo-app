@@ -1,3 +1,5 @@
+import { UpdateCard } from '../components/UpdateCard';
+import { boundedMessages, mergeRecent, parseUpdate, decodeReadIds, UPDATE_READ_KEY } from '../services/chatUpdates';
 import { AUTOMATIC_RECOVERY_PAUSED } from '../services/startupRecovery';
 import { VoiceCallView, VoiceIconButton, voicePresentation } from '../components/VoiceCallView';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -45,9 +47,15 @@ export default function AssistantScreen() {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<AssistantMessage[]>([]);
   const [historyMore, setHistoryMore] = useState(false);
-  const historyRequested = useRef(!AUTOMATIC_RECOVERY_PAUSED);
-  const [historyPaused, setHistoryPaused] = useState(AUTOMATIC_RECOVERY_PAUSED);
-  const resumeHistory = () => { historyRequested.current = true; setHistoryPaused(false); };
+  const readingEarlier = useRef(false);
+  const [earlierPage, setEarlierPage] = useState(false);
+  const [updatesOnly, setUpdatesOnly] = useState(false);
+  const [readIds, setReadIds] = useState<string[]>([]);
+  const [readIdsReady, setReadIdsReady] = useState(false);
+  useEffect(() => { void AsyncStorage.getItem(UPDATE_READ_KEY).then(raw => { setReadIds(decodeReadIds(raw)); setReadIdsReady(true); }).catch(() => setReadIdsReady(true)); }, []);
+  useEffect(() => { if (readIdsReady) void AsyncStorage.setItem(UPDATE_READ_KEY, JSON.stringify(readIds.slice(-200))).catch(() => {}); }, [readIds, readIdsReady]);
+  const markRead = (id: string) => setReadIds(old => [...old.filter(x => x !== id), id].slice(-200));
+  const resumeHistory = () => { readingEarlier.current = false; setEarlierPage(false); };
   const [historyCount, setHistoryCount] = useState(0);
   const [activity, setActivity] = useState<any>({ tasks: [], artifacts: [], session: {} });
   const [stream, setStream] = useState<Record<string, string>>({});
@@ -76,7 +84,7 @@ export default function AssistantScreen() {
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newMessages, setNewMessages] = useState(false);
-  const [voiceView, setVoiceView] = useState(true);
+  const [voiceView, setVoiceView] = useState(false);
   const [voiceCaption, setVoiceCaption] = useState('');
   const pendingVoice = useRef(false);
   const dismissSheet = () => { if (pendingVoice.current) { pendingVoice.current = false; setVoiceView(true); } };
@@ -90,7 +98,7 @@ export default function AssistantScreen() {
   const loadingEarlier = useRef(false);
   const [tailCache] = useState(() => createConversationTailCache(createPreviewStorage(AsyncStorage, key => Platform.OS === 'ios'
     ? NativeModules?.EchoDiagnosticBridge?.canReadPreview?.(key) ?? Promise.resolve(false)
-    : Promise.resolve(true))));
+    : Promise.resolve(true)), 'v103-'));
   const historyPosition = useRef({ nextOffset: 0, total: 0, hasMore: false });
   const voice = useRealtimeVoice(conversationId);
   useEffect(() => {
@@ -116,15 +124,17 @@ export default function AssistantScreen() {
     refreshing.current = true; const id = selected.current;
     try {
       const [h, a, e, q] = await Promise.all([
-        (historyRequested.current ? assistantApi(`/conversations/${id}/history`) : Promise.resolve({messages:[]})), assistantApi(`/conversations/${id}/activity`),
+        (readingEarlier.current ? Promise.resolve(null) : assistantApi(`/conversations/${id}/history`)), assistantApi(`/conversations/${id}/activity`),
         assistantApi(`/conversations/${id}/events?epoch=${cursor.current.epoch}&after=${cursor.current.after}`), loadSubmissions(),
       ]);
       if (!alive.current || selected.current !== id) return;
-      const tail = visibleHistory(h.messages || []);
+      const tail = boundedMessages(visibleHistory(h?.messages || []));
       setMessages(old => {
+        if (!h) return old;
         if (initial) return tail;
-        const map = new Map(old.map(m => [m.id, m])); tail.forEach(m => map.set(m.id, m)); return [...map.values()];
+        return mergeRecent(old, tail);
       });
+      if (h) {
       const pos = historyPosition.current;
       if (initial || pos.nextOffset === 0) {
         pos.nextOffset = h.nextOffset || 0; pos.hasMore = !!h.hasMore;
@@ -133,6 +143,7 @@ export default function AssistantScreen() {
       } else { pos.nextOffset = h.nextOffset || 0; pos.hasMore = !!h.hasMore; }
       pos.total = h.totalMessages || 0;
       setHistoryMore(pos.hasMore); setHistoryCount(pos.nextOffset);
+      }
       const accepted = new Map((a.submissions || []).filter((r: any) => r.state === 'accepted').map((r: any) => [r.id, r.receipt]));
       for (const pending of q) if (pending.state !== 'accepted' && accepted.has(pending.id)) {
         pending.state = 'accepted'; pending.receipt = accepted.get(pending.id); await saveSubmission(pending);
@@ -145,7 +156,7 @@ export default function AssistantScreen() {
         if (submission?.analysisStatus === 'failed') return { ...old, stage: 'review_failed' };
         return old;
       });
-      if (!AUTOMATIC_RECOVERY_PAUSED) void tailCache.save(id, tail).catch(() => {});
+      if (h && !readingEarlier.current) void tailCache.save(id, tail).catch(() => {});
       cursor.current = { epoch: e.epoch, after: e.cursor };
       for (const event of e.events || []) {
         if (!event.voice && event.runId && ['final', 'error', 'aborted'].includes(event.state)) {
@@ -175,7 +186,9 @@ export default function AssistantScreen() {
     alive.current = true;
     void (async () => {
       try {
-        const b = await assistantApi('/bootstrap'); const saved = await AsyncStorage.getItem(SELECTED);
+        const b = await assistantApi('/bootstrap');
+        const live = liveVoiceSession.getSnapshot();
+        const saved = ['connecting','connected','reconnecting','paused','stopping'].includes(live.status) ? live.conversationId : 'home';
         if (!alive.current) return;
         setConversations(b.conversations); const id = b.conversations.some((c: Conversation) => c.id === saved) ? saved! : 'home';
         selected.current = id; setConversationId(id); setReady(true);
@@ -189,9 +202,9 @@ export default function AssistantScreen() {
     setVoiceNotice(null);
     cursor.current = { epoch: '', after: 0 };
     historyPosition.current = { nextOffset: 0, total: 0, hasMore: false };
-    const id = conversationId;
+    const id = conversationId; resumeHistory();
     let cacheReadActive = true;
-    if (!AUTOMATIC_RECOVERY_PAUSED) void tailCache.read(id).then(cached => {
+    void tailCache.read(id).then(cached => {
       if (cacheReadActive && selected.current === id) setMessages(old => old.length ? old : cached);
     }).catch(() => {});
     void refresh(true);
@@ -319,14 +332,13 @@ export default function AssistantScreen() {
     } finally { sendLock.current = false; setSending(false); setUploading(false); setUploadProgress(''); }
   };
   const loadEarlier = async () => {
-    resumeHistory();
     if (loadingEarlier.current || refreshing.current) return;
     loadingEarlier.current = true;
     try {
       const id = conversationId; const h = await assistantApi(`/conversations/${id}/history?offset=${historyCount}`);
       if (selected.current !== id) return;
-      const rows = visibleHistory(h.messages || []);
-      setMessages(old => { const m = new Map(rows.map(r => [r.id, r])); old.forEach(r => m.set(r.id, r)); return [...m.values()]; });
+      const rows = boundedMessages(visibleHistory(h.messages || []));
+      readingEarlier.current = true; setEarlierPage(true); setMessages(rows);
       historyPosition.current = { nextOffset: h.nextOffset || 0, total: h.totalMessages || 0, hasMore: !!h.hasMore };
       setHistoryCount(h.nextOffset || 0); setHistoryMore(!!h.hasMore);
     } catch (e: any) { setError(e.message); } finally { loadingEarlier.current = false; }
@@ -386,8 +398,14 @@ export default function AssistantScreen() {
     {outbox.length > 0 && <Button title="Delivery not confirmed · check in Text" onPress={() => setVoiceView(false)}/>}
     {(attachments.length > 0 || text.trim()) && <View><Text numberOfLines={2} style={s.subtle}>{text.trim() || `Send to Echo · ${title}`}</Text><Button primary title={sending ? uploadProgress || 'Sending…' : 'Send to Echo'} disabled={mediaBusy || !ready} onPress={() => {void send();}}/></View>}
   </>;
+  const unreadUpdates = messages.filter(m => parseUpdate(m) && !readIds.includes(m.id)).length;
+  const discussUpdate = (item: AssistantMessage) => {
+    const card = parseUpdate(item);
+    setVoiceView(false);
+    setText(old => old.trim() ? old : `Let's discuss the saved update “${card?.title || 'Update'}” (Home message ${item.id}). Please read that saved message for context.`);
+  };
   return <ChatViewport>
-    {voiceView ? <VoiceCallView visible={focused} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => {setCameraOpen(false);setMediaMenu(false);setVoiceView(false);}} onMore={() => setSheet('more')} onAttach={() => setMediaMenu(value => !value)} onHangUp={() => {setCameraOpen(false);setMediaMenu(false);void voice.stop();}} mediaDisabled={!ready || mediaBusy || cameraOpen} content={cameraPanel} draftContent={voiceDraft}/> : <>
+    {voiceView ? <VoiceCallView visible={focused} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => {setCameraOpen(false);setMediaMenu(false);setVoiceView(false);}} onMore={() => setSheet('more')} onAttach={() => setMediaMenu(value => !value)} onHangUp={() => {setCameraOpen(false);setMediaMenu(false);void voice.stop();}} mediaDisabled={!ready || mediaBusy || cameraOpen} content={cameraPanel} draftContent={<>{unreadUpdates > 0 && <Button title={`${unreadUpdates} new updates in Chat`} onPress={() => {setVoiceView(false); setUpdatesOnly(true);}}/>}{voiceDraft}</>}/> : <>
     <ScrollView style={s.conversationControls} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
     <View style={s.header}>
       <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button" accessibilityLabel="Select conversation" style={{ flex: 1 }}><Text style={s.heading}>Echo · {title} ▾</Text></TouchableOpacity>
@@ -400,16 +418,16 @@ export default function AssistantScreen() {
     </TouchableOpacity>
     {(mediaError || error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || mediaError || error || voiceNotice}</Text>}
     {receiptContent}
-    {requestedBrief && <View style={{ maxHeight: 320 }}><View style={s.row}><Text style={[s.role, {flex: 1}]}>Saved in Home · Morning brief</Text><Button title="Close" onPress={() => router.setParams({briefMessageId: undefined})}/></View><ScrollView>{linkedBrief ? <MessageText text={linkedBrief.content}/> : <Text style={s.subtle}>{briefError || 'Loading saved brief…'}</Text>}</ScrollView></View>}
-    {historyPaused && <View><Text style={s.subtle}>Safe start: earlier messages are not loaded automatically. Saved phone history remains untouched.</Text><Button title="Load recent conversation" onPress={() => { resumeHistory(); void refresh(true); }} /></View>}
+    {requestedBrief && <View style={{ maxHeight: 320 }}><View style={s.row}><Text style={[s.role, {flex: 1}]}>Saved in Home · Update</Text><Button title="Close" onPress={() => router.setParams({briefMessageId: undefined})}/></View><ScrollView>{linkedBrief ? <MessageText text={parseUpdate({id: linkedBrief.id, role:'assistant', content:linkedBrief.content})?.body || linkedBrief.content}/> : <Text style={s.subtle}>{briefError || 'Loading saved brief…'}</Text>}</ScrollView></View>}
+    <View style={s.row}><Button title={updatesOnly ? 'Show all messages' : `Updates${unreadUpdates ? ` · ${unreadUpdates} new` : ''}`} onPress={() => setUpdatesOnly(value => !value)}/>{earlierPage && <Button title="Back to latest" onPress={() => { resumeHistory(); void refresh(true); }}/>}</View>
     {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={reconnect} /></View>}
     </ScrollView>
-    {cameraPanel || <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
+    {cameraPanel || <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={updatesOnly ? messages.filter(m => parseUpdate(m)) : messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
       onScroll={e => { const n = e.nativeEvent; atBottom.current = n.contentOffset.y + n.layoutMeasurement.height >= n.contentSize.height - 100; }} scrollEventThrottle={100}
       onContentSizeChange={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); else setNewMessages(true); }}
       ListHeaderComponent={historyMore ? <Button title="Load earlier messages" onPress={() => { void loadEarlier(); }} /> : null}
       ListEmptyComponent={ready ? <View style={s.empty}><Text style={s.body}>Start a conversation here or tap Live Voice. You can continue it later without starting over.</Text><Button title="Earlier chats on this phone" onPress={() => setSheet('legacy')} /></View> : null}
-      renderItem={({ item }) => <TouchableOpacity activeOpacity={0.9} accessibilityHint="Long press for copy and share" onLongPress={() => Alert.alert('Message options', undefined, [{ text: 'Copy', onPress: () => { void Clipboard.setStringAsync(item.content); } }, { text: 'Share', onPress: () => { void Share.share({ message: item.content }); } }, { text: 'Cancel', style: 'cancel' }])} style={[s.message, item.role === 'user' && s.userMessage]}><Text style={s.role}>{item.role === 'user' ? 'You' : 'Echo'}</Text><MessageText text={item.content}/></TouchableOpacity>}
+      renderItem={({ item }) => parseUpdate(item) ? <UpdateCard card={parseUpdate(item)!} timestamp={item.timestamp} unread={!readIds.includes(item.id)} onRead={() => markRead(item.id)} onDiscuss={() => discussUpdate(item)} renderBody={body => <MessageText text={body}/>}/> : <TouchableOpacity activeOpacity={0.9} accessibilityHint="Long press for copy and share" onLongPress={() => Alert.alert('Message options', undefined, [{ text: 'Copy', onPress: () => { void Clipboard.setStringAsync(item.content); } }, { text: 'Share', onPress: () => { void Share.share({ message: item.content }); } }, { text: 'Cancel', style: 'cancel' }])} style={[s.message, item.role === 'user' && s.userMessage]}><Text style={s.role}>{item.role === 'user' ? 'You' : 'Echo'}</Text><MessageText text={item.content}/></TouchableOpacity>}
       ListFooterComponent={<View>
         {Object.entries(stream).map(([id, content]) => <View key={id} style={s.message}><Text style={s.role}>Echo · responding</Text><MessageText text={content}/></View>)}
         {outbox.map(item => <View key={item.id} style={s.message}><Text style={s.error}>Delivery not confirmed—check Activity before retrying.</Text><Text selectable style={s.body}>{item.message}</Text><Button disabled={sending} title="Check / retry same request" onPress={() => { void send(item); }}/></View>)}
@@ -431,6 +449,7 @@ export default function AssistantScreen() {
         <ScrollView keyboardShouldPersistTaps="handled">
           {sheet === 'more' && <>
             <Button title={callActive ? 'Return to Live Voice' : 'Live Voice'} onPress={() => { pendingVoice.current = true; setSheet(null); if (Platform.OS !== 'ios') dismissSheet(); }}/>
+            <Button title="Dictate" onPress={() => { setSheet(null); router.push('/dictation'); }} />
             <Button title="Conversations" onPress={() => setSheet('projects')}/>
             <Button title={active ? 'Activity · working' : 'Activity'} onPress={() => setSheet('activity')}/>
             <Button title="Memory" onPress={() => { void openMemory(); }}/>

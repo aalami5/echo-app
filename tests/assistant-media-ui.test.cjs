@@ -27,7 +27,7 @@ for(const ext of ['.ts','.tsx'])require.extensions[ext]=(m,f)=>m._compile(ts.tra
 const Screen=require('../src/screens/AssistantScreen.tsx').default;Module._load=load;
 const press=async(ui,label)=>{const b=ui.root.findAllByType('Button').find(b=>b.props.accessibilityLabel===label);assert.ok(b,label);assert.ok(!b.props.disabled,`${label} enabled`);await act(async()=>b.props.onPress());};
 test('photo draft survives voice/text/tab switches and upload failure; explicit send shares same conversation',async()=>{
- let ui;await act(async()=>{ui=create(React.createElement(Screen));});
+ let ui;await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Return to Live Voice');
  assert.equal(ui.root.findAllByType('Modal').length,0);
  assert.equal(ui.root.findAllByType('Text').some(t=>t.children.some(v=>typeof v==='string'&&/^(Tasks(?: ·.*)?|Show all|Active only)$/.test(v))),false);
  for(const label of ['Show captions','Mute microphone','Hang up','Switch to chat; keep connection active'])assert.ok(ui.root.findAllByType('Button').some(b=>b.props.accessibilityLabel===label),label);
@@ -40,19 +40,19 @@ test('photo draft survives voice/text/tab switches and upload failure; explicit 
  assert.equal(ui.root.findAllByType('Image').length,0);await act(async()=>ui.unmount());
 });
 test('camera closes on navigation away without hanging up or changing conversation',async()=>{
- let ui;await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Add attachment');await press(ui,'Camera');assert.equal(ui.root.findAllByType('CameraPanel').length,1);
+ let ui;await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Return to Live Voice');await press(ui,'Add attachment');await press(ui,'Camera');assert.equal(ui.root.findAllByType('CameraPanel').length,1);
  focused=false;await act(async()=>ui.update(React.createElement(Screen)));assert.equal(ui.root.findAllByType('CameraPanel').length,0);
  focused=true;await act(async()=>ui.update(React.createElement(Screen)));assert.equal(ui.root.findAllByType('CameraPanel').length,0);assert.equal(stops,0);await act(async()=>ui.unmount());
 });
 
 test('Hang up also closes an open camera, but retains the conversation draft',async()=>{
- let ui;await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Add attachment');await press(ui,'Photo Library');await press(ui,'Add attachment');await press(ui,'Camera');assert.equal(ui.root.findAllByType('CameraPanel').length,1);
+ let ui;await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Return to Live Voice');await press(ui,'Add attachment');await press(ui,'Photo Library');await press(ui,'Add attachment');await press(ui,'Camera');assert.equal(ui.root.findAllByType('CameraPanel').length,1);
  await press(ui,'Hang up');assert.equal(stops,1);assert.equal(ui.root.findAllByType('CameraPanel').length,0);assert.equal(ui.root.findAllByType('Image').length,1);await act(async()=>ui.unmount());
 });
 
 test('voice plus menu offers all sources; Files cancellation and menu cancellation do not send or disconnect',async()=>{
  const before={stops,uploads:uploads.length,submissions:submissions.length,files};let ui;
- await act(async()=>{ui=create(React.createElement(Screen));});
+ await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Return to Live Voice');
  assert.equal(ui.root.findAllByType('Button').filter(b=>b.props.accessibilityLabel==='Add attachment').length,1);
  await press(ui,'Add attachment');
  for(const label of ['Camera','Photo Library','Files','Cancel'])assert.ok(ui.root.findAllByType('Button').some(b=>b.props.accessibilityLabel===label));
@@ -65,7 +65,7 @@ test('voice plus menu offers all sources; Files cancellation and menu cancellati
 test('upload confirmation is visible and haptic before review admission, without claiming analysis is finished',async()=>{
  storage.clear(); const before=haptics; let ui,release;
  holdSubmit=new Promise(resolve=>{release=resolve;});
- await act(async()=>{ui=create(React.createElement(Screen));});
+ await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Return to Live Voice');
  await press(ui,'Add attachment');await press(ui,'Photo Library');
  let sending;
  await act(async()=>{sending=ui.root.findAllByType('Button').find(b=>b.props.accessibilityLabel==='Send to Echo').props.onPress();await new Promise(r=>setImmediate(r));});
