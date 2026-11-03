@@ -33,7 +33,7 @@ global.XMLHttpRequest = class {
   send() { queueMicrotask(() => { if (serverFailure) this.onerror(); else this.onload(); }); }
   abort() { this.onabort?.(); }
 };
-const Screen = require('../app/(tabs)/patients.tsx').default;
+const Screen = require('../src/screens/ReadOnlyPatientsScreen.tsx').default;
 test('safe-start route displays searchable virtualized read-only rows; refresh/background never write or hydrate legacy stores', async () => {
   let tree; await act(async () => { tree = create(React.createElement(Screen)); });
   let rendered = JSON.stringify(tree.toJSON());

@@ -1,5 +1,7 @@
 import { AUTOMATIC_RECOVERY_PAUSED } from '../src/services/startupRecovery';
 import { RecoveryPaused } from '../src/components/RecoveryPaused';
+import { useNewPatientCasesStore, newCaseHeader } from '../src/stores/newPatientCasesStore';
+import { usePreventRemove } from '@react-navigation/native';
 import { beginClinicalAudio } from '../src/services/clinicalAudioHandoff';
 import { releaseClinicalAudio } from '../src/services/audioOwnership';
 import { sourceFingerprint } from '../src/services/operativeDrafting';
@@ -75,8 +77,44 @@ const extractCptCodes = (report: string): string[] => {
   return Array.from(new Set(matches));
 };
 
+const useCaseDictationsStore = AUTOMATIC_RECOVERY_PAUSED ? useNewPatientCasesStore : usePatientDictationsStore;
+const useCasePatientsStore = AUTOMATIC_RECOVERY_PAUSED ? useNewPatientCasesStore : usePatientsStore;
+const caseHeader = AUTOMATIC_RECOVERY_PAUSED ? newCaseHeader : buildPatientDictationHeader;
+
 export default function PatientDictationScreen() {
-  return AUTOMATIC_RECOVERY_PAUSED ? <RecoveryPaused /> : <PatientDictationScreenBody />;
+  const params = useLocalSearchParams<{ dictationId?: string; patientId?: string }>();
+  if (!AUTOMATIC_RECOVERY_PAUSED) return <PatientDictationScreenBody />;
+  if (typeof params.dictationId !== 'string' || !params.dictationId.startsWith('newcase-')) return <RecoveryPaused />;
+  return <NewCaseGate id={params.dictationId} patientId={params.patientId} />;
+}
+function NewCaseGate({ id, patientId }: { id: string; patientId?: string }) {
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const [ready, setReady] = useState(false), [error, setError] = useState('');
+  const { saving, saveError, savedAt, retrySave } = useNewPatientCasesStore();
+  usePreventRemove(saving || !!saveError, () => {
+    Alert.alert('Save this case before leaving', saving ? 'Saving your latest changes. Try Back again when Saved on this phone appears.' : 'Your latest changes are not saved. Tap Retry save and keep Echo open.');
+  });
+  useEffect(() => {
+    let active = true; setReady(false); setError('');
+    void useNewPatientCasesStore.getState().open(id).then(() => {
+      const d = useNewPatientCasesStore.getState().dictations[id];
+      if (!d || d.patientId !== patientId) throw Error('Patient mismatch');
+      if (active) setReady(true);
+    }).catch(() => { if (active) setError('This case could not be opened. Saved data has not been changed. Check any unsaved case, then try again.'); });
+    return () => { active = false; };
+  }, [id, patientId]);
+  if (!ready) return <SafeAreaView style={styles.container}><Text style={{ color: colors.textPrimary, padding: 20 }}>{error || 'Opening saved case…'}</Text>
+    {!error && <ActivityIndicator />}<TouchableOpacity onPress={() => router.back()}><Text style={{ color: colors.primary, padding: 20 }}>Back</Text></TouchableOpacity>
+    {!!saveError && <TouchableOpacity onPress={() => void retrySave().catch(() => {})}><Text style={{ color: colors.primary, padding: 20 }}>Retry save</Text></TouchableOpacity>}
+  </SafeAreaView>;
+  return <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ paddingHorizontal: 16, paddingTop: Math.max(insets.top, 8) }}>
+      <Text accessibilityLiveRegion="polite" style={{ color: colors.textSecondary }}>{saveError || (saving ? 'Saving on this phone…' : savedAt ? 'Saved on this phone · server backup not enabled for new cases' : 'Not yet saved')}</Text>
+      {!!saveError && <TouchableOpacity accessibilityRole="button" onPress={() => void retrySave().catch(() => {})}><Text style={{ color: colors.primary, padding: 10 }}>Retry save</Text></TouchableOpacity>}
+    </View>
+    <PatientDictationScreenBody />
+  </View>;
 }
 function PatientDictationScreenBody() {
   const insets = useSafeAreaInsets();
@@ -87,7 +125,7 @@ function PatientDictationScreenBody() {
   const dictationId = typeof params.dictationId === 'string' ? params.dictationId : undefined;
   const mode: ScreenMode = (params.mode as ScreenMode) || 'new';
 
-  const { patients } = usePatientsStore();
+  const { patients } = useCasePatientsStore();
   const patient = patientId ? patients[patientId] : null;
 
   const {
@@ -96,7 +134,7 @@ function PatientDictationScreenBody() {
     createDictation,
     updateDictation,
     finalizeDictation,
-  } = usePatientDictationsStore();
+  } = useCaseDictationsStore();
 
   const {
     customProcedures,
@@ -135,6 +173,10 @@ function PatientDictationScreenBody() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  usePreventRemove(isRecording || isTranscribing || isGenerating || (showTextInput && !!textDraft.trim()) ||
+    ((screenState === 'direct-editing' || screenState === 'editing') && !!editText.trim()), () => {
+    Alert.alert('Finish this step before leaving', 'Stop recording and wait for transcription, or save your text edits before closing this case.');
+  });
 
   const recordingStarting = useRef(false);
   const recordingMounted = useRef(true);
@@ -233,8 +275,8 @@ function PatientDictationScreenBody() {
   // Ensure header transcript part exists and stays first
   useEffect(() => {
     if (!activeDictation || !patient) return;
-    if (activeDictation.transcriptParts.length === 0 || !activeDictation.transcriptParts[0].content.startsWith('This is Dr. Aalami')) {
-      const headerText = buildPatientDictationHeader(patient.name, patient.mrn, activeDictation.dateOfOperation);
+    if (activeDictation.transcriptParts.length === 0 || !/^This is Dr\. (?:Oliver )?Aalami/.test(activeDictation.transcriptParts[0].content)) {
+      const headerText = caseHeader(patient.name, patient.mrn, activeDictation.dateOfOperation);
       const headerPart: TranscriptPart = {
         id: `${Date.now()}-header`,
         type: 'text',
@@ -398,7 +440,7 @@ function PatientDictationScreenBody() {
   // Save OCR/corrections against the latest store snapshot, not a captured render.
   const persistCaseSource = (part: TranscriptPart) => {
     if (!dictationId) return;
-    const current = usePatientDictationsStore.getState().dictations[dictationId];
+    const current = useCaseDictationsStore.getState().dictations[dictationId];
     if (!current) throw new Error('This report is no longer available.');
     const found = current.transcriptParts.some(p => p.id === part.id);
     updateDictation(current.id, { transcriptParts: found ? current.transcriptParts.map(p => p.id === part.id ? part : p) : [...current.transcriptParts, part] });
@@ -411,8 +453,8 @@ function PatientDictationScreenBody() {
     setIsGenerating(true);
     try {
       const report = await generateReport(gw, activeDictation.transcriptParts, activeDictation.selectedProcedures, {caseId:activeDictation.id,onSource:persistCaseSource,previousRoutineDefaults:activeDictation.reportReview?.routineDefaults,
-        getCurrentParts:()=>usePatientDictationsStore.getState().dictations[activeDictation.id].transcriptParts,
-        onResult:(r,fingerprint)=>{if(usePatientDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while drafting. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,routineDefaults:r.routineDefaults,review:[],statements:[],confirmedSteps:[]}});}});
+        getCurrentParts:()=>useCaseDictationsStore.getState().dictations[activeDictation.id].transcriptParts,
+        onResult:(r,fingerprint)=>{if(useCaseDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while drafting. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,routineDefaults:r.routineDefaults,review:[],statements:[],confirmedSteps:[]}});}});
       updateDictation(activeDictation.id, { generatedReport: report, status:'draft' });
     } catch (e: any) {
       console.error('[PatientDictation] Generate failed', e);
@@ -593,8 +635,8 @@ function PatientDictationScreenBody() {
         activeDictation.transcriptParts,
         activeDictation.selectedProcedures,
         {caseId:activeDictation.id,onSource:persistCaseSource,previousRoutineDefaults:activeDictation.reportReview?.routineDefaults,
-          getCurrentParts:()=>usePatientDictationsStore.getState().dictations[activeDictation.id].transcriptParts,
-          onResult:(r,fingerprint)=>{if(usePatientDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while applying AI edits. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,routineDefaults:r.routineDefaults,review:[],statements:[],confirmedSteps:[]}});}},
+          getCurrentParts:()=>useCaseDictationsStore.getState().dictations[activeDictation.id].transcriptParts,
+          onResult:(r,fingerprint)=>{if(useCaseDictationsStore.getState().dictations[activeDictation.id].generatedReport!==activeDictation.generatedReport)throw Error('The report was edited while applying AI edits. Your edits were preserved; please try again.');updateDictation(activeDictation.id,{reportReview:{sourceFingerprint:fingerprint,sessionId:r.sessionId,policyVersion:r.policyVersion,routineDefaults:r.routineDefaults,review:[],statements:[],confirmedSteps:[]}});}},
       );
       updateDictation(activeDictation.id, { generatedReport: report, status:'draft' });
     } catch (e: any) {
@@ -620,7 +662,7 @@ function PatientDictationScreenBody() {
         text: 'Clear',
         style: 'destructive',
         onPress: () => {
-          const headerText = buildPatientDictationHeader(patient.name, patient.mrn, activeDictation.dateOfOperation);
+          const headerText = caseHeader(patient.name, patient.mrn, activeDictation.dateOfOperation);
           const headerPart: TranscriptPart = {
             id: `${Date.now()}-header`,
             type: 'text',
@@ -651,11 +693,14 @@ function PatientDictationScreenBody() {
     }
     Alert.alert('Finalize reviewed report?', 'Confirm the procedure, case details and any routine steps accurately describe this operation.', [
       {text:'Keep reviewing',style:'cancel'},
-      {text:'Confirm & finalize',onPress:()=>{
+      {text:'Confirm & finalize',onPress:async()=>{
+        try {
         if (activeDictation.reportReview) updateDictation(activeDictation.id,{generatedReport:separateRoutineDefaults(report).report,reportReview:{...activeDictation.reportReview,routineDefaults:[...(activeDictation.reportReview.routineDefaults||[]),...separateRoutineDefaults(report).routineDefaults],reviewedAt:new Date().toISOString()}});
         finalizeDictation(activeDictation.id);
+        if (AUTOMATIC_RECOVERY_PAUSED) await useNewPatientCasesStore.getState().flush();
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         router.back();
+        } catch { Alert.alert('Not saved', 'Keep Echo open and tap Retry save before leaving.'); }
       }},
     ]);
   };
@@ -663,6 +708,7 @@ function PatientDictationScreenBody() {
   const handleStartNewReport = (startFromPrevious: boolean) => {
     if (!patient) return;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    if (AUTOMATIC_RECOVERY_PAUSED) { router.push('/new-patient-case' as any); return; }
     const newId = createDictation(patient.id);
     const suggested = patient.chiefComplaint ? getSuggestedProcedures(patient.chiefComplaint) : [];
     const now = new Date().toISOString();
@@ -709,7 +755,7 @@ function PatientDictationScreenBody() {
   const updateOperationDate = (date: Date) => {
     if (!activeDictation || !patient) return;
     const iso = toISODate(date);
-    const headerText = buildPatientDictationHeader(patient.name, patient.mrn, iso);
+    const headerText = caseHeader(patient.name, patient.mrn, iso);
     const existingHeader = activeDictation.transcriptParts[0];
     const nextHeader: TranscriptPart = existingHeader
       ? { ...existingHeader, content: headerText }

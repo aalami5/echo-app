@@ -11,7 +11,7 @@ function sourceLabel(name: string, result: SourceResult) {
   return result.status === 'ready' ? `${name}: ${result.snapshot.rows.length} records · checked ${new Date(result.checkedAt).toLocaleTimeString()}` : `${name}: ${result.message}`;
 }
 
-export default function ReadOnlyPatientsScreen() {
+export default function ReadOnlyPatientsScreen({ headerAddon }: { headerAddon?: React.ReactNode }) {
   const gatewayUrl = useSettingsStore(state => state.gatewayUrl);
   const gatewayToken = useSettingsStore(state => state.gatewayToken);
   const focused = useIsFocused();
@@ -61,7 +61,8 @@ export default function ReadOnlyPatientsScreen() {
           <Text style={[styles.refresh, loading && styles.disabled]}>Refresh</Text>
         </TouchableOpacity>
       </View>
-      <Text style={styles.notice}>Read-only view. Editing, reports and dictations remain paused. Saved records are not changed.</Text>
+      {headerAddon}
+      <Text style={styles.notice}>Read-only view of older patients. Their saved reports remain protected and paused.</Text>
       {view && <>
         <Text style={styles.status}>{sourceLabel('Phone', view.local)}</Text>
         <Text style={styles.status}>{sourceLabel('Server', view.server)}</Text>
