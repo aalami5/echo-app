@@ -5,7 +5,7 @@ const React = require('react'), { create, act } = require('react-test-renderer')
 global.IS_REACT_ACT_ENVIRONMENT = true;
 const load = Module._load;
 const requests = [], peers = [], nativeListeners = new Set(), appListeners = new Set();
-let routes = 0, voiceCount = 0, currentVoice;
+let routes = 0, voiceCount = 0, currentVoice, createError, closeError;
 class Peer {
   connectionState = 'new'; iceGatheringState = 'complete'; localDescription = {sdp:'offer'};
   constructor() { peers.push(this); }
@@ -23,7 +23,7 @@ Module._load = function(id, ...args) {
   if (id.endsWith('/services/realtimeVoice')) return {hasWebRtcRuntime:()=>true, getWebRtcRuntime:()=>({RTCPeerConnection:Peer,mediaDevices:{getUserMedia:async()=>{
     const track={enabled:true,stopped:false,stop(){this.stopped=true;}};return {getTracks:()=>[track],getAudioTracks:()=>[track]};
   }}})};
-  if (id.endsWith('/services/assistant')) return {ACTIVE_VOICE_KEY:'active',closeAbandonedVoice:async()=>{},assistantApi:async(path)=>{requests.push(path);return path.endsWith('/voice')?{voiceSessionId:`v${++voiceCount}`}:{answerSdp:'answer'};}};
+  if (id.endsWith('/services/assistant')) return {ACTIVE_VOICE_KEY:'active',closeAbandonedVoice:async()=>{},assistantApi:async(path)=>{requests.push(path);if(path.endsWith('/voice') && createError) throw createError;if(path.endsWith('/close') && closeError) throw closeError;return path.endsWith('/voice')?{voiceSessionId:`v${++voiceCount}`}:{answerSdp:'answer'};}};
   if (id.endsWith('/services/liveAudioRoute')) return {prepareLiveVoiceAudioRoute:async()=>{routes++;},releaseLiveVoiceAudioRoute:async()=>{routes--;}};
   return load.call(this,id,...args);
 };
@@ -66,4 +66,41 @@ test('clinical lease blocks a personal call and terminal failure cleans up witho
   await act(async()=>{pc.connectionState='failed';pc.onconnectionstatechange();await Promise.resolve();});assert.equal(pc.track.stopped,true);assert.equal(currentVoice.status,'idle');
   assert.equal(requests.some(x=>x.includes('/messages')||x.includes('/stop')),false);
   await act(async()=>{ui.unmount();});
+});
+
+test('foreground catches a terminal peer missed while JS was suspended',async()=>{
+  let ui;await act(async()=>{ui=create(React.createElement(Screen));await currentVoice?.stop();});
+  await act(async()=>{await currentVoice.start();});const pc=peers.at(-1);
+  app.currentState='background';appListeners.forEach(fn=>fn('background'));
+  pc.connectionState='failed'; // no native callback delivered during suspension
+  app.currentState='active';
+  await act(async()=>{appListeners.forEach(fn=>fn('active'));await Promise.resolve();});
+  assert.equal(pc.track.stopped,true);assert.equal(currentVoice.status,'idle');
+  assert.match(currentVoice.error,/background/);
+  await act(async()=>ui.unmount());
+});
+test('call conflict offers exact reset without opening microphone or replaying work',async()=>{
+  let ui;await act(async()=>{ui=create(React.createElement(Screen));});
+  createError=Object.assign(new Error('Previous connection remains open'),{code:'VOICE_SESSION_ACTIVE',voiceSessionId:'orphan-call'});
+  await act(async()=>{await currentVoice.start();});createError=null;
+  assert.equal(currentVoice.status,'error');assert.equal(currentVoice.recoveryVoiceId,'orphan-call');
+  const before=peers.length;
+  closeError=new Error('offline');await act(async()=>{await currentVoice.resetConnection();});closeError=null;
+  assert.equal(currentVoice.recoveryVoiceId,'orphan-call','failed cleanup stays retryable');
+  await act(async()=>{await currentVoice.resetConnection();});
+  assert.equal(peers.length,before,'reset does not reacquire microphone');
+  assert.equal(currentVoice.status,'idle');assert.equal(currentVoice.recoveryVoiceId,null);
+  assert.equal(requests.at(-1),'/conversations/project-a/voice/orphan-call/close');
+  await act(async()=>{await currentVoice.start();});assert.equal(currentVoice.status,'connected');
+  await act(async()=>{await currentVoice.stop();ui.unmount();});
+});
+test('terminal gateway events close only the matching current call',async()=>{
+  let ui;await act(async()=>{ui=create(React.createElement(Screen));});
+  await act(async()=>{await currentVoice.start();});const pc=peers.at(-1), id=`v${voiceCount}`;
+  await act(async()=>{liveVoiceSession.handleTerminalEvent({state:'session.closed',voiceSessionId:'old-call'});});
+  assert.equal(currentVoice.status,'connected');
+  await act(async()=>{liveVoiceSession.handleTerminalEvent({state:'session.closed',voiceSessionId:id});await Promise.resolve();});
+  assert.equal(pc.track.stopped,true);assert.equal(currentVoice.status,'idle');
+  assert.equal(requests.some(x=>x.includes('/send')||x.includes('/stop')),false);
+  await act(async()=>ui.unmount());
 });

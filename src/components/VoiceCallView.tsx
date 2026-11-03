@@ -56,7 +56,7 @@ export function VoiceCallView({ visible, title, voice, working, ready, caption, 
         {(voice.error || (!ready && connectionError)) && <Text accessibilityRole="alert" style={styles.error}>{voice.error || connectionError}</Text>}
         {!ready && connectionError && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Retry connection" onPress={onRetry} style={styles.start}><Text style={styles.startText}>Try again</Text></TouchableOpacity>}
         {voice.status === 'paused' && <TouchableOpacity accessibilityRole="button" onPress={() => { void voice.resume(); }} style={styles.start}><Text style={styles.startText}>Resume audio</Text></TouchableOpacity>}
-        {ready && !voice.isActive && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Connect to Echo" disabled={!ready || !voice.isSupported} onPress={() => { void voice.start(); }} style={[styles.start, (!ready || !voice.isSupported) && { opacity: 0.4 }]}><Text style={styles.startText}>{ready ? 'Connect' : 'Connecting to Echo…'}</Text></TouchableOpacity>}
+        {ready && !voice.isActive && <TouchableOpacity accessibilityRole="button" accessibilityLabel={voice.recoveryVoiceId ? 'Reset voice connection' : 'Connect to Echo'} disabled={!ready || !voice.isSupported} onPress={() => { if (voice.recoveryVoiceId) void voice.resetConnection(); else void voice.start(); }} style={[styles.start, (!ready || !voice.isSupported) && { opacity: 0.4 }]}><Text style={styles.startText}>{voice.recoveryVoiceId ? 'Reset connection' : 'Connect'}</Text></TouchableOpacity>}
         {captions && <Text style={styles.caption}>{caption ? caption.slice(-400) : 'Spoken replies appear here.'}</Text>}
       </ScrollView>}
       <View style={styles.footer}>

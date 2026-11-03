@@ -35,3 +35,10 @@ test('muted microphone has a faded red bubble distinct from hangup red',async()=
  const color=b=>Object.assign({},...b.props.style.filter(Boolean)).backgroundColor;
  assert.equal(color(mic),'#663F49');assert.equal(color(end),'#9F2835');await act(async()=>ui.unmount());
 });
+test('an orphaned call exposes Reset connection instead of another blocked Connect',async()=>{
+ let ui,resets=0,starts=0;await act(async()=>{ui=create(React.createElement(VoiceCallView,{visible:true,title:'Home',voice:{...base,status:'error',isActive:false,isConnected:false,recoveryVoiceId:'orphan',resetConnection:()=>resets++,start:()=>starts++},ready:true,onRetry(){},onText(){},onMore(){}}));});
+ const buttons=ui.root.findAllByType('Button'),reset=buttons.find(b=>b.props.accessibilityLabel==='Reset voice connection');
+ assert.ok(reset);assert.equal(reset.props.disabled,false);reset.props.onPress();
+ assert.equal(resets,1);assert.equal(starts,0);assert.equal(buttons.some(b=>b.props.accessibilityLabel==='Connect to Echo'),false);
+ await act(async()=>ui.unmount());
+});

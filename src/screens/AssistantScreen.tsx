@@ -163,6 +163,7 @@ export default function AssistantScreen() {
           setAttachmentReceipt(old => old && old.runId === event.runId && old.conversationId === id ? { ...old, stage: event.state === 'final' ? 'ready' : 'review_failed' } : old);
         }
         if (!event.voice || event.at < liveVoiceSession.getSnapshot().startedAt) continue;
+        liveVoiceSession.handleTerminalEvent(event);
         if (event.state === 'output.text.done' && event.text) setVoiceCaption(event.text);
         if (event.state === 'error') setVoiceNotice(event.error);
         if (event.state === 'tool.call') setVoiceNotice('Echo is working on your request.');

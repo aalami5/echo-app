@@ -67,7 +67,7 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
   });
   const route = (method, suffix, fn) => app[method](prefix + suffix, async (req, res) => {
     try { await fn(req, res); }
-    catch (e) { res.status(e.status || 503).json({ error: e.message || 'Assistant unavailable' }); }
+    catch (e) { res.status(e.status || 503).json({ error: e.message || 'Assistant unavailable', ...(e.code === 'VOICE_SESSION_ACTIVE' ? { code: e.code, voiceSessionId: e.voiceSessionId } : {}) }); }
   });
   const bad = (message, status = 400) => { throw Object.assign(new Error(message), { status }); };
   const conversation = id => state.conversations[id] || bad('Unknown conversation', 404);
@@ -92,16 +92,18 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
     if (event.event === 'talk.event') {
       const v = voices.get(p.voiceSessionId); const t = p.talkEvent;
       if (!v || !t) return;
-      if (['transcript.done', 'output.text.done', 'tool.call', 'tool.progress', 'tool.result', 'error', 'session.ended'].includes(t.type)) {
-        const entry = { sequence: ++seq, conversationId: v.conversationId, voice: true,
+      if (['transcript.done', 'output.text.done', 'tool.call', 'tool.progress', 'tool.result', 'error', 'session.error', 'session.closed', 'session.ended'].includes(t.type)) {
+        const entry = { sequence: ++seq, conversationId: v.conversationId, voice: true, voiceSessionId: p.voiceSessionId,
           state: t.type, at: Date.now(),
           text: ['transcript.done', 'output.text.done'].includes(t.type) ? String(t.payload?.text || '') : undefined,
-          error: t.type === 'error' ? 'Live Voice reported a problem. Check Activity before repeating an action.' : undefined };
+          error: ['error', 'session.error'].includes(t.type) ? 'Live Voice reported a problem. Check Activity before repeating an action.' : undefined };
         events.push(entry); if (events.length > 500) events.shift();
       }
       // A terminal gateway event is authoritative: keeping this record blocks
       // the next call even though the phone has no live connection.
-      if (t.type === 'session.ended') voices.delete(p.voiceSessionId);
+      if (['session.closed', 'session.ended'].includes(t.type)) voices.delete(p.voiceSessionId);
+      // session.error is not a close acknowledgement. Retain ownership until
+      // the gateway reports closed or an explicit exact-ID close succeeds.
       return;
     }
     const c = Object.values(state.conversations).find(c => c.key === p.sessionKey || c.key === p.agentSessionKey);
@@ -259,6 +261,11 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
     await rpc.call('talk.client.close', { sessionKey: v.key, voiceSessionId: id });
     if (voices.get(id) === v) voices.delete(id);
   };
+  route('get', '/conversations/:id/voice', async (req, res) => {
+    const c = await ensure(req.params.id);
+    const entry = [...voices].find(([, v]) => v.conversationId === c.id);
+    res.json({ voiceSessionId: entry?.[0] || null, creating: creatingVoice.has(c.id) });
+  });
   route('post', '/conversations/:id/voice', async (req, res) => {
     const c = await ensure(req.params.id);
     if (creatingVoice.has(c.id)) bad('A voice connection is already being started. Please wait.', 409);
@@ -269,7 +276,8 @@ function installAssistantContinuity(app, { authToken, dataDir, gatewayUrl, works
     for (const [id, v] of voices) {
       if (v.conversationId === c.id && (v.failed || (!v.exchanged && now() > v.expiresAt))) await closeVoice(id, v);
     }
-    if ([...voices.values()].some(v => v.conversationId === c.id)) bad('End the current call before starting another', 409);
+    const existing = [...voices].find(([, v]) => v.conversationId === c.id);
+    if (existing) throw Object.assign(new Error('A previous voice connection is still open. Reset the connection to reconnect.'), { status: 409, code: 'VOICE_SESSION_ACTIVE', voiceSessionId: existing[0] });
     const voice = await rpc.call('talk.client.create', { sessionKey: c.key, provider: 'openai', model: 'gpt-realtime-2.1', voice: 'marin', mode: 'realtime', transport: 'webrtc', brain: 'agent-consult', capabilities: ['gateway-control-v1', 'voice-transcript'] }, 45000);
     if (voice.clientControl?.owner !== 'gateway' || voice.transport !== 'webrtc' || voice.offerUrl !== '/plugins/openai/realtime/calls') {
       if (voice.voiceSessionId) await rpc.call('talk.client.close', { sessionKey: c.key, voiceSessionId: voice.voiceSessionId });

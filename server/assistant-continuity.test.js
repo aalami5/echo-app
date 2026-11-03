@@ -228,14 +228,15 @@ test('camera/photo uploads reach the same native voice conversation as image att
   assert.equal((await request('/conversations/home/send',body)).status,200);assert.equal(rpc.sent,1);
 });
 
-test('terminal voice event frees only its session; reconnect never aborts accepted work', async t => {
+for (const terminalType of ['session.closed', 'session.ended']) test(`${terminalType} frees only its session; reconnect never aborts accepted work`, async t => {
   const {request,rpc}=await fixture(t);
   await request('/conversations/home/voice',{});
-  rpc.emit('event',{event:'talk.event',payload:{voiceSessionId:'unrelated',talkEvent:{type:'session.ended'}}});
+  rpc.emit('event',{event:'talk.event',payload:{voiceSessionId:'unrelated',talkEvent:{type:terminalType}}});
   assert.equal((await request('/conversations/home/voice',{})).status,409);
-  rpc.emit('event',{event:'talk.event',payload:{voiceSessionId:'voice-one',talkEvent:{type:'session.ended'}}});
+  rpc.emit('event',{event:'talk.event',payload:{voiceSessionId:'voice-one',talkEvent:{type:terminalType}}});
   const events=await request('/conversations/home/events');
-  assert.equal(events.data.events.at(-1).state,'session.ended');
+  assert.equal(events.data.events.at(-1).state,terminalType);
+  assert.equal(events.data.events.at(-1).voiceSessionId,'voice-one');
   assert.equal((await request('/conversations/home/voice',{})).status,200);
   assert.equal(rpc.calls.some(c=>c.method==='chat.abort'),false);
 });
@@ -288,4 +289,34 @@ test('concurrent recovery serializes creation; a slow offer remains protected', 
   assert.equal((await request('/conversations/home/voice',{})).status,409);
   resolveOffer(new Response('v=0\r\n'));assert.equal((await pending).status,200);
   assert.equal(rpc.calls.filter(c=>c.method==='talk.client.create').length,2);
+});
+
+test('lost local call identity is recoverable with an authenticated exact-ID close', async t => {
+  const {request,rpc}=await fixture(t);
+  let count=0; const original=rpc.call.bind(rpc);
+  rpc.call=async(method,params)=>method==='talk.client.create'
+    ? {...await original(method,params),voiceSessionId:`recover-${++count}`}:original(method,params);
+  const first=await request('/conversations/home/voice',{});
+  const blocked=await request('/conversations/home/voice',{});
+  assert.equal(blocked.status,409);assert.equal(blocked.data.code,'VOICE_SESSION_ACTIVE');
+  assert.equal(blocked.data.voiceSessionId,first.data.voiceSessionId);
+  assert.doesNotMatch(JSON.stringify(blocked),/do-not-expose/);
+  assert.equal((await request('/conversations/home/voice',undefined,'wrong')).status,403);
+  assert.equal((await request('/conversations/expenses/voice')).data.voiceSessionId,null);
+  assert.equal((await request('/conversations/expenses/voice/recover-1/close',{})).status,404);
+  await request('/conversations/home/voice/recover-1/close',{});
+  assert.equal((await request('/conversations/home/voice')).data.voiceSessionId,null);
+  const next=await request('/conversations/home/voice',{});
+  await request('/conversations/home/voice/recover-1/close',{});
+  assert.equal((await request('/conversations/home/voice')).data.voiceSessionId,next.data.voiceSessionId,'late reset must not close replacement');
+  assert.equal(rpc.calls.some(c=>c.method==='chat.abort'||c.method==='chat.send'),false);
+});
+test('nonterminal errors retain ownership until close is confirmed',async t=>{
+  const {request,rpc}=await fixture(t);
+  await request('/conversations/home/voice',{});
+  rpc.emit('event',{event:'talk.event',payload:{voiceSessionId:'voice-one',talkEvent:{type:'session.error',final:true,payload:{message:'private-provider-error'}}}});
+  assert.equal((await request('/conversations/home/voice',{})).status,409);
+  const events=await request('/conversations/home/events');
+  assert.equal(events.data.events.at(-1).state,'session.error');
+  assert.doesNotMatch(JSON.stringify(events),/private-provider-error/);
 });

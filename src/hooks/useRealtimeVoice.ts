@@ -10,7 +10,7 @@ type LiveVoiceStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'p
 type VoiceCall = { generation: number; pc?: any; stream?: any; voiceId?: string; conversationId: string; audio?: any; recapReady?: boolean; timers?: ReturnType<typeof setTimeout>[]; stats?: ReturnType<typeof setInterval>; nativeSub?: { remove(): void }; appSub?: { remove(): void } };
 // The call outlives screen mounts. Only explicit End, logout or terminal failure closes it.
 const listeners = new Set<() => void>();
-let snapshot = { status: (hasWebRtcRuntime() ? 'idle' : 'unsupported') as LiveVoiceStatus, error: null as string | null, muted: false, conversationId: 'home', startedAt: 0, speaking: false, level: 0 };
+let snapshot = { status: (hasWebRtcRuntime() ? 'idle' : 'unsupported') as LiveVoiceStatus, error: null as string | null, muted: false, conversationId: 'home', startedAt: 0, speaking: false, level: 0, recoveryVoiceId: null as string | null };
 function update(patch: Partial<typeof snapshot>) { snapshot = { ...snapshot, ...patch }; listeners.forEach(fn => fn()); }
 const setStatus = (status: LiveVoiceStatus) => update({ status });
 const setError = (error: string | null) => update({ error });
@@ -48,7 +48,7 @@ const stop = async () => {
     if (stopping.current) await stopping.current;
     if (current.current || hasClinicalAudioLease()) return;
     const call: VoiceCall = { generation: ++generation.current, conversationId, timers: [] };
-    update({ conversationId, startedAt: Date.now(), muted: false, speaking: false, level: 0 });
+    update({ conversationId, startedAt: Date.now(), muted: false, speaking: false, level: 0, recoveryVoiceId: null });
     current.current = call; setStatus('connecting'); setError(null);
     const active = () => current.current === call && generation.current === call.generation;
     const signalRecapReady = async () => {
@@ -81,7 +81,12 @@ const stop = async () => {
         });
       }
       call.appSub = AppState.addEventListener('change', state => {
-        if (state === 'active' && active() && pc.connectionState === 'connected' && snapshot.status !== 'paused') {
+        if (state !== 'active' || !active()) return;
+        // iOS can suspend JS while media interrupts audio. A terminal peer
+        // event/timer may never have run; reconcile it when returning to Echo.
+        if (['failed', 'closed', 'disconnected'].includes(pc.connectionState) || track.readyState === 'ended') {
+          void stop().then(() => setError('Connection ended while Echo was in the background. Tap Connect to reconnect.'));
+        } else if (pc.connectionState === 'connected' && snapshot.status !== 'paused') {
           setStatus('connected');
         }
       });
@@ -159,7 +164,11 @@ const stop = async () => {
       // Timer only observes this call; an old call cannot stop its replacement.
       if (pc.connectionState === 'connected') { clearTimeout(timer); if ((snapshot.status as LiveVoiceStatus) !== 'paused') setStatus('connected'); await signalRecapReady(); }
     } catch (e: any) {
-      if (active()) { await stop(); setError(e.message || 'Could not connect Live Voice.'); setStatus('error'); }
+      if (active()) {
+        await stop();
+        update({ error: e.message || 'Could not connect Live Voice.', status: 'error',
+          recoveryVoiceId: e.code === 'VOICE_SESSION_ACTIVE' ? e.voiceSessionId || null : null });
+      }
     }
   };
 const toggleMute = () => {
@@ -179,10 +188,37 @@ const resume = async () => {
     setStatus('connected'); setError(null);
   } catch { setError('Audio is unavailable. Disconnect and try again.'); }
 };
-export const liveVoiceSession = { stop, getSnapshot: () => snapshot };
+// Explicit recovery closes only the exact call returned by the authenticated
+// conflict response. It never stops a chat task, clears history, or starts a mic.
+const resetConnection = async () => {
+  if (current.current || stopping.current || !snapshot.recoveryVoiceId) return;
+  const voiceId = snapshot.recoveryVoiceId, conversationId = snapshot.conversationId;
+  setStatus('stopping');
+  const work = (async () => {
+    try {
+      await assistantApi(`/conversations/${conversationId}/voice/${voiceId}/close`, {});
+      const raw = await AsyncStorage.getItem(ACTIVE_VOICE_KEY);
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved.voiceSessionId === voiceId && saved.conversationId === conversationId) await AsyncStorage.removeItem(ACTIVE_VOICE_KEY);
+      }
+      update({ recoveryVoiceId: null, status: 'idle', error: null });
+    } catch {
+      update({ status: 'error', error: 'Could not reset the connection. Try again when Echo is online.' });
+    } finally { stopping.current = null; }
+  })();
+  stopping.current = work;
+  return work;
+};
+const handleTerminalEvent = (event: { voiceSessionId?: string; state?: string }) => {
+  const call = current.current;
+  if (!call?.voiceId || event.voiceSessionId !== call.voiceId || !['session.closed', 'session.ended'].includes(event.state || '')) return;
+  void stop().then(() => setError('Call ended. Tap Connect to reconnect.'));
+};
+export const liveVoiceSession = { stop, handleTerminalEvent, getSnapshot: () => snapshot };
 export function useRealtimeVoice(conversationId = 'home') {
   const state = useSyncExternalStore(fn => { listeners.add(fn); return () => { listeners.delete(fn); }; }, () => snapshot, () => snapshot);
-  return { ...state, toggleMute, resume, start: () => start(conversationId), stop,
+  return { ...state, toggleMute, resume, resetConnection, start: () => start(conversationId), stop,
     isActive: ['connecting', 'connected', 'reconnecting', 'paused', 'stopping'].includes(state.status),
     isConnected: state.status === 'connected', isSupported: state.status !== 'unsupported' };
 }

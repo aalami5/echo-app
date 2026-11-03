@@ -23,7 +23,11 @@ export async function assistantApi<T = any>(route: string, body?: unknown): Prom
     });
     const data = await response.json().catch(() => null);
     if (controller.signal.aborted) throw new Error('Request timed out.');
-    if (!response.ok) throw new Error(data?.error || `Echo is unavailable (${response.status}).`);
+    if (!response.ok) throw Object.assign(new Error(data?.error || `Echo is unavailable (${response.status}).`), {
+      status: response.status,
+      code: data?.code,
+      voiceSessionId: typeof data?.voiceSessionId === 'string' ? data.voiceSessionId : undefined,
+    });
     if (data === null) throw new Error('Echo returned an unreadable response. Please reconnect.');
     return data as T;
   } catch (error) {
