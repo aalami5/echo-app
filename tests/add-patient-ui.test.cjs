@@ -3,6 +3,8 @@ const React=require('react');const {create,act}=require('react-test-renderer');g
 const values=new Map();const storage={getItem:async k=>values.get(k)||null,setItem:async(k,v)=>values.set(k,v),removeItem:async k=>values.delete(k)};
 const original=Module._load;
 Module._load=function(id,...args){
+ // Historical editing screen only. The real safe-start route is tested separately.
+ if(id.endsWith('/startupRecovery'))return {AUTOMATIC_RECOVERY_PAUSED:false,requireClinicalRecovery:()=>{}};
  if(id==='expo-secure-store')return {getItemAsync:storage.getItem,setItemAsync:storage.setItem,deleteItemAsync:storage.removeItem};
  if(id==='@react-native-async-storage/async-storage')return {__esModule:true,default:storage};
  if(id==='react-native')return {View:'View',Text:'Text',ScrollView:'ScrollView',TouchableOpacity:'TouchableOpacity',TextInput:'TextInput',Image:'Image',ActivityIndicator:'ActivityIndicator',StyleSheet:{create:x=>x},Platform:{OS:'ios'},Alert:{alert:()=>{}},Share:{},Keyboard:{dismiss:()=>{}},ActionSheetIOS:{},Animated:{View:'AnimatedView',Value:class {constructor(v){this.value=v;}},spring:()=>({start:()=>{}})},Modal:({visible,children})=>visible?React.createElement('Modal',{},children):null};
@@ -20,7 +22,7 @@ Module._load=function(id,...args){
  return original.call(this,id,...args);
 };
 for(const ext of ['.ts','.tsx'])require.extensions[ext]=(mod,file)=>mod._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.React,esModuleInterop:true}}).outputText,file);
-const Screen=require('../app/(tabs)/patients.tsx').default;
+const Screen=require('../src/screens/LegacyPatientsScreen.tsx').default;
 const {usePatientsStore:store}=require('../src/stores/patientsStore.ts');
 test('fresh installation: Add patient opens form, Save creates and displays patient immediately',async()=>{
  await store.persist.rehydrate();let tree;await act(async()=>{tree=create(React.createElement(Screen));});

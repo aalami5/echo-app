@@ -1,3 +1,4 @@
+import { AUTOMATIC_RECOVERY_PAUSED, requireClinicalRecovery } from '../services/startupRecovery';
 /**
  * Patients Store
  * 
@@ -123,6 +124,7 @@ const getISODate = (date: Date): string => {
 // Custom storage adapter using SecureStore for persistence (PHI security)
 const secureStorage = {
   getItem: async (name: string): Promise<string | null> => {
+    requireClinicalRecovery();
     try {
       return await SecureStore.getItemAsync(name);
     } catch (e) {
@@ -131,6 +133,7 @@ const secureStorage = {
     }
   },
   setItem: async (name: string, value: string): Promise<void> => {
+    requireClinicalRecovery();
     try {
       await SecureStore.setItemAsync(name, value);
     } catch (e) {
@@ -138,6 +141,7 @@ const secureStorage = {
     }
   },
   removeItem: async (name: string): Promise<void> => {
+    requireClinicalRecovery();
     try {
       await SecureStore.deleteItemAsync(name);
     } catch (e) {
@@ -148,10 +152,16 @@ const secureStorage = {
 
 export const usePatientsStore = create<PatientsState>()(
   persist(
-    (set, get) => ({
+    (persistSet, get) => {
+      const set: typeof persistSet = (...args: any[]) => {
+        requireClinicalRecovery();
+        return (persistSet as any)(...args);
+      };
+      return ({
       // Initial state
       removedPatientIds: [],
       restoreMissing: (data) => {
+        requireClinicalRecovery();
         const state=get();
         const patients={...data.patients,...state.patients};
         for (const [id, local] of Object.entries(state.patients)) {
@@ -177,6 +187,7 @@ export const usePatientsStore = create<PatientsState>()(
       clearPendingPatient: () => set({ pendingPatient: null }),
       
       addPatient: (patientData, callDayId) => {
+        requireClinicalRecovery();
         const state = get();
         const today = getISODate(new Date());
         
@@ -241,6 +252,7 @@ export const usePatientsStore = create<PatientsState>()(
       },
       
       updatePatient: (id, updates) => {
+        requireClinicalRecovery();
         set((state) => ({
           patients: {
             ...state.patients,
@@ -262,6 +274,7 @@ export const usePatientsStore = create<PatientsState>()(
       },
       
       deletePatient: (id) => {
+        requireClinicalRecovery();
         const patient = get().patients[id];
         if (!patient) return;
         
@@ -292,6 +305,7 @@ export const usePatientsStore = create<PatientsState>()(
       },
       
       createCallDay: (date = new Date()) => {
+        requireClinicalRecovery();
         const isoDate = getISODate(date);
         const state = get();
         
@@ -342,6 +356,7 @@ export const usePatientsStore = create<PatientsState>()(
       },
       
       deleteCallDay: (id) => {
+        requireClinicalRecovery();
         const callDay = get().callDays[id];
         if (!callDay) return;
         
@@ -452,6 +467,7 @@ export const usePatientsStore = create<PatientsState>()(
       
       // Maintenance: fix any incorrect displayDate/dayOfWeek based on actual date
       fixCallDayLabels: () => {
+        requireClinicalRecovery();
         const state = get();
         let hasChanges = false;
         const fixedCallDays: Record<string, CallDay> = {};
@@ -491,6 +507,7 @@ export const usePatientsStore = create<PatientsState>()(
       
       // Maintenance: merge any duplicate date groups
       mergeDuplicateDates: () => {
+        requireClinicalRecovery();
         const state = get();
         const dateToCallDay = new Map<string, string>();
         const mergedCallDays: Record<string, CallDay> = {};
@@ -554,6 +571,7 @@ export const usePatientsStore = create<PatientsState>()(
       
       // Maintenance: reorganize patients into correct date groups based on timeSeen
       reorganizePatientsByTimeSeen: () => {
+        requireClinicalRecovery();
         const state = get();
         const updatedPatients: Record<string, Patient> = {};
         const updatedCallDays: Record<string, CallDay> = {};
@@ -666,6 +684,7 @@ export const usePatientsStore = create<PatientsState>()(
       
       // Export
       exportToCSV: () => {
+        requireClinicalRecovery();
         const state = get();
         const headers = ['Call Date', 'Day', 'Hospital', 'Room', 'Patient Name', 'MRN', 'DOB', 'Chief Complaint', 'Time Seen'];
         const rows: string[][] = [headers];
@@ -710,9 +729,11 @@ export const usePatientsStore = create<PatientsState>()(
           row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(',')
         ).join('\n');
       },
-    }),
+      });
+    },
     {
       name: 'echo-patients',
+      skipHydration: AUTOMATIC_RECOVERY_PAUSED,
       storage: createJSONStorage(() => secureStorage),
       partialize: (state) => ({
         patients: state.patients,

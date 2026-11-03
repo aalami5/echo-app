@@ -1,3 +1,4 @@
+import { AUTOMATIC_RECOVERY_PAUSED } from './startupRecovery';
 /**
  * Patient Sync Service
  * 
@@ -30,6 +31,7 @@ export const syncPatients = async (data: {
   callDays: Record<string, any>;
   callDayOrder: string[];
 }): Promise<{ success: boolean; error?: string }> => {
+  if (AUTOMATIC_RECOVERY_PAUSED) return { success: false, error: 'Patient changes remain paused.' };
   // Always update pending data with latest
   if (!Object.keys(data.patients).length && !Object.keys(data.callDays).length) return {success:true};
   pendingSyncData = data;
@@ -47,6 +49,7 @@ export const syncPatients = async (data: {
  * Actually perform the sync
  */
 const performSync = async (): Promise<{ success: boolean; error?: string }> => {
+  if (AUTOMATIC_RECOVERY_PAUSED) return { success: false, error: 'Patient changes remain paused.' };
   if (!pendingSyncData) {
     return { success: true };
   }
