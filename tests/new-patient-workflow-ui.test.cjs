@@ -10,13 +10,16 @@ const prefHook=()=>emptyDictation;prefHook.getState=()=>emptyDictation;
 const original=Module._load;
 Module._load=function(id,...args){
  if(id==='@react-native-async-storage/async-storage')return {__esModule:true,default:storage};
+ if(id==='react-native-keyboard-aware-scroll-view')return {KeyboardAwareScrollView:'ScrollView'};
+ if(id.endsWith('/usePatientScan'))return {usePatientScan:()=>({clearScan:()=>{},scanFromCamera:async()=>null,scanFromLibrary:async()=>null})};
+ if(id.endsWith('/usePatientVoiceInput'))return {usePatientVoiceInput:()=>({cancelRecording:async()=>{}})};
  if(id==='expo-crypto')return {randomUUID:require('node:crypto').randomUUID};
  if(id==='expo-router')return {useRouter:()=>router,useLocalSearchParams:()=>params};
  if(id==='@react-navigation/native')return {usePreventRemove:(blocked,callback)=>guards.push({blocked,callback}),useIsFocused:()=>true};
  if(id==='expo-secure-store')return {getItemAsync:async()=>null};
  if(id==='react-native')return {
    View:'View',Text:'Text',ScrollView:'ScrollView',TextInput:'TextInput',TouchableOpacity:'TouchableOpacity',ActivityIndicator:'ActivityIndicator',KeyboardAvoidingView:'KeyboardAvoidingView',
-   FlatList:props=>React.createElement('FlatList',{},props.data.length?props.data.map(item=>React.createElement('Row',{key:item.id},props.renderItem({item}))):props.ListEmptyComponent),
+   FlatList:props=>React.createElement('FlatList',{},props.data.length?props.data.map((item,index)=>React.createElement('Row',{key:item.key||item.id},props.renderItem({item,index}))):props.ListEmptyComponent),
    SectionList:props=>React.createElement('SectionList',{},props.ListEmptyComponent),
    Modal:({visible,children})=>visible?React.createElement('Modal',{},children):null,
    StyleSheet:{create:x=>x},Platform:{OS:'ios'},Alert:{alert:(...a)=>alerts.push(a)},AppState:{currentState:'active',addEventListener:()=>({remove(){}})},
@@ -54,7 +57,7 @@ const content=tree=>JSON.stringify(tree.toJSON());
 const button=(tree,text)=>tree.root.findAllByType('TouchableOpacity').find(x=>x.findAllByType('Text').some(t=>t.props.children===text));
 test('patient tab exposes add even when older sources are unavailable; form validates and opens one durable linked case',async()=>{
  let tree;await act(async()=>{tree=create(React.createElement(Patients));});
- await act(async()=>tree.root.findByProps({accessibilityLabel:'Add patient and dictate'}).props.onPress());assert.equal(routes.at(-1),'/new-patient-case');
+ await act(async()=>tree.root.findByProps({accessibilityLabel:'Add patient'}).props.onPress());assert.match(content(tree),/Add Patient/);assert.equal(routes.length,0);
  await act(async()=>tree.unmount());await act(async()=>{tree=create(React.createElement(Form));});
  await act(async()=>button(tree,'Start dictation').props.onPress());assert.match(content(tree),/Enter the patient name/);
  const change=async(label,value)=>act(async()=>tree.root.findByProps({accessibilityLabel:label}).props.onChangeText(value));

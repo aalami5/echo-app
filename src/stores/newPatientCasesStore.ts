@@ -15,6 +15,7 @@ type State = {
   summaries: CaseSummary[]; saving: boolean; saveError: string | null; savedAt: string | null;
   refresh: () => Promise<void>; open: (id: string) => Promise<void>;
   start: (patient: Omit<Patient, 'id' | 'callDayId' | 'timeSeen'>, date: string) => Promise<string>;
+  startForPatient: (patient: Patient, date: string) => Promise<string>;
   createDictation: (patientId: string) => string;
   updateDictation: (id: string, updates: Partial<PatientDictation>) => void;
   finalizeDictation: (id: string) => void;
@@ -64,6 +65,14 @@ export const useNewPatientCasesStore = create<State>((set, get) => ({
     persistCase(value);
     // Open the case even if the first save fails: the visible Retry save keeps
     // the same case ID and in-memory notes, never generates a duplicate on retry.
+    return value.dictation.id;
+  },
+  startForPatient: async (patient, date) => {
+    await pending;
+    ++openRevision;
+    const value = initialCase({ ...patient }, date); checkCase(value);
+    set({ patients: { [patient.id]: value.patient }, dictations: { [value.dictation.id]: value.dictation }, savedAt: null });
+    persistCase(value);
     return value.dictation.id;
   },
   createDictation: patientId => {

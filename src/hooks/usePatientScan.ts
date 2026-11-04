@@ -10,7 +10,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { deleteAsync } from 'expo-file-system/legacy';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { clinicalMediaRequest } from '../services/clinicalMedia';
-import { Hospital } from '../stores/patientsStore';
+import type { Hospital } from '../stores/patientsStore';
 
 export interface ScannedPatientData {
   name?: string;
