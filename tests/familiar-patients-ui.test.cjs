@@ -32,6 +32,7 @@ const content=t=>JSON.stringify(t.toJSON());
 const byLabel=(t,label)=>t.root.findAllByType('TouchableOpacity').find(n=>n.props.accessibilityLabel===label);
 const button=(t,label)=>t.root.findAllByType('TouchableOpacity').find(n=>n.findAllByType('Text').some(x=>x.props.children===label));
 const change=async(t,label,value)=>act(async()=>t.root.findByProps({accessibilityLabel:label}).props.onChangeText(value));
+const expandDay=async t=>{const row=byLabel(t,'Patients for 2026-11-03');if(row&&!row.props.accessibilityState.expanded)await act(async()=>row.props.onPress());};
 let newPatientId,reportId;
 test('familiar add sheet saves a patient first, scans into editable fields, preserves retry identity and returns to grouped card without creating a report',async()=>{
  let tree;await act(async()=>{tree=create(React.createElement(Screen));});
@@ -48,34 +49,33 @@ test('familiar add sheet saves a patient first, scans into editable fields, pres
  assert.equal(tree.root.findByType('FlatList').props.initialNumToRender,12);
  await act(async()=>tree.unmount());
 });
-test('reopen lists patient metadata only; explicit Op Report uses current patient and chosen operation date',async()=>{
+test('reopen lists metadata only; Op Report opens the full screen directly without a date-entry sheet',async()=>{
  reads.length=0;let tree;await act(async()=>{tree=create(React.createElement(Screen));});
- assert.match(content(tree),/New Synthetic/);assert.deepEqual(reads.sort(),['echo-new-patient-cases-v1','echo-patient-view-v1'].sort());
- await act(async()=>byLabel(tree,'Op Report for New Synthetic').props.onPress());
- await act(async()=>button(tree,'Start dictation').props.onPress());assert.match(content(tree),/Enter the date of operation/);assert.equal(routes.length,0);
- await change(tree,'Operation date','2026-10-30');await act(async()=>button(tree,'Start dictation').props.onPress());await act(async()=>store.getState().flush());
+ await expandDay(tree);assert.match(content(tree),/New Synthetic/);assert.deepEqual(reads.sort(),['echo-new-patient-cases-v1','echo-patient-view-v1'].sort());
+ await act(async()=>{const open=byLabel(tree,'Op Report for New Synthetic').props.onPress;await Promise.all([open(),open()]);});await act(async()=>store.getState().flush());
+ assert.equal(tree.root.findAllByType('Modal').length,0);assert.equal(routes.length,1);assert.doesNotMatch(content(tree),/Start dictation/);
  const route=routes.at(-1);assert.equal(route.params.patientId,newPatientId);reportId=route.params.dictationId;
- assert.equal(store.getState().dictations[reportId].dateOfOperation,'2026-10-30');assert.match(store.getState().dictations[reportId].transcriptParts[0].content,/October 30, 2026/);
+ assert.equal(store.getState().dictations[reportId].dateOfOperation,'');assert.match(store.getState().dictations[reportId].transcriptParts[0].content,/not specified/);
  assert.deepEqual(store.getState().dictations[reportId].selectedProcedures,[]);
  await act(async()=>tree.unmount());
 });
 test('draft/final actions reopen exact saved report; patient edits do not rewrite report identity or contents',async()=>{
- store.getState().updateDictation(reportId,{generatedReport:'Synthetic manual draft'});await store.getState().flush();
+ store.getState().updateDictation(reportId,{generatedReport:'Synthetic manual draft',dateOfOperation:'2026-10-30'});await store.getState().flush();
  let tree;await act(async()=>{tree=create(React.createElement(Screen));});
- await act(async()=>byLabel(tree,'Continue Report for New Synthetic').props.onPress());assert.equal(routes.at(-1).params.dictationId,reportId);
+ await expandDay(tree);await act(async()=>byLabel(tree,'Continue Report for New Synthetic').props.onPress());assert.equal(routes.at(-1).params.dictationId,reportId);
  const before=values.get('echo-new-patient-case-v1-'+reportId);
  await act(async()=>byLabel(tree,'Edit patient New Synthetic').props.onPress());await change(tree,'Room','EDITED-ROOM');await act(async()=>button(tree,'Save').props.onPress());
  assert.equal(values.get('echo-new-patient-case-v1-'+reportId),before);assert.match(content(tree),/EDITED-ROOM/);
  await act(async()=>tree.unmount());store.getState().finalizeDictation(reportId);await store.getState().flush();
- await act(async()=>{tree=create(React.createElement(Screen));});await act(async()=>byLabel(tree,'View Report for New Synthetic').props.onPress());assert.equal(routes.at(-1).params.mode,'view');assert.equal(routes.at(-1).params.dictationId,reportId);
+ await act(async()=>{tree=create(React.createElement(Screen));});await expandDay(tree);await act(async()=>byLabel(tree,'View Report for New Synthetic').props.onPress());assert.equal(routes.at(-1).params.mode,'view');assert.equal(routes.at(-1).params.dictationId,reportId);
  await act(async()=>tree.unmount());
 });
 test('date collapse, search, source failures and background clearing preserve metadata and never hydrate old reports',async()=>{
  let tree;await act(async()=>{tree=create(React.createElement(Screen));});
- await act(async()=>byLabel(tree,'Patients for 2026-11-03').props.onPress());assert.doesNotMatch(content(tree),/Edit patient New Synthetic/);
+ await expandDay(tree);await act(async()=>byLabel(tree,'Patients for 2026-11-03').props.onPress());assert.doesNotMatch(content(tree),/Edit patient New Synthetic/);
  await act(async()=>byLabel(tree,'Search patients').props.onPress());await change(tree,'Search by name or MRN','NEW-TEST');assert.ok(byLabel(tree,'Edit patient New Synthetic'));
  await act(async()=>listeners[0]('background'));assert.doesNotMatch(content(tree),/New Synthetic/);
  await act(async()=>listeners[0]('active'));assert.ok(byLabel(tree,'Edit patient New Synthetic'));await act(async()=>tree.unmount());
  localFailed=true;await act(async()=>{tree=create(React.createElement(Screen));});assert.match(content(tree),/Server copy only/);await act(async()=>tree.unmount());
- serverFailed=true;await act(async()=>{tree=create(React.createElement(Screen));});assert.match(content(tree),/Older patients could not be loaded/);assert.match(content(tree),/New Synthetic/);assert.doesNotMatch(content(tree),/private-error/);await act(async()=>tree.unmount());
+ serverFailed=true;await act(async()=>{tree=create(React.createElement(Screen));});assert.match(content(tree),/Older patients could not be loaded/);await expandDay(tree);assert.match(content(tree),/New Synthetic/);assert.doesNotMatch(content(tree),/private-error/);await act(async()=>tree.unmount());
 });

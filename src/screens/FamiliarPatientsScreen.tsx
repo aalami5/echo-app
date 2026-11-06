@@ -39,7 +39,6 @@ export default function FamiliarPatientsScreen() {
   const [query,setQuery] = useState(''), [searching,setSearching] = useState(false), [expanded,setExpanded] = useState<Set<string>>(()=>new Set([localDate()]));
   const [quick,setQuick] = useState(false);
   const [form,setForm] = useState<SavedPatient|null>(null), [editing,setEditing] = useState(false), [error,setError] = useState(''), [busy,setBusy] = useState(false);
-  const [reportPatient,setReportPatient] = useState<FamiliarPatient|null>(null), [operationDate,setOperationDate] = useState('');
   const [choosingReports,setChoosingReports] = useState<FamiliarPatient|null>(null);
   const reader = useRef<ReturnType<typeof createPatientReader>|null>(null), generation = useRef(0), saving = useRef(false), formGeneration = useRef(0);
   const scan = usePatientScan(), voice = usePatientVoiceInput();
@@ -103,18 +102,16 @@ export default function FamiliarPatientsScreen() {
     else await voice.startRecording();
   };
   const openReport=(summary:CaseSummary)=> { setChoosingReports(null);router.push({pathname:'/patient-dictation',params:{patientId:summary.patientId,dictationId:summary.id,mode:summary.status==='final'?'view':'continue'}} as any); };
-  const chooseNewReport=(patient:FamiliarPatient)=> { setChoosingReports(null);setReportPatient(patient);setOperationDate('');setError(''); };
-  const startReport=async()=> {
-    if(!reportPatient||saving.current) return;
-    if(!validOperationDate(operationDate)) {setError('Enter the date of operation (YYYY-MM-DD).');return;}
-    if(!reportPatient.hospital) {setError('Open the existing report to check its patient details first.');return;}
+  const chooseNewReport=async(reportPatient:FamiliarPatient)=> {
+    if(saving.current||caseSaving||caseError) return;
+    if(!reportPatient.hospital) {Alert.alert('Patient details needed','Edit this patient and choose a hospital before starting a report.');return;}
     saving.current=true;setBusy(true);setError('');
     try {
       const {reports,source,archived,date,...patient}=reportPatient;
-      const id=await useNewPatientCasesStore.getState().startForPatient({...patient,hospital:reportPatient.hospital},operationDate);
-      setReportPatient(null);
-      router.push({pathname:'/patient-dictation',params:{patientId:patient.id,dictationId:id,mode:'continue'}} as any);
-    } catch {setError('Could not open a new report. Save any unfinished report and try again.');}
+      const id=await useNewPatientCasesStore.getState().startForPatient({...patient,hospital:reportPatient.hospital},'');
+      setChoosingReports(null);
+      router.push({pathname:'/patient-dictation',params:{patientId:patient.id,dictationId:id,mode:'new'}} as any);
+    } catch {Alert.alert('Could not open report','Save any unfinished report and try again. Your saved reports have not been changed.');}
     finally {saving.current=false;setBusy(false);}
   };
   const exportPatients=async()=> {
@@ -136,7 +133,7 @@ export default function FamiliarPatientsScreen() {
     return <View style={[{backgroundColor:colors.surface,paddingHorizontal:spacing.md},last&&{paddingBottom:spacing.sm,marginBottom:spacing.md,borderBottomLeftRadius:12,borderBottomRightRadius:12}]}><View style={styles.patientRow}>
       <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Edit patient ${patient.name}`} onPress={()=>openForm(patient)}><Text style={styles.patientName} numberOfLines={2}>{patient.name}</Text></TouchableOpacity>
       <View style={styles.patientBadgeRow}>{!!patient.room&&<Text style={styles.patientRoom}>{patient.room}</Text>}
-        <TouchableOpacity style={actionStyle} accessibilityRole="button" accessibilityLabel={`${label} for ${patient.name}`} onPress={()=>report?patient.reports.length>1?setChoosingReports(patient):openReport(report):chooseNewReport(patient)}>
+        <TouchableOpacity style={actionStyle} accessibilityRole="button" accessibilityLabel={`${label} for ${patient.name}`} disabled={busy||caseSaving||!!caseError} onPress={()=>report?patient.reports.length>1?setChoosingReports(patient):openReport(report):chooseNewReport(patient)}>
           {draft&&draft.hasContent!==false&&<View style={styles.draftDot}/>}<Ionicons name={report?.status==='final'?'document-text-outline':draft&&draft.hasContent!==false?'time-outline':'mic'} size={14} color={report?.status==='final'?colors.primary:colors.textInverse}/><Text style={textStyle}>{label}</Text>
         </TouchableOpacity><View style={{flex:1}}/><TouchableOpacity accessibilityRole="button" accessibilityLabel={`Edit details for ${patient.name}`} onPress={()=>openForm(patient)} style={styles.patientEditIcon}><Ionicons name="pencil" size={16} color={colors.textTertiary}/></TouchableOpacity>
       </View><View style={styles.patientDetails}><Text style={styles.patientMRN}>MRN: {patient.mrn}</Text>{!!patient.dob&&<Text style={styles.patientDOB}>DOB: {patient.dob}</Text>}</View>
@@ -181,13 +178,8 @@ export default function FamiliarPatientsScreen() {
         <Text style={styles.patientHospital}>Saved on this phone. Existing reports keep their original patient details.</Text>
       </KeyboardAwareScrollView>}</View></View>
     </Modal>
-    <Modal visible={!!reportPatient} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>{if(!busy)setReportPatient(null);}}><View style={styles.modalContainer}><View style={styles.modalHeader}><TouchableOpacity disabled={busy} onPress={()=>setReportPatient(null)}><Text style={styles.modalCancel}>Cancel</Text></TouchableOpacity><Text style={styles.modalTitle}>Op Report</Text></View><View style={styles.form}>
-      <Text style={styles.patientName}>{reportPatient?.name}</Text><Text style={styles.formLabel}>Date of operation *</Text><TextInput accessibilityLabel="Operation date" style={styles.formInput} placeholder="YYYY-MM-DD" placeholderTextColor={colors.textTertiary} value={operationDate} onChangeText={setOperationDate} maxLength={10}/>
-      {!!error&&<Text style={styles.voiceError}>{error}</Text>}<TouchableOpacity accessibilityRole="button" disabled={busy||caseSaving||!!caseError} style={styles.opReportButton} onPress={()=>void startReport()}><Text style={styles.opReportButtonText}>{busy?'Opening…':'Start dictation'}</Text></TouchableOpacity>
-      <Text style={styles.patientHospital}>A new report using only the notes you provide. Older reports are not opened or changed.</Text>
-    </View></View></Modal>
     <Modal visible={!!choosingReports} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setChoosingReports(null)}><View style={styles.modalContainer}><View style={styles.modalHeader}><TouchableOpacity onPress={()=>setChoosingReports(null)}><Text style={styles.modalCancel}>Done</Text></TouchableOpacity><Text style={styles.modalTitle}>Patient Reports</Text></View>
-      <FlatList data={choosingReports?.reports??[]} keyExtractor={r=>r.id} renderItem={({item})=><TouchableOpacity style={styles.patientRow} onPress={()=>openReport(item)}><Text style={styles.patientName}>{item.date}</Text><Text style={styles.patientMRN}>{item.status==='final'?'View Report':'Continue Report'} · {item.name} · MRN {item.mrn}</Text></TouchableOpacity>}/>
+      <FlatList data={choosingReports?.reports??[]} keyExtractor={r=>r.id} renderItem={({item})=><TouchableOpacity style={styles.patientRow} onPress={()=>openReport(item)}><Text style={styles.patientName}>{item.date || 'Operation date not selected'}</Text><Text style={styles.patientMRN}>{item.status==='final'?'View Report':'Continue Report'} · {item.name} · MRN {item.mrn}</Text></TouchableOpacity>}/>
       {choosingReports?.hospital&&<TouchableOpacity style={styles.opReportButton} onPress={()=>chooseNewReport(choosingReports)}><Text style={styles.opReportButtonText}>New Op Report</Text></TouchableOpacity>}
     </View></Modal>
     <Modal visible={details} animationType="slide" presentationStyle="pageSheet" onRequestClose={()=>setDetails(false)}><View style={styles.modalContainer}><View style={styles.modalHeader}><TouchableOpacity onPress={()=>setDetails(false)}><Text style={styles.modalCancel}>Done</Text></TouchableOpacity><Text style={styles.modalTitle}>Patient List</Text></View><View style={styles.form}><Text style={styles.patientMRN}>{statusText(view)}</Text><Text style={styles.patientComplaint}>Phone edits take precedence. New patients, edits and reports are saved on this phone only. Older reports remain preserved but unavailable. Reports are not sent automatically.</Text><TouchableOpacity onPress={refresh}><Text style={styles.modalSave}>Refresh</Text></TouchableOpacity></View></View></Modal>

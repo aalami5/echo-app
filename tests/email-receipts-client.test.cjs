@@ -4,11 +4,12 @@ const ts = require('typescript');
 const Module = require('module');
 const storage = new Map();
 const asyncStorage = { getItem: async (k) => storage.get(k) || null, setItem: async (k,v) => { storage.set(k,v); }, removeItem: async (k) => { storage.delete(k); } };
+const legacy={persist:{hasHydrated:()=>assert.fail('must not hydrate legacy archive')},getState:()=>assert.fail('must not read legacy archive')};
 const load = Module._load;
 Module._load = function(id, ...args) {
   if (id === '@react-native-async-storage/async-storage') return { __esModule:true, default:asyncStorage };
   if (id === 'react-native') return { View:'View', Text:'Text' };
-  if (id.endsWith('/patientDictationsStore')) return { usePatientDictationsStore: { persist: { hasHydrated:()=>true }, getState:()=>({dictations:{}}) } };
+  if (id.endsWith('/patientDictationsStore')) return { usePatientDictationsStore: legacy };
   if (id.endsWith('/settingsStore')) return { useSettingsStore: { getState: () => ({ gatewayUrl: 'https://test.invalid', gatewayToken:'synthetic' }) } };
   return load.call(this,id,...args);
 };
@@ -57,4 +58,11 @@ test('rendered report status shows sent timestamp, recipients and edited state',
  const text=JSON.stringify(tree.toJSON());
  assert.match(text,/Sent · Updated since last email/);assert.match(text,/Last emailed/);assert.match(text,/test@example.invalid/);
  await act(async()=>tree.unmount());
+});
+
+test('new-case receipt refresh reconciles sent status without hydrating the legacy report archive or replaying sends',async()=>{
+ const {refreshEmailReceipts}=require('../src/services/emailReceipts.ts');
+ let calls=0;global.fetch=async(url,options)=>{calls++;assert.match(url,/email-receipts$/);assert.equal(options.method,undefined);return {ok:true,json:async()=>({receipts:[{...receipt,id:'new-case-receipt',reportId:'newcase-synthetic'}]})};};
+ await refreshEmailReceipts({newCasesOnly:true});assert.equal(calls,1);
+ assert.ok(require('../src/stores/emailReceiptsStore.ts').useEmailReceiptsStore.getState().receipts.some(r=>r.id==='new-case-receipt'));
 });

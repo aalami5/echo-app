@@ -52,7 +52,7 @@ export function mergePatientView(legacy: PatientRow[], saved: SavedPatient[], su
       rows.set(summary.patientId, { id: summary.patientId, name: p?.name ?? summary.name, mrn: p?.mrn ?? summary.mrn,
         dob: p?.dob ?? '', room: p?.room ?? '', chiefComplaint: p?.chiefComplaint ?? '', hospital: p?.hospital ?? null,
         callDayId: p?.callDayId ?? `newday-${summary.date}`, timeSeen: p?.timeSeen ?? summary.updatedAt,
-        date: summary.date, source: 'new', reports: [], archived: false });
+        date: summary.date || p?.timeSeen?.slice(0,10) || summary.updatedAt.slice(0,10), source: 'new', reports: [], archived: false });
     }
     const existing = rows.get(summary.patientId)!;
     if (existing.source === 'new' && summary.patient) {

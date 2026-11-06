@@ -16,12 +16,16 @@ const text = (value: unknown, max = 8192): value is string => typeof value === '
 export function validOperationDate(date: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
 }
+// Notes can be captured immediately; an operation date is required before drafting/finalizing.
+function validCaseDate(date: unknown, status: unknown): boolean {
+  return typeof date === 'string' && (validOperationDate(date) || (date === '' && status === 'draft'));
+}
 export function checkCase(value: any): asserts value is NewCase {
   const p = value?.patient, d = value?.dictation;
   if (value?.version !== 1 || !p || !d || !validId(d.id) || !text(p.id, 200) || !p.id || d.patientId !== p.id ||
       !text(p.name, 300) || !p.name.trim() || !text(p.mrn, 300) || !text(p.dob) || !text(p.room) ||
       !text(p.chiefComplaint) || !Object.hasOwn(HOSPITAL_LABELS, p.hospital) || !text(p.callDayId) || !text(p.timeSeen) ||
-      !validOperationDate(d.dateOfOperation) || !['draft', 'final'].includes(d.status) ||
+      !validCaseDate(d.dateOfOperation, d.status) || !['draft', 'final'].includes(d.status) ||
       !text(d.createdAt, 100) || !text(d.updatedAt, 100) ||
       !Array.isArray(d.transcriptParts) || d.transcriptParts.length > 500 ||
       !d.transcriptParts.every((part: any) => part && text(part.id, 200) && ['text', 'voice', 'image'].includes(part.type) &&
@@ -40,7 +44,7 @@ function parseIndex(raw: string | null): CaseSummary[] {
   const data = JSON.parse(raw);
   if (data?.version !== 1 || !Array.isArray(data.cases) || data.cases.length > CASE_COUNT ||
       !data.cases.every((v: any) => v && validId(v.id) && text(v.patientId, 200) && text(v.name, 300) && text(v.mrn, 300) &&
-        validOperationDate(v.date) && text(v.updatedAt, 100) && ['draft', 'final'].includes(v.status) &&
+        validCaseDate(v.date, v.status) && text(v.updatedAt, 100) && ['draft', 'final'].includes(v.status) &&
         (v.hasContent === undefined || typeof v.hasContent === 'boolean') &&
         (v.patient === undefined || (v.patient.id === v.patientId && text(v.patient.name, 300) && text(v.patient.mrn, 300) &&
           text(v.patient.dob) && text(v.patient.room) && text(v.patient.chiefComplaint) && Object.hasOwn(HOSPITAL_LABELS, v.patient.hospital) &&

@@ -1,6 +1,7 @@
 import { AUTOMATIC_RECOVERY_PAUSED } from '../src/services/startupRecovery';
 import { RecoveryPaused } from '../src/components/RecoveryPaused';
 import { useNewPatientCasesStore, newCaseHeader } from '../src/stores/newPatientCasesStore';
+import { validOperationDate } from '../src/services/newPatientCases';
 import { usePreventRemove } from '@react-navigation/native';
 import { beginClinicalAudio } from '../src/services/clinicalAudioHandoff';
 import { releaseClinicalAudio } from '../src/services/audioOwnership';
@@ -85,14 +86,13 @@ export default function PatientDictationScreen() {
   const params = useLocalSearchParams<{ dictationId?: string; patientId?: string }>();
   if (!AUTOMATIC_RECOVERY_PAUSED) return <PatientDictationScreenBody />;
   if (typeof params.dictationId !== 'string' || !params.dictationId.startsWith('newcase-')) return <RecoveryPaused />;
-  return <NewCaseGate id={params.dictationId} patientId={params.patientId} />;
+  return <NewCaseGate key={params.dictationId} id={params.dictationId} patientId={params.patientId} />;
 }
 function NewCaseGate({ id, patientId }: { id: string; patientId?: string }) {
   const router = useRouter();
-  const insets = useSafeAreaInsets();
   const [ready, setReady] = useState(false), [error, setError] = useState('');
-  const { saving, saveError, savedAt, retrySave } = useNewPatientCasesStore();
-  usePreventRemove(saving || !!saveError, () => {
+  const { saving, saveError, retrySave, dictations } = useNewPatientCasesStore();
+  usePreventRemove(!!dictations[id] && (saving || !!saveError), () => {
     Alert.alert('Save this case before leaving', saving ? 'Saving your latest changes. Try Back again when Saved on this phone appears.' : 'Your latest changes are not saved. Tap Retry save and keep Echo open.');
   });
   useEffect(() => {
@@ -108,12 +108,13 @@ function NewCaseGate({ id, patientId }: { id: string; patientId?: string }) {
     {!error && <ActivityIndicator />}<TouchableOpacity onPress={() => router.back()}><Text style={{ color: colors.primary, padding: 20 }}>Back</Text></TouchableOpacity>
     {!!saveError && <TouchableOpacity onPress={() => void retrySave().catch(() => {})}><Text style={{ color: colors.primary, padding: 20 }}>Retry save</Text></TouchableOpacity>}
   </SafeAreaView>;
-  return <View style={{ flex: 1, backgroundColor: colors.background }}>
-    <View style={{ paddingHorizontal: 16, paddingTop: Math.max(insets.top, 8) }}>
-      <Text accessibilityLiveRegion="polite" style={{ color: colors.textSecondary }}>{saveError || (saving ? 'Saving on this phone…' : savedAt ? 'Saved on this phone · server backup not enabled for new cases' : 'Not yet saved')}</Text>
-      {!!saveError && <TouchableOpacity accessibilityRole="button" onPress={() => void retrySave().catch(() => {})}><Text style={{ color: colors.primary, padding: 10 }}>Retry save</Text></TouchableOpacity>}
-    </View>
-    <PatientDictationScreenBody />
+  return <PatientDictationScreenBody />;
+}
+function CaseSaveStatus() {
+  const { saving, saveError, savedAt, retrySave } = useNewPatientCasesStore();
+  return <View style={{ paddingHorizontal: spacing.lg, paddingBottom: spacing.sm }}>
+    <Text accessibilityLiveRegion="polite" style={{ color: colors.textSecondary, fontSize: 12 }}>{saveError || (saving ? 'Saving on this phone…' : savedAt ? 'Saved on this phone' : 'Not yet saved')}</Text>
+    {!!saveError && <TouchableOpacity accessibilityRole="button" onPress={() => void retrySave().catch(() => {})}><Text style={{ color: colors.primary, paddingVertical: 8 }}>Retry save</Text></TouchableOpacity>}
   </View>;
 }
 function PatientDictationScreenBody() {
@@ -164,7 +165,7 @@ function PatientDictationScreenBody() {
   const receipts = useEmailReceiptsStore((s) => s.receipts);
   const emailStatus = useMemo(() => emailReceiptStatus(receipts, activeDictation?.id, activeDictation?.generatedReport ? separateRoutineDefaults(activeDictation.generatedReport).report : null, activeDictation?.emailTrackingEnabled), [receipts, activeDictation?.id, activeDictation?.generatedReport, activeDictation?.emailTrackingEnabled]);
   const emailSent = emailStatus.sent;
-  useEffect(() => { refreshEmailReceipts().catch(() => {}); }, [dictationId]);
+  useEffect(() => { refreshEmailReceipts({ newCasesOnly: dictationId?.startsWith('newcase-') }).catch(() => {}); }, [dictationId]);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [isReadingBack, setIsReadingBack] = useState(false);
   const [readBackState, setReadBackState] = useState<'idle' | 'processing' | 'ready' | 'playing' | 'paused'>('idle');
@@ -173,6 +174,12 @@ function PatientDictationScreenBody() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const startingReport = useRef(false);
+  const [replacementRoute, setReplacementRoute] = useState<Href | null>(null);
+  useEffect(() => {
+    // Navigate after React commits the save/guard state for the outgoing case.
+    if (replacementRoute) router.replace(replacementRoute);
+  }, [replacementRoute, router]);
   usePreventRemove(isRecording || isTranscribing || isGenerating || (showTextInput && !!textDraft.trim()) ||
     ((screenState === 'direct-editing' || screenState === 'editing') && !!editText.trim()), () => {
     Alert.alert('Finish this step before leaving', 'Stop recording and wait for transcription, or save your text edits before closing this case.');
@@ -337,7 +344,7 @@ function PatientDictationScreenBody() {
 
   // ─── Voice Recording ───
   const startRecording = async () => {
-    if (isReadOnly) return;
+    if (isReadOnly || isTranscribing) return;
     if (recordingStarting.current || recordingRef.current) return;
     recordingStarting.current = true;
     try {
@@ -448,6 +455,11 @@ function PatientDictationScreenBody() {
   // ─── Generate Report ───
   const handleGenerate = async () => {
     if (!activeDictation) return;
+    if (!validOperationDate(activeDictation.dateOfOperation)) {
+      setShowDatePicker(true);
+      Alert.alert('Date of operation', 'Choose the operation date using the calendar. Your notes are saved.');
+      return;
+    }
     const gw = getGateway();
     if (!gw) return;
     setIsGenerating(true);
@@ -705,40 +717,39 @@ function PatientDictationScreenBody() {
     ]);
   };
 
-  const handleStartNewReport = (startFromPrevious: boolean) => {
-    if (!patient) return;
+  const handleStartNewReport = async (startFromPrevious: boolean) => {
+    if (!patient || startingReport.current) return;
+    startingReport.current = true;
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    if (AUTOMATIC_RECOVERY_PAUSED) { router.push('/new-patient-case' as any); return; }
-    const newId = createDictation(patient.id);
-    const suggested = patient.chiefComplaint ? getSuggestedProcedures(patient.chiefComplaint) : [];
-    const now = new Date().toISOString();
-
-    if (startFromPrevious && pendingDuplicateSourceRef.current) {
-      const source = dictations[pendingDuplicateSourceRef.current];
+    try {
+      // Snapshot before opening the next isolated case; never reopen the old archive.
+      const source = startFromPrevious && pendingDuplicateSourceRef.current
+        ? dictations[pendingDuplicateSourceRef.current] : null;
+      if (AUTOMATIC_RECOVERY_PAUSED) await useNewPatientCasesStore.getState().flush();
+      if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+      activeDictationRef.current = null;
+      const newId = createDictation(patient.id);
       if (source?.generatedReport) {
-        const baseParts = dictations[newId]?.transcriptParts || [];
-        const nextParts = [
-          ...baseParts,
-          {
-            id: `${Date.now()}-copy`,
-            type: 'text',
-            content: source.generatedReport,
-            sourceKind: 'historical',
-            timestamp: now,
-          } as TranscriptPart,
-        ];
-        updateDictation(newId, {
-          transcriptParts: nextParts,
-          selectedProcedures: suggested.length > 0 ? suggested : source.selectedProcedures,
-        });
+        const baseParts = useCaseDictationsStore.getState().dictations[newId]?.transcriptParts || [];
+        updateDictation(newId, { transcriptParts: [...baseParts, {
+          id: `${newId}-reference`, type: 'text', content: source.generatedReport,
+          sourceKind: 'historical', timestamp: new Date().toISOString(),
+        }], selectedProcedures: [] });
       }
-    } else if (suggested.length > 0) {
-      updateDictation(newId, { selectedProcedures: suggested });
+      pendingDuplicateSourceRef.current = null;
+      setShowDuplicateModal(false);
+      const route = { pathname: '/patient-dictation', params: { patientId: patient.id, dictationId: newId, mode: 'new' } } as unknown as Href;
+      // One live case is loaded at a time; Close returns to Patients, not a stale case screen.
+      if (AUTOMATIC_RECOVERY_PAUSED) {
+        // If the initial save fails, still open this same case with Retry save.
+        await useNewPatientCasesStore.getState().flush().catch(() => {});
+        setReplacementRoute(route);
+      } else router.push(route);
+    } catch {
+      Alert.alert('Could not start report', 'Save your current report and try again. Your saved report has not been changed.');
+    } finally {
+      startingReport.current = false;
     }
-
-    pendingDuplicateSourceRef.current = null;
-    setShowDuplicateModal(false);
-    router.push(({ pathname: '/patient-dictation', params: { patientId: patient.id, dictationId: newId, mode: 'new' } }) as unknown as Href);
   };
 
   const openDuplicateModal = () => {
@@ -1110,7 +1121,7 @@ function PatientDictationScreenBody() {
     );
   }
 
-  const displayDate = formatPatientDictationDate(activeDictation.dateOfOperation);
+  const displayDate = activeDictation.dateOfOperation ? formatPatientDictationDate(activeDictation.dateOfOperation) : 'Choose date';
   const selectedProcedures = activeDictation.selectedProcedures;
   const transcriptParts = activeDictation.transcriptParts;
 
@@ -1124,7 +1135,7 @@ function PatientDictationScreenBody() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Close dictation" onPress={() => router.back()} style={styles.headerButton}>
               <Ionicons name="close" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
             <View>
@@ -1135,6 +1146,8 @@ function PatientDictationScreenBody() {
           <View style={styles.headerRight}>
             <TouchableOpacity
               style={styles.datePill}
+              accessibilityRole="button"
+              accessibilityLabel="Date of operation"
               onPress={() => setShowDatePicker(true)}
               disabled={isReadOnly}
             >
@@ -1149,20 +1162,25 @@ function PatientDictationScreenBody() {
           </View>
         </View>
 
+        {AUTOMATIC_RECOVERY_PAUSED && <CaseSaveStatus />}
+
         {showDatePicker && (
           Platform.OS === 'ios' ? (
             <Modal transparent animationType="fade" onRequestClose={() => setShowDatePicker(false)}>
               <BlurView intensity={70} tint="dark" style={styles.modalOverlayCenter}>
                 <View style={styles.datePickerCard}>
                   <DateTimePicker
-                    value={new Date(activeDictation.dateOfOperation + 'T00:00:00')}
+                    value={activeDictation.dateOfOperation ? new Date(activeDictation.dateOfOperation + 'T00:00:00') : new Date()}
                     mode="date"
                     display="inline"
                     onChange={(event, date) => {
                       if (date) updateOperationDate(date);
                     }}
                   />
-                  <TouchableOpacity style={styles.modalSaveButton} onPress={() => setShowDatePicker(false)}>
+                  <TouchableOpacity style={styles.modalSaveButton} onPress={() => {
+                    if (!activeDictation.dateOfOperation) updateOperationDate(new Date());
+                    setShowDatePicker(false);
+                  }}>
                     <Text style={styles.modalSaveText}>Done</Text>
                   </TouchableOpacity>
                 </View>
@@ -1170,7 +1188,7 @@ function PatientDictationScreenBody() {
             </Modal>
           ) : (
             <DateTimePicker
-              value={new Date(activeDictation.dateOfOperation + 'T00:00:00')}
+              value={activeDictation.dateOfOperation ? new Date(activeDictation.dateOfOperation + 'T00:00:00') : new Date()}
               mode="date"
               display="calendar"
               onChange={(event, date) => {
@@ -1250,6 +1268,8 @@ function PatientDictationScreenBody() {
                   }}
                 />
                 <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel="Add typed operative notes"
                   style={[styles.sendButton, !textDraft.trim() && styles.sendButtonDisabled]}
                   onPress={submitText}
                   disabled={!textDraft.trim()}
@@ -1441,6 +1461,8 @@ function PatientDictationScreenBody() {
           <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, spacing.md) + 60 }] }>
             <TouchableOpacity
               style={styles.bottomButton}
+              accessibilityRole="button"
+              accessibilityLabel="Type or paste operative notes"
               onPress={() => setShowTextInput(!showTextInput)}
             >
               <Ionicons
@@ -1452,6 +1474,9 @@ function PatientDictationScreenBody() {
 
             <TouchableOpacity
               style={[styles.micButton, isRecording && styles.micButtonRecording]}
+              accessibilityRole="button"
+              accessibilityLabel={isRecording ? 'Stop dictation recording' : 'Record dictation'}
+              disabled={isTranscribing}
               onPress={toggleRecording}
               onLongPress={startRecording}
             >
@@ -1465,6 +1490,8 @@ function PatientDictationScreenBody() {
 
             <TouchableOpacity
               style={styles.bottomButton}
+              accessibilityRole="button"
+              accessibilityLabel="Add operative note photos"
               onPress={() => setShowImagePicker(true)}
             >
               <Ionicons name="image-outline" size={24} color={colors.textSecondary} />

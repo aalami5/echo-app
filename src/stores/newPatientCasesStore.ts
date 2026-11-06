@@ -7,7 +7,7 @@ import { createCaseRepository, type NewCase, type CaseSummary, checkCase, summar
 
 const repository = createCaseRepository(AsyncStorage);
 export function newCaseHeader(name: string, mrn: string, date: string) {
-  const display = new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const display = date ? new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'not specified';
   return `This is Dr. Oliver Aalami with a dictated operative report for ${name}, medical record number ${mrn || 'not specified'}. The date of operation is ${display}.`;
 }
 type State = {
@@ -38,7 +38,7 @@ function persistCase(value: NewCase) {
   });
 }
 function initialCase(patient: Patient, date: string): NewCase {
-  if (!validOperationDate(date)) throw Error('Enter a valid operation date (YYYY-MM-DD).');
+  if (date !== '' && !validOperationDate(date)) throw Error('Enter a valid operation date (YYYY-MM-DD).');
   const now = new Date().toISOString(), id = `newcase-${Crypto.randomUUID()}`;
   return { version: 1, patient, dictation: { id, patientId: patient.id, emailTrackingEnabled: true, status: 'draft',
     dateOfOperation: date, transcriptParts: [{ id: `${id}-header`, type: 'text', content: newCaseHeader(patient.name, patient.mrn, date), timestamp: now }],
@@ -79,9 +79,7 @@ export const useNewPatientCasesStore = create<State>((set, get) => ({
     if (get().saving || get().saveError) throw Error('Save the current report before starting another.');
     const patient = get().patients[patientId];
     if (!patient) throw Error('Patient not loaded.');
-    const date = Object.values(get().dictations)[0]?.dateOfOperation;
-    if (!date) throw Error('Choose an operation date first.');
-    const value = initialCase(patient, date);
+    const value = initialCase(patient, '');
     set({ dictations: { [value.dictation.id]: value.dictation }, savedAt: null }); persistCase(value);
     return value.dictation.id;
   },

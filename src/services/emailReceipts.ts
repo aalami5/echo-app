@@ -7,8 +7,8 @@ import { usePatientDictationsStore } from '../stores/patientDictationsStore';
 import type { GatewayService } from './gateway';
 
 let refreshInFlight: Promise<void> | null = null;
-export function refreshEmailReceipts(): Promise<void> {
-  if (AUTOMATIC_RECOVERY_PAUSED) return Promise.resolve(); // Existing receipts remain untouched.
+export function refreshEmailReceipts(options?: { newCasesOnly?: boolean }): Promise<void> {
+  if (AUTOMATIC_RECOVERY_PAUSED && !options?.newCasesOnly) return Promise.resolve();
   if (refreshInFlight) return refreshInFlight;
   refreshInFlight = (async () => {
     const { gatewayUrl, gatewayToken } = useSettingsStore.getState();
@@ -23,6 +23,9 @@ export function refreshEmailReceipts(): Promise<void> {
       const data = await response.json();
       if (!Array.isArray(data.receipts)) throw new Error('Invalid email history');
       useEmailReceiptsStore.getState().merge(data.receipts);
+      // New-case receipts already have stable report IDs. Refresh their status
+      // without hydrating or migrating the large legacy report archive.
+      if (AUTOMATIC_RECOVERY_PAUSED) return;
       // Bind exact historical matches to stable IDs BEFORE a later edit changes the hash.
       if (!usePatientDictationsStore.persist.hasHydrated()) await usePatientDictationsStore.persist.rehydrate();
       const receipts = data.receipts as EmailReceipt[];
@@ -64,6 +67,6 @@ export async function sendReportWithReceipt(gateway: GatewayService, report: str
     await AsyncStorage.removeItem(key);
   } finally {
     sending.delete(id);
-    refreshEmailReceipts().catch(() => {}); // Never clear cached history when offline.
+    refreshEmailReceipts({ newCasesOnly: id.startsWith('newcase-') }).catch(() => {}); // Never clear cached history when offline.
   }
 }

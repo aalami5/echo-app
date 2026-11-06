@@ -78,3 +78,12 @@ test('list loads only bounded metadata; opening one case does not read another c
   await store.getState().open(id);assert.deepEqual(touched,[['read',service.CASE_PREFIX+id]]);
   assert.deepEqual(Object.keys(store.getState().dictations),[id]);assert.notEqual(id,second);
 });
+
+test('undated drafts open immediately and persist; invalid dates and undated final reports are rejected',async()=>{
+ const next=await store.getState().startForPatient(Object.values(store.getState().patients)[0],'');await store.getState().flush();
+ assert.equal(store.getState().dictations[next].dateOfOperation,'');assert.match(store.getState().dictations[next].transcriptParts[0].content,/not specified/);
+ await store.getState().refresh();assert.equal(store.getState().summaries.find(s=>s.id===next).date,'');
+ store.setState({patients:{},dictations:{}});await store.getState().open(next);
+ assert.throws(()=>store.getState().finalizeDictation(next));assert.throws(()=>store.getState().updateDictation(next,{dateOfOperation:'2026-02-31'}));
+ assert.equal(store.getState().dictations[next].status,'draft');
+});
