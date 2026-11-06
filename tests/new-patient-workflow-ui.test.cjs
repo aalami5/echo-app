@@ -1,8 +1,9 @@
 const {test}=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript'),Module=require('node:module');
 const React=require('react'),{create,act}=require('react-test-renderer');global.IS_REACT_ACT_ENVIRONMENT=true;
-const values=new Map(),writes=[],routes=[],alerts=[],draftCalls=[],guards=[];let params={},failed=false,recordings=0,transcriptions=0;
+const values=new Map(),writes=[],routes=[],alerts=[],draftCalls=[],guards=[],liveGuards=new Map();let blockedExits=0;let params={},failed=false,recordings=0,transcriptions=0;
 const storage={getItem:async k=>values.get(k)??null,setItem:async(k,v)=>{assert.match(k,/^echo-new-patient-case/);if(failed)throw Error('disk full');writes.push(k);values.set(k,v);}};
-const router={push:r=>routes.push(r),replace:r=>{routes.push(r);params=r.params;},back:()=>routes.push('back')};
+const navigateBack=()=>{const guard=[...liveGuards.values()].find(g=>g.blocked);if(guard){blockedExits++;guard.callback({data:{action:{type:'GO_BACK'}}});}else routes.push('back');};
+const router={push:r=>routes.push(r),replace:r=>{routes.push(r);params=r.params;},back:navigateBack};
 const settings={gatewayUrl:'https://test.invalid',gatewayToken:'synthetic',elevenlabsApiKey:'synthetic'};
 const clips=[],examples=[],sends=[],tts=[],aiEdits=[];
 const emptyDictation={customProcedures:[],stylePreferences:[],saveAsExample:(...args)=>examples.push(args),addCustomProcedure:p=>emptyDictation.customProcedures.push(p),updateCustomProcedure:()=>{},removeCustomProcedure:()=>{}};
@@ -14,9 +15,10 @@ Module._load=function(id,...args){
  if(id==='react-native-keyboard-aware-scroll-view')return {KeyboardAwareScrollView:'ScrollView'};
  if(id.endsWith('/usePatientScan'))return {usePatientScan:()=>({clearScan:()=>{},scanFromCamera:async()=>null,scanFromLibrary:async()=>null})};
  if(id.endsWith('/usePatientVoiceInput'))return {usePatientVoiceInput:()=>({cancelRecording:async()=>{}})};
+ if(id.endsWith('/newCasePersistence'))return {caseRepository:require('../src/services/newPatientCases.ts').createCaseRepository(storage),caseSaveMessage:e=>'Not saved: '+e.message};
  if(id==='expo-crypto')return {randomUUID:require('node:crypto').randomUUID};
  if(id==='expo-router')return {useRouter:()=>router,useLocalSearchParams:()=>params};
- if(id==='@react-navigation/native')return {usePreventRemove:(blocked,callback)=>guards.push({blocked,callback}),useIsFocused:()=>true};
+ if(id==='@react-navigation/native')return {usePreventRemove:(blocked,callback)=>{const key=React.useId();liveGuards.set(key,{blocked,callback});guards.push({blocked,callback});React.useEffect(()=>()=>liveGuards.delete(key),[]);},useIsFocused:()=>true,useNavigation:()=>({dispatch:a=>a.type==='GO_BACK'?navigateBack():routes.push(a)})};
  if(id==='expo-secure-store')return {getItemAsync:async()=>null};
  if(id==='react-native')return {
    View:'View',Text:'Text',ScrollView:'ScrollView',TextInput:'TextInput',TouchableOpacity:'TouchableOpacity',ActivityIndicator:'ActivityIndicator',KeyboardAvoidingView:'KeyboardAvoidingView',
@@ -111,7 +113,7 @@ test('original full input view opens without a date gate; typed notes, photos, c
  const id=await store.getState().startForPatient(patient,'');await store.getState().flush();
  params={patientId:patient.id,dictationId:id,mode:'new'};
  let tree;await act(async()=>{tree=create(React.createElement(Dictation));});
- assert.match(content(tree),/Choose date/);assert.doesNotMatch(content(tree),/Start dictation/);
+ assert.doesNotMatch(content(tree),/Choose date|Start dictation/);assert.equal(tree.root.findAllByType('DatePicker').length,0);
  assert.ok(tree.root.findByProps({accessibilityLabel:'Record dictation'}));
  await act(async()=>tree.root.findByProps({accessibilityLabel:'Type or paste operative notes'}).props.onPress());
  await act(async()=>tree.root.findByType('TextInput').props.onChangeText('Synthetic combined procedure notes.'));
@@ -119,8 +121,7 @@ test('original full input view opens without a date gate; typed notes, photos, c
  await act(async()=>tree.root.findByProps({accessibilityLabel:'Add operative note photos'}).props.onPress());
  await act(async()=>tree.root.findByType('ImagePickerModal').props.onImageSelected('file:///synthetic.png','dGVzdA==','image/png','Synthetic operative photo'));
  assert.equal(store.getState().dictations[id].transcriptParts.length,3);
- const calls=draftCalls.length;await act(async()=>button(tree,'Generate draft').props.onPress());assert.equal(draftCalls.length,calls);
- assert.match(alerts.at(-1)[0],/Date of operation/);
+ await act(async()=>tree.root.findByProps({accessibilityLabel:'Date of operation'}).props.onPress());
  await act(async()=>tree.root.findByType('DatePicker').props.onChange({},new Date(2026,10,5,12)));
  await act(async()=>button(tree,'Done').props.onPress());
  assert.equal(store.getState().dictations[id].dateOfOperation,'2026-11-05');assert.match(store.getState().dictations[id].transcriptParts[0].content,/November 5, 2026/);
@@ -155,10 +156,10 @@ test('New Report keeps the same patient, preserves prior report and routes to fu
  await act(async()=>button(tree,'New Report').props.onPress());
  await act(async()=>{const fn=button(tree,'Start from Previous').props.onPress;await Promise.all([fn(),fn()]);});
  const route=routes.at(-1);assert.equal(route.pathname,'/patient-dictation');assert.equal(route.params.patientId,old.patient.id);assert.notEqual(route.params.dictationId,oldId);
- let d=store.getState().dictations[route.params.dictationId];assert.equal(d.dateOfOperation,'');assert.equal(d.generatedReport,null);assert.deepEqual(d.selectedProcedures,[]);
- assert.match(d.transcriptParts[0].content,/not specified/);assert.equal(d.transcriptParts[1].sourceKind,'historical');assert.equal(d.transcriptParts[1].content,old.dictation.generatedReport);
+ let d=store.getState().dictations[route.params.dictationId];assert.equal(d.dateOfOperation,require('../src/services/newPatientCases.ts').localOperationDate(d.createdAt));assert.equal(d.generatedReport,null);assert.deepEqual(d.selectedProcedures,[]);
+ assert.doesNotMatch(d.transcriptParts[0].content,/not specified/);assert.equal(d.transcriptParts[1].sourceKind,'historical');assert.equal(d.transcriptParts[1].content,old.dictation.generatedReport);
  assert.deepEqual(JSON.parse(values.get('echo-new-patient-case-v1-'+oldId)),old);
- await act(async()=>tree.unmount());await act(async()=>{tree=create(React.createElement(Dictation));});assert.match(content(tree),/Choose date/);assert.ok(tree.root.findByType('Avatar'));
+ await act(async()=>tree.unmount());await act(async()=>{tree=create(React.createElement(Dictation));});assert.doesNotMatch(content(tree),/Choose date/);assert.ok(tree.root.findByType('Avatar'));
  await act(async()=>tree.unmount());
 });
 
@@ -171,6 +172,17 @@ test('finalize saves reviewed report before closing; Start Fresh stays patient-l
  await act(async()=>button(tree,'New Report').props.onPress());
  await act(async()=>button(tree,'Start Fresh').props.onPress());
  assert.equal(routes.at(-1).pathname,'/patient-dictation');
- const next=store.getState().dictations[params.dictationId];assert.equal(next.transcriptParts.length,1);assert.equal(next.generatedReport,null);assert.equal(next.dateOfOperation,'');
+ const next=store.getState().dictations[params.dictationId];assert.equal(next.transcriptParts.length,1);assert.equal(next.generatedReport,null);assert.equal(next.dateOfOperation,require('../src/services/newPatientCases.ts').localOperationDate(next.createdAt));
+ await act(async()=>tree.unmount());
+});
+
+test('Save & Close retries a failed save and exits only after committed guards are clear',async()=>{
+ let tree;await act(async()=>{tree=create(React.createElement(Dictation));});
+ const id=params.dictationId;failed=true;
+ await act(async()=>{store.getState().updateDictation(id,{generatedReport:'Synthetic unsaved report'});await store.getState().flush().catch(()=>{});});
+ assert.match(content(tree),/Not saved/);assert.ok(button(tree,'Save & Close'));
+ const before=routes.length;await act(async()=>button(tree,'Save & Close').props.onPress());assert.equal(routes.length,before);
+ failed=false;const blocks=blockedExits;await act(async()=>button(tree,'Save & Close').props.onPress());
+ assert.equal(routes.at(-1),'back');assert.equal(blockedExits,blocks);assert.equal(store.getState().saveError,null);
  await act(async()=>tree.unmount());
 });

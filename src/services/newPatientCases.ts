@@ -16,7 +16,12 @@ const text = (value: unknown, max = 8192): value is string => typeof value === '
 export function validOperationDate(date: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(date) && Number.isFinite(Date.parse(date)) && new Date(date).toISOString().slice(0, 10) === date;
 }
-// Notes can be captured immediately; an operation date is required before drafting/finalizing.
+export function localOperationDate(createdAt: string | Date = new Date()): string {
+  const date = typeof createdAt === 'string' ? new Date(createdAt) : createdAt;
+  if (!Number.isFinite(date.getTime())) throw Error('Invalid record creation date.');
+  return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`;
+}
+// Build106 drafts may lack dates; retain readability and fill only the opened case.
 function validCaseDate(date: unknown, status: unknown): boolean {
   return typeof date === 'string' && (validOperationDate(date) || (date === '' && status === 'draft'));
 }

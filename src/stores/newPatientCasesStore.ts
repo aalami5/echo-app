@@ -1,11 +1,10 @@
 import { create } from 'zustand';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { caseRepository as repository, caseSaveMessage } from '../services/newCasePersistence';
 import * as Crypto from 'expo-crypto';
 import type { Patient } from './patientsStore';
 import type { PatientDictation } from './patientDictationsStore';
-import { createCaseRepository, type NewCase, type CaseSummary, checkCase, summaryOf, validOperationDate } from '../services/newPatientCases';
+import { localOperationDate, type NewCase, type CaseSummary, checkCase, summaryOf, validOperationDate } from '../services/newPatientCases';
 
-const repository = createCaseRepository(AsyncStorage);
 export function newCaseHeader(name: string, mrn: string, date: string) {
   const display = date ? new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'not specified';
   return `This is Dr. Oliver Aalami with a dictated operative report for ${name}, medical record number ${mrn || 'not specified'}. The date of operation is ${display}.`;
@@ -33,13 +32,14 @@ function persistCase(value: NewCase) {
   void pending.then(() => {
     if (current === revision) useNewPatientCasesStore.setState(state => ({ saving: false, savedAt: value.dictation.updatedAt,
       summaries: [summaryOf(value), ...state.summaries.filter(s => s.id !== value.dictation.id)] }));
-  }, () => {
-    if (current === revision) useNewPatientCasesStore.setState({ saving: false, saveError: 'Not saved. Keep Echo open and tap Retry save. Your last saved copy is unchanged.' });
+  }, error => {
+    if (current === revision) useNewPatientCasesStore.setState({ saving: false, saveError: caseSaveMessage(error) });
   });
 }
 function initialCase(patient: Patient, date: string): NewCase {
   if (date !== '' && !validOperationDate(date)) throw Error('Enter a valid operation date (YYYY-MM-DD).');
   const now = new Date().toISOString(), id = `newcase-${Crypto.randomUUID()}`;
+  date = date || localOperationDate(now);
   return { version: 1, patient, dictation: { id, patientId: patient.id, emailTrackingEnabled: true, status: 'draft',
     dateOfOperation: date, transcriptParts: [{ id: `${id}-header`, type: 'text', content: newCaseHeader(patient.name, patient.mrn, date), timestamp: now }],
     selectedProcedures: [], generatedReport: null, createdAt: now, updatedAt: now } };
@@ -52,14 +52,23 @@ export const useNewPatientCasesStore = create<State>((set, get) => ({
     if (get().dictations[id]) return;
     await pending; // Never replace an unsaved case with another one.
     const value = await repository.load(id);
+    const dateWasMissing = !value.dictation.dateOfOperation;
+    if (dateWasMissing) {
+      const date = localOperationDate(value.dictation.createdAt);
+      value.dictation.dateOfOperation = date;
+      const header = value.dictation.transcriptParts[0];
+      if (header && /^This is Dr\. (?:Oliver )?Aalami/.test(header.content)) header.content = newCaseHeader(value.patient.name, value.patient.mrn, date);
+      // Do not rewrite report prose or any already-selected operation date.
+    }
     if (request !== openRevision) throw Error('A different case was opened.');
     set({ patients: { [value.patient.id]: value.patient }, dictations: { [id]: value.dictation }, savedAt: value.dictation.updatedAt, saveError: null });
+    if (dateWasMissing) persistCase(value);
   },
   start: async (input, date) => {
     await pending;
     ++openRevision;
     const now = new Date().toISOString();
-    const patient: Patient = { ...input, name: input.name.trim(), mrn: input.mrn.trim(), id: `newpatient-${Crypto.randomUUID()}`, callDayId: `newday-${date}`, timeSeen: now };
+    const patient: Patient = { ...input, name: input.name.trim(), mrn: input.mrn.trim(), id: `newpatient-${Crypto.randomUUID()}`, callDayId: `newday-${date || localOperationDate(now)}`, timeSeen: now };
     const value = initialCase(patient, date); checkCase(value);
     set({ patients: { [patient.id]: patient }, dictations: { [value.dictation.id]: value.dictation }, savedAt: null });
     persistCase(value);
@@ -92,7 +101,7 @@ export const useNewPatientCasesStore = create<State>((set, get) => ({
     set({ dictations: { [id]: dictation } }); persistCase(value);
   },
   finalizeDictation: id => get().updateDictation(id, { status: 'final' }),
-  flush: async () => { await pending; },
+  flush: async () => { while (true) { const latest = pending; await latest; if (latest === pending) return; } },
   retrySave: async () => {
     const dictation = Object.values(get().dictations)[0];
     if (!dictation) return;

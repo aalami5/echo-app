@@ -7,6 +7,7 @@ const storage = { getItem: async key => { touched.push(['read',key]); assert.ok(
 const original = Module._load;
 Module._load = function(id,...args) {
   if(id === '@react-native-async-storage/async-storage') return {__esModule:true,default:storage};
+ if(id.endsWith('/newCasePersistence'))return {caseRepository:require('../src/services/newPatientCases.ts').createCaseRepository(storage),caseSaveMessage:e=>'Not saved: '+e.message};
   if(id === 'expo-crypto') return {randomUUID:require('node:crypto').randomUUID};
   if(/\/(patientsStore|patientDictationsStore|patientSync|dictationSync|clinicalRestore|emailReceipts)$/.test(id)) assert.fail('new-case store must not import '+id);
   return original.call(this,id,...args);
@@ -79,11 +80,16 @@ test('list loads only bounded metadata; opening one case does not read another c
   assert.deepEqual(Object.keys(store.getState().dictations),[id]);assert.notEqual(id,second);
 });
 
-test('undated drafts open immediately and persist; invalid dates and undated final reports are rejected',async()=>{
+test('default operation date is the local creation date, not UTC; selected dates are preserved',async()=>{
  const next=await store.getState().startForPatient(Object.values(store.getState().patients)[0],'');await store.getState().flush();
- assert.equal(store.getState().dictations[next].dateOfOperation,'');assert.match(store.getState().dictations[next].transcriptParts[0].content,/not specified/);
- await store.getState().refresh();assert.equal(store.getState().summaries.find(s=>s.id===next).date,'');
- store.setState({patients:{},dictations:{}});await store.getState().open(next);
- assert.throws(()=>store.getState().finalizeDictation(next));assert.throws(()=>store.getState().updateDictation(next,{dateOfOperation:'2026-02-31'}));
- assert.equal(store.getState().dictations[next].status,'draft');
+ const d=store.getState().dictations[next];assert.equal(d.dateOfOperation,service.localOperationDate(d.createdAt));assert.doesNotMatch(d.transcriptParts[0].content,/not specified/);
+ store.getState().updateDictation(next,{dateOfOperation:'2026-10-10'});await store.getState().flush();store.setState({patients:{},dictations:{}});await store.getState().open(next);
+ assert.equal(store.getState().dictations[next].dateOfOperation,'2026-10-10');assert.throws(()=>store.getState().updateDictation(next,{dateOfOperation:'2026-02-31'}));
+});
+test('build106 blank operation dates use original creation date on selective reopen, without rewriting generated report',async()=>{
+ const patient=Object.values(store.getState().patients)[0];
+ const next=await store.getState().startForPatient(patient,'2026-11-01');await store.getState().flush();
+ const key=service.CASE_PREFIX+next,value=JSON.parse(values.get(key));value.dictation.dateOfOperation='';value.dictation.createdAt='2026-11-01T01:00:00.000Z';value.dictation.generatedReport='Original report prose';values.set(key,JSON.stringify(value));
+ store.setState({patients:{},dictations:{}});await store.getState().open(next);await store.getState().flush();
+ assert.equal(store.getState().dictations[next].dateOfOperation,service.localOperationDate(value.dictation.createdAt));assert.equal(store.getState().dictations[next].generatedReport,'Original report prose');
 });

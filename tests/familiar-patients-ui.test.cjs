@@ -9,6 +9,7 @@ Module._load=function(id,...args){
  if(/\/(LegacyPatientsScreen|patientsStore|patientDictationsStore|clinicalRestore|patientSync|dictationSync|emailReceiptsStore|chatStore)$/.test(id))assert.fail('screen must not import '+id);
  if(id==='@react-native-async-storage/async-storage')return {__esModule:true,default:storage};
  if(id==='expo-secure-store')return {getItemAsync:async k=>{assert.equal(k,'echo-patients');if(localFailed)throw Error('private-error');return JSON.stringify({version:0,state:dataset});}};
+ if(id.endsWith('/newCasePersistence'))return {caseRepository:require('../src/services/newPatientCases.ts').createCaseRepository(storage),caseSaveMessage:e=>'Not saved: '+e.message};
  if(id==='expo-crypto')return {randomUUID:require('node:crypto').randomUUID};
  if(id==='expo-router')return {useRouter:()=>({push:r=>routes.push(r)})};
  if(id==='@react-navigation/native')return {useIsFocused:()=>true,usePreventRemove:()=>{}};
@@ -55,7 +56,7 @@ test('reopen lists metadata only; Op Report opens the full screen directly witho
  await act(async()=>{const open=byLabel(tree,'Op Report for New Synthetic').props.onPress;await Promise.all([open(),open()]);});await act(async()=>store.getState().flush());
  assert.equal(tree.root.findAllByType('Modal').length,0);assert.equal(routes.length,1);assert.doesNotMatch(content(tree),/Start dictation/);
  const route=routes.at(-1);assert.equal(route.params.patientId,newPatientId);reportId=route.params.dictationId;
- assert.equal(store.getState().dictations[reportId].dateOfOperation,'');assert.match(store.getState().dictations[reportId].transcriptParts[0].content,/not specified/);
+ assert.equal(store.getState().dictations[reportId].dateOfOperation,require('../src/services/newPatientCases.ts').localOperationDate(store.getState().dictations[reportId].createdAt));assert.doesNotMatch(store.getState().dictations[reportId].transcriptParts[0].content,/not specified/);
  assert.deepEqual(store.getState().dictations[reportId].selectedProcedures,[]);
  await act(async()=>tree.unmount());
 });

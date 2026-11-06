@@ -13,12 +13,13 @@ import { useSettingsStore } from '../stores/settingsStore';
 import { useNewPatientCasesStore } from '../stores/newPatientCasesStore';
 import { usePatientScan } from '../hooks/usePatientScan';
 import { usePatientVoiceInput } from '../hooks/usePatientVoiceInput';
-import { createCaseRepository, validOperationDate, type CaseSummary } from '../services/newPatientCases';
+import { validOperationDate, type CaseSummary } from '../services/newPatientCases';
 import { createPatientReader, displayedRows, HOSPITAL_LABELS, requestPatientMetadata, type PatientView, type Hospital } from '../services/readOnlyPatients';
 import { createPatientViewRepository, mergePatientView, patientListItems, type FamiliarPatient, type SavedPatient, type PatientListItem } from '../services/familiarPatients';
+import { caseRepository as cases } from '../services/newCasePersistence';
 import { patientStyles as styles } from './patientStyles';
 
-const repository = createPatientViewRepository(AsyncStorage), cases = createCaseRepository(AsyncStorage);
+const repository = createPatientViewRepository(AsyncStorage);
 const commonComplaints = ['DVT consult','PE consult','LE bypass evaluation','Carotid stenosis','AAA evaluation','Claudication','Critical limb ischemia','Wound care','Dialysis access','AV fistula evaluation'];
 const hospitalColors = { SEQ:'#10B981', ECH:'#3B82F6', SMCMC:'#F59E0B', Mills:'#8B5CF6', OTHER:'#6B7280' };
 function localDate() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
