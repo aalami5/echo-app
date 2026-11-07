@@ -7,6 +7,9 @@ export const CASE_INDEX_KEY = 'echo-new-patient-cases-v1';
 export const CASE_PREFIX = 'echo-new-patient-case-v1-';
 export const CASE_BYTES = 8 * 1024 * 1024;
 export const CASE_COUNT = 500;
+export class CaseLimitError extends Error {
+  constructor(public code: 'REPORT_SIZE_LIMIT' | 'CASE_LIST_LIMIT', message: string) { super(message); }
+}
 export type NewCase = { version: 1; patient: Patient; dictation: PatientDictation };
 export type CaseSummary = { id: string; patientId: string; name: string; mrn: string; date: string; updatedAt: string; status: 'draft' | 'final'; patient?: Patient; hasContent?: boolean };
 export type CaseStorage = { getItem(key: string): Promise<string | null>; setItem(key: string, value: string): Promise<void> };
@@ -77,15 +80,15 @@ export function createCaseRepository(storage: CaseStorage) {
     // Snapshot before queuing; later edits cannot mutate an in-flight save.
     checkCase(value);
     const raw = JSON.stringify(value);
-    if (raw.length > CASE_BYTES || utf8Bytes(raw) > CASE_BYTES) throw Error('This case is too large to save safely. Your last saved copy is unchanged. Keep Echo open and reduce large attachments.');
+    if (raw.length > CASE_BYTES || utf8Bytes(raw) > CASE_BYTES) throw new CaseLimitError('REPORT_SIZE_LIMIT', 'This case is too large to save safely. Your last saved copy is unchanged.');
     const summary = summaryOf(value);
     const operation = queue.catch(() => {}).then(async () => {
       const index = await list();
       const existing = index.findIndex(item => item.id === summary.id);
+      if (existing < 0 && index.length >= CASE_COUNT) throw new CaseLimitError('CASE_LIST_LIMIT', 'The new-case list is full. No saved case was removed.');
       const nextIndex = existing < 0 ? [summary, ...index] : index.map(item => item.id === summary.id ? summary : item);
       encodeIndex(nextIndex);
       if (existing < 0) {
-        if (index.length >= CASE_COUNT) throw Error('The new-case list is full. No saved case was removed.');
         // Reserve discovery BEFORE writing the case. An interrupted initial write
         // is shown explicitly on reopen; completed case bytes never become orphaned.
         index.unshift(summary);

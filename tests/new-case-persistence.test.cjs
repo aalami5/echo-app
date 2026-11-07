@@ -6,7 +6,7 @@ const files={documentDirectory:root+'/',EncodingType:{UTF8:'utf8'},getInfoAsync:
 const original=Module._load;Module._load=function(id,...args){
  if(id==='@react-native-async-storage/async-storage')return {__esModule:true,default:primary};
  if(id==='expo-file-system/legacy')return files;
- if(id==='expo-crypto')return {randomUUID:require('node:crypto').randomUUID};
+ if(id==='expo-crypto')return {randomUUID:require('node:crypto').randomUUID,CryptoDigestAlgorithm:{SHA256:'sha256'},digestStringAsync:async(alg,text)=>require('node:crypto').createHash(alg).update(text).digest('hex')};
  if(/\/(patientsStore|patientDictationsStore|patientSync|dictationSync|clinicalRestore)$/.test(id))assert.fail('must not load legacy store');
  return original.call(this,id,...args);
 };
@@ -54,13 +54,72 @@ test('a successful write callback is not considered Saved if the independent rea
  const repo=createVerifiedCaseRepository(createCaseRepository(primary),createCaseRepository(corrupted));
  const value=JSON.parse(fs.readFileSync(savedFile(id),'utf8'));await assert.rejects(repo.save(value),/VERIFY/);
 });
-test('oversized attachments give an actionable error; unrelated paths and oversized recovery reads are rejected',async()=>{
- const before=fs.readFileSync(savedFile(id),'utf8');const d=store.getState().dictations[id];
- const big={id:'big',type:'image',content:'Synthetic',timestamp:new Date().toISOString(),imageBase64:'x'.repeat(8*1024*1024-100)};
- store.getState().updateDictation(id,{transcriptParts:[...d.transcriptParts,big]});await assert.rejects(store.getState().flush());assert.match(store.getState().saveError,/SIZE_LIMIT/);assert.equal(fs.readFileSync(savedFile(id),'utf8'),before);
+test('attachment-heavy report over the old 8 MiB limit saves losslessly and reopens through a fresh repository',async()=>{
+ const d=store.getState().dictations[id],before=[...originalBytes];
+ const big={id:'big',type:'image',content:'Synthetic',timestamp:new Date().toISOString(),imageBase64:'x'.repeat(8*1024*1024-100),imageMimeType:'image/png',ocrText:'Preserved synthetic OCR'};
+ const second={...big,id:'second',imageBase64:'y'.repeat(3*1024*1024)};
+ const {createCaseRepository:oldRepository}=require('../src/services/newPatientCases.ts');
+ assert.throws(()=>oldRepository(primary).save({version:1,patient:store.getState().patients[d.patientId],dictation:{...d,transcriptParts:[...d.transcriptParts,big,second]}}),/too large/);
+ store.getState().updateDictation(id,{transcriptParts:[...d.transcriptParts,big,second],generatedReport:'Latest synthetic operative report'});await store.getState().flush();
+ assert.equal(store.getState().saveError,null);const expected=structuredClone(store.getState().dictations[id]);
+ const manifest=fs.readFileSync(savedFile(id),'utf8');assert.ok(Buffer.byteLength(manifest)<10000);assert.match(manifest,/echo-case-image-v1:/);assert.ok(!manifest.includes(big.imageBase64));
+ const {createAttachmentCaseRepository,createCaseAttachmentStorage}=require('../src/services/caseAttachments.ts');
+ const {createCaseRepository}=require('../src/services/newPatientCases.ts');
+ const {createVerifiedCaseRepository}=require('../src/services/newCasePersistence.ts');
+ const fresh=createVerifiedCaseRepository(createCaseRepository(primary),createAttachmentCaseRepository(createCaseRepository(createCaseFileStorage(files)),createCaseAttachmentStorage(files)));
+ assert.deepEqual((await fresh.load(id)).dictation,expected);assert.deepEqual([...originalBytes],before);
+ const originalRead=files.readAsStringAsync;const imageReads=[];files.readAsStringAsync=async uri=>{imageReads.push(uri);return originalRead(uri);};
+ try{await fresh.list();assert.ok(imageReads.every(x=>!x.endsWith('.b64')));}finally{files.readAsStringAsync=originalRead;}
+ const count=fs.readdirSync(path.join(root,'echo-new-case-images-v1')).length;
+ store.getState().updateDictation(id,{generatedReport:'Latest edit with unchanged images'});await store.getState().flush();
+ assert.equal(fs.readdirSync(path.join(root,'echo-new-case-images-v1')).length,count);
  store.getState().updateDictation(id,{transcriptParts:d.transcriptParts});await store.getState().flush();
+});
+test('unrelated paths and oversized recovery reads are rejected before allocation',async()=>{
  await assert.rejects(createCaseFileStorage(files).getItem('../patient-dictations-store'),/recovery key/);
  const huge=createCaseFileStorage({...files,getInfoAsync:async()=>({exists:true,isDirectory:false,size:9*1024*1024}),readAsStringAsync:async()=>assert.fail('must not allocate oversized file')});await assert.rejects(huge.getItem(CASE_PREFIX+id));
+});
+test('attachment write failure preserves previous report; retry commits and missing/corrupt files never silently fall back',async()=>{
+ const previous=fs.readFileSync(savedFile(id),'utf8'),d=store.getState().dictations[id];
+ const part={id:'failure-image',type:'image',content:'Synthetic',timestamp:new Date().toISOString(),imageBase64:'c3ludGhldGlj',imageMimeType:'image/png'};
+ diskFull=true;store.getState().updateDictation(id,{transcriptParts:[...d.transcriptParts,part],generatedReport:'Pending image draft'});
+ await assert.rejects(store.getState().flush());assert.match(store.getState().saveError,/DEVICE_FULL/);assert.equal(fs.readFileSync(savedFile(id),'utf8'),previous);
+ diskFull=false;await store.getState().retrySave();assert.equal(store.getState().saveError,null);
+ const hash=require('node:crypto').createHash('sha256').update(part.imageBase64).digest('hex'),file=path.join(root,'echo-new-case-images-v1',hash+'.b64');
+ fs.writeFileSync(file,'x'.repeat(part.imageBase64.length));await assert.rejects(caseRepository.load(id),/ATTACHMENT_VERIFY/);
+ await store.getState().retrySave();assert.equal(store.getState().saveError,null);assert.equal(fs.readFileSync(file,'utf8'),part.imageBase64);
+ fs.unlinkSync(file);await assert.rejects(caseRepository.load(id),/ATTACHMENT_READ/);
+ await store.getState().retrySave();assert.equal((await caseRepository.load(id)).dictation.generatedReport,'Pending image draft');
+ store.getState().updateDictation(id,{transcriptParts:d.transcriptParts});await store.getState().flush();
+});
+test('corrupt attachment write cannot replace the last verified report manifest',async()=>{
+ const before=fs.readFileSync(savedFile(id),'utf8'),d=store.getState().dictations[id];
+ corruptWrites=true;store.getState().updateDictation(id,{transcriptParts:[...d.transcriptParts,{id:'corrupt',type:'image',content:'Synthetic',timestamp:new Date().toISOString(),imageBase64:'YW5vdGhlciBzeW50aGV0aWM='}]});
+ await assert.rejects(store.getState().flush());assert.match(store.getState().saveError,/ATTACHMENT_READ/);assert.equal(fs.readFileSync(savedFile(id),'utf8'),before);
+ corruptWrites=false;await store.getState().retrySave();assert.equal(store.getState().saveError,null);
+ store.getState().updateDictation(id,{transcriptParts:d.transcriptParts});await store.getState().flush();
+});
+test('sidecar reference traversal and aggregate allocation attacks are rejected before image reads',async()=>{
+ const {createAttachmentCaseRepository}=require('../src/services/caseAttachments.ts');
+ const value=JSON.parse(fs.readFileSync(savedFile(id),'utf8'));
+ let reads=0;const repo=createAttachmentCaseRepository({load:async()=>structuredClone(value),list:async()=>[],save:async()=>{}},{read:async()=>{reads++;assert.fail('must not read');}});
+ value.dictation.transcriptParts=[{id:'invalid',type:'image',content:'Synthetic',timestamp:'2026-11-06',imageBase64:'echo-case-image-v1:../../private:10'}];
+ await assert.rejects(repo.load(id),/ATTACHMENT_READ/);assert.equal(reads,0);
+ value.dictation.transcriptParts=Array.from({length:9},(_,i)=>({id:String(i),type:'image',content:'Synthetic',timestamp:'2026-11-06',imageBase64:'echo-case-image-v1:'+'a'.repeat(64)+':8388608'}));
+ await assert.rejects(repo.load(id),/ATTACHMENT_LIMIT/);assert.equal(reads,0);
+});
+test('saving beyond attachment memory budget rejects before writing and reports an app limit, not device full',async()=>{
+ const {createAttachmentCaseRepository}=require('../src/services/caseAttachments.ts');
+ const value=JSON.parse(fs.readFileSync(savedFile(id),'utf8'));let writes=0;
+ const repo=createAttachmentCaseRepository({load:async()=>value,list:async()=>[],save:async()=>writes++},{write:async()=>{writes++;}});
+ value.dictation.transcriptParts=Array.from({length:9},(_,i)=>({id:String(i),type:'image',content:'Synthetic',timestamp:'2026-11-06',imageBase64:'a'.repeat(8*1024*1024)}));
+ await assert.rejects(repo.save(value),/ATTACHMENT_LIMIT/);assert.equal(writes,0);
+});
+test('storage errors distinguish report limit, list capacity and physical disk full',()=>{
+ const {caseSaveMessage,CasePersistenceError}=require('../src/services/newCasePersistence.ts');const {CaseLimitError}=require('../src/services/newPatientCases.ts');
+ assert.match(caseSaveMessage(new CasePersistenceError('RECOVERY_WRITE',new CaseLimitError('CASE_LIST_LIMIT','full'))),/CASE_LIST_LIMIT/);
+ assert.match(caseSaveMessage(new CasePersistenceError('RECOVERY_WRITE',new CaseLimitError('REPORT_SIZE_LIMIT','too large'))),/REPORT_SIZE_LIMIT/);
+ assert.match(caseSaveMessage(new CasePersistenceError('RECOVERY_WRITE',Error('ENOSPC'))),/DEVICE_FULL/);
 });
 test('operation-date default uses the device-local creation day across UTC midnight',()=>{
  const old=process.env.TZ;process.env.TZ='Pacific/Honolulu';try{assert.equal(localOperationDate('2026-11-06T02:30:00.000Z'),'2026-11-05');}finally{if(old===undefined)delete process.env.TZ;else process.env.TZ=old;}

@@ -1,7 +1,8 @@
 /** Independent, verified phone-local recovery for new cases only. No legacy archive reads. */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
-import { createCaseRepository, CASE_BYTES, CASE_INDEX_KEY, type CaseStorage, type NewCase, type CaseSummary } from './newPatientCases';
+import { createCaseRepository, CaseLimitError, CASE_BYTES, CASE_INDEX_KEY, type CaseStorage, type NewCase, type CaseSummary } from './newPatientCases';
+import { createAttachmentCaseRepository, CaseAttachmentError } from './caseAttachments';
 
 export class CasePersistenceError extends Error {
   constructor(public stage: string, public cause?: unknown) { super(`Case save failed: ${stage}`); }
@@ -9,7 +10,12 @@ export class CasePersistenceError extends Error {
 export function caseSaveMessage(error: unknown): string {
   const cause = error instanceof CasePersistenceError ? error.cause : error;
   const detail = cause instanceof Error ? cause.message : '';
-  if (/too large|full.*list|list is full/i.test(detail)) return 'Not saved: this case or list exceeds the storage limit. Copy your report before reducing attachments. [SIZE_LIMIT]';
+  if (cause instanceof CaseLimitError) return cause.code === 'CASE_LIST_LIMIT'
+    ? 'Not saved: the new-case list is at its capacity. Your open report is unchanged; copy it somewhere safe. [CASE_LIST_LIMIT]'
+    : 'Not saved: the report text and review data exceed the per-report limit; this does not mean your iPhone is full. Copy your report somewhere safe. [REPORT_SIZE_LIMIT]';
+  if (cause instanceof CaseAttachmentError) return cause.stage === 'ATTACHMENT_LIMIT'
+    ? 'Not saved: the attachments exceed the supported size or format. Your open report is unchanged; copy it somewhere safe. [ATTACHMENT_LIMIT]'
+    : `Not saved: an attached image could not be saved and verified. Keep this report open, copy its text, then retry. [${cause.stage}]`;
   if (/disk full|no space|ENOSPC/i.test(detail)) return 'Not saved: iPhone storage is full. Copy your report, free some space, then tap Save report. [DEVICE_FULL]';
   const stage = error instanceof CasePersistenceError ? error.stage : 'LOCAL_SAVE';
   return `Not saved: the local ${stage === 'VERIFY' ? 'save could not be verified' : 'storage write failed'}. Your report is still open. Copy it, then tap Save report to retry. [${stage}]`;
@@ -74,4 +80,4 @@ export function createVerifiedCaseRepository(primary: Repository, recovery: Repo
     },
   };
 }
-export const caseRepository = createVerifiedCaseRepository(createCaseRepository(AsyncStorage), createCaseRepository(createCaseFileStorage()));
+export const caseRepository = createVerifiedCaseRepository(createCaseRepository(AsyncStorage), createAttachmentCaseRepository(createCaseRepository(createCaseFileStorage())));
