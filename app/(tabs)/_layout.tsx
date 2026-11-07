@@ -1,6 +1,8 @@
 import { useRealtimeVoice } from '../../src/hooks/useRealtimeVoice';
 import React from 'react';
-import { Tabs } from 'expo-router';
+import { Tabs, usePathname, useGlobalSearchParams } from 'expo-router';
+import AssistantScreen from '../../src/screens/AssistantScreen';
+import { AssistantWorkspaceContext } from '../../src/screens/AssistantWorkspace';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { StyleSheet, View, Platform } from 'react-native';
@@ -24,7 +26,12 @@ function TabBarIcon({
 
 export default function TabLayout() {
   const voice = useRealtimeVoice();
+  const pathname = usePathname();
+  const params = useGlobalSearchParams<{ briefMessageId?: string }>();
   return (
+    <AssistantScreen mode={pathname === '/chat' ? 'chat' : 'live'}
+      workspaceFocused={pathname === '/' || pathname === '/chat'} briefMessageId={params.briefMessageId}>
+    {content => <AssistantWorkspaceContext.Provider value={content}>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -44,7 +51,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: voice.isActive ? 'Live Voice' : 'Chat',
+          title: 'Live',
           tabBarBadge: voice.isActive ? '•' : undefined,
           tabBarHideOnKeyboard: true,
           tabBarIcon: ({ color, focused }) => (
@@ -53,6 +60,16 @@ export default function TabLayout() {
               color={color} 
               focused={focused}
             />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: 'Chat',
+          tabBarHideOnKeyboard: true,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIcon name={focused ? 'chatbubbles' : 'chatbubbles-outline'} color={color} focused={focused}/>
           ),
         }}
       />
@@ -117,6 +134,8 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </AssistantWorkspaceContext.Provider>}
+    </AssistantScreen>
   );
 }
 

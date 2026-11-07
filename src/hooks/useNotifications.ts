@@ -204,7 +204,7 @@ export function useNotifications() {
   useEffect(() => {
     // Linked briefs must work in safe-start mode, where legacy hydration is
     // deliberately paused. Do not await or restore that oversized store.
-    const openLinkedBrief = (messageId: string) => router.push({ pathname: '/', params: { briefMessageId: messageId } });
+    const openLinkedBrief = (messageId: string) => router.push({ pathname: '/chat', params: { briefMessageId: messageId } });
     void Notifications.getLastNotificationResponseAsync().then(async response => {
       const id = linkedBriefId(response?.notification.request.content.data);
       if (id && await AsyncStorage.getItem(OPENED_BRIEF_KEY) !== id) openLinkedBrief(id);
@@ -291,7 +291,7 @@ export function useNotifications() {
       (eventId) => {
         console.log('Meeting notification tapped:', eventId);
         // Navigate to home tab which shows calendar
-        router.push('/');
+        router.push('/chat');
       },
       // Message tap - navigate to chat + always server sync for reliability
       (messageData) => {
@@ -316,12 +316,12 @@ export function useNotifications() {
         // Small delay to ensure store is hydrated on cold start
         setTimeout(() => syncMessagesFromServer(), 300);
         
-        router.push('/');
+        router.push('/chat');
       },
       // Brief tap - navigate to home
       () => {
         console.log('Daily brief notification tapped');
-        router.push('/');
+        router.push('/chat');
       },
       openLinkedBrief
     );

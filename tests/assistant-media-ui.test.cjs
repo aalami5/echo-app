@@ -62,7 +62,7 @@ test('voice plus menu offers all sources; Files cancellation and menu cancellati
  assert.equal(stops,before.stops);assert.equal(uploads.length,before.uploads);assert.equal(submissions.length,before.submissions);
  await act(async()=>ui.unmount());
 });
-test('upload confirmation is visible and haptic before review admission, without claiming analysis is finished',async()=>{
+test('receipt stays out of Live and remains visible in Chat; haptic still confirms upload',async()=>{
  storage.clear(); const before=haptics; let ui,release;
  holdSubmit=new Promise(resolve=>{release=resolve;});
  await act(async()=>{ui=create(React.createElement(Screen));});await press(ui,'Return to Live Voice');
@@ -70,9 +70,34 @@ test('upload confirmation is visible and haptic before review admission, without
  let sending;
  await act(async()=>{sending=ui.root.findAllByType('Button').find(b=>b.props.accessibilityLabel==='Send to Echo').props.onPress();await new Promise(r=>setImmediate(r));});
  const texts=()=>ui.root.findAllByType('Text').map(t=>t.children.filter(x=>typeof x==='string').join('')).join('\n');
+ assert.doesNotMatch(texts(),/Received 1 attachment/);
+ await press(ui,'Switch to chat; keep connection active');
  assert.match(texts(),/Received 1 attachment · Saved by Echo/);
  assert.doesNotMatch(texts(),/Review ready/);assert.equal(haptics,before+1);
  await act(async()=>{release();await new Promise(r=>setImmediate(r));});holdSubmit=null;
  assert.match(texts(),/Received 1 attachment · Review requested/);
  await act(async()=>ui.unmount());
+});
+
+test('controlled Live and Chat tabs keep one draft and never start or stop voice',async()=>{
+ storage.clear();let ui;const before=stops;
+ await act(async()=>{ui=create(React.createElement(Screen,{mode:'chat',workspaceFocused:true}));});
+ await act(async()=>ui.root.findByType('TextInput').props.onChangeText('Keep this unsent draft'));
+ await act(async()=>ui.update(React.createElement(Screen,{mode:'live',workspaceFocused:true})));
+ assert.equal(ui.root.findAllByType('TextInput').length,0);
+ await press(ui,'Add attachment');await press(ui,'Camera');assert.equal(ui.root.findAllByType('CameraPanel').length,1);
+ await act(async()=>ui.update(React.createElement(Screen,{mode:'chat',workspaceFocused:true})));
+ assert.equal(ui.root.findAllByType('CameraPanel').length,0);
+ assert.equal(ui.root.findByType('TextInput').props.value,'Keep this unsent draft');assert.equal(stops,before);
+ await act(async()=>ui.unmount());
+});
+
+test('standalone Chat sends text while voice is disconnected',async()=>{
+ storage.clear();const priorActive=voice.isActive,priorConnected=voice.isConnected,priorStatus=voice.status;
+ voice.isActive=false;voice.isConnected=false;voice.status='idle';const before={stops,sent:submissions.length};let ui;
+ try {
+  await act(async()=>{ui=create(React.createElement(Screen,{mode:'chat',workspaceFocused:true}));});
+  await act(async()=>ui.root.findByType('TextInput').props.onChangeText('Synthetic text-only check'));
+  await press(ui,'Send');assert.equal(submissions.length,before.sent+1);assert.equal(submissions.at(-1).message,'Synthetic text-only check');assert.equal(submissions.at(-1).conversationId,'home');assert.equal(stops,before.stops);assert.equal(voice.isActive,false);
+ } finally {await act(async()=>ui?.unmount());voice.isActive=priorActive;voice.isConnected=priorConnected;voice.status=priorStatus;}
 });

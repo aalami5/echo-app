@@ -1,3 +1,4 @@
+import { loadUpdatePage } from '../services/updateHistory';
 import { UpdateCard } from '../components/UpdateCard';
 import { boundedMessages, mergeRecent, parseUpdate, decodeReadIds, UPDATE_READ_KEY } from '../services/chatUpdates';
 import { AUTOMATIC_RECOVERY_PAUSED } from '../services/startupRecovery';
@@ -36,10 +37,15 @@ function MessageText({ text }: { text: string }) {
   const parts = text.split(/(https?:\/\/[^\s<>\)\]]+)/g);
   return <Text selectable style={s.body}>{parts.map((p, i) => /^https?:\/\//.test(p) ? <Text key={i} style={s.link} onPress={() => { void Linking.openURL(p); }}>{p}</Text> : p)}</Text>;
 }
-export default function AssistantScreen() {
+// One controller owns the shared draft, receipts and polling across both tabs.
+// The render prop lets the active tab host the view without mounting two controllers.
+export default function AssistantScreen({ mode, workspaceFocused, briefMessageId, children }: {
+  mode?: 'live' | 'chat'; workspaceFocused?: boolean; briefMessageId?: string;
+  children?: (content: React.ReactNode) => React.ReactNode;
+} = {}) {
   const params = useLocalSearchParams<{ briefMessageId?: string }>();
   const router = useRouter();
-  const requestedBrief = linkedBriefId({ conversationId: 'home', chatMessageId: params.briefMessageId });
+  const requestedBrief = linkedBriefId({ conversationId: 'home', chatMessageId: briefMessageId ?? params.briefMessageId });
   const [linkedBrief, setLinkedBrief] = useState<{ id: string; content: string } | null>(null);
   const [briefError, setBriefError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
@@ -50,6 +56,28 @@ export default function AssistantScreen() {
   const readingEarlier = useRef(false);
   const [earlierPage, setEarlierPage] = useState(false);
   const [updatesOnly, setUpdatesOnly] = useState(false);
+  const [updateMessages, setUpdateMessages] = useState<AssistantMessage[]>([]);
+  const [updatesLoading, setUpdatesLoading] = useState(false);
+  const [updatesError, setUpdatesError] = useState<string | null>(null);
+  const [updatesMore, setUpdatesMore] = useState(false);
+  const [updatesEarlier, setUpdatesEarlier] = useState(false);
+  const updateOffset = useRef(0), updateRequest = useRef(0);
+  const loadUpdates = async (earlier = false) => {
+    const request = ++updateRequest.current;
+    setUpdatesLoading(true); setUpdatesError(null);
+    try {
+      const page = await loadUpdatePage(offset => assistantApi(`/conversations/home/history?offset=${offset}`), visibleHistory,
+        earlier ? updateOffset.current : 0, () => alive.current && request === updateRequest.current);
+      if (!page) return;
+      setUpdateMessages(page.messages); updateOffset.current = page.nextOffset;
+      setUpdatesMore(page.hasMore); setUpdatesEarlier(earlier);
+    } catch (e: any) { if (alive.current && request === updateRequest.current) setUpdatesError(e.message); }
+    finally { if (alive.current && request === updateRequest.current) setUpdatesLoading(false); }
+  };
+  useEffect(() => {
+    if (updatesOnly) void loadUpdates();
+    return () => { updateRequest.current++; };
+  }, [updatesOnly]);
   const [readIds, setReadIds] = useState<string[]>([]);
   const [readIdsReady, setReadIdsReady] = useState(false);
   useEffect(() => { void AsyncStorage.getItem(UPDATE_READ_KEY).then(raw => { setReadIds(decodeReadIds(raw)); setReadIdsReady(true); }).catch(() => setReadIdsReady(true)); }, []);
@@ -73,7 +101,8 @@ export default function AssistantScreen() {
   const [attachmentReceipt, setAttachmentReceipt] = useState<{ conversationId: string; count: number; total: number; runId?: string; stage: 'received' | 'reviewing' | 'ready' | 'review_failed' | 'not_confirmed' } | null>(null);
   const mediaLock = useRef(false);
   const sendLock = useRef(false);
-  const focused = useIsFocused();
+  const routeFocused = useIsFocused();
+  const focused = workspaceFocused ?? routeFocused;
   const [uploading, setUploading] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +113,13 @@ export default function AssistantScreen() {
   const [memoryBusy, setMemoryBusy] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newMessages, setNewMessages] = useState(false);
-  const [voiceView, setVoiceView] = useState(false);
+  const [localVoiceView, setLocalVoiceView] = useState(false);
+  const voiceView = mode ? mode === 'live' : localVoiceView;
+  const setVoiceView = (live: boolean) => {
+    if (mode) { if (live !== (mode === 'live')) router.navigate(live ? '/' : '/chat'); }
+    else setLocalVoiceView(live);
+  };
+  useEffect(() => { setCameraOpen(false); setMediaMenu(false); }, [mode]);
   const [voiceCaption, setVoiceCaption] = useState('');
   const pendingVoice = useRef(false);
   const dismissSheet = () => { if (pendingVoice.current) { pendingVoice.current = false; setVoiceView(true); } };
@@ -183,6 +218,7 @@ export default function AssistantScreen() {
     } catch (e: any) { if (alive.current && selected.current === id) setError(e.message); }
     finally { refreshing.current = false; }
   }, [tailCache]);
+  useEffect(() => { if (focused && ready) void refresh(); }, [focused, mode, ready, refresh]);
   useEffect(() => {
     alive.current = true;
     void (async () => {
@@ -379,7 +415,7 @@ export default function AssistantScreen() {
   const receiptLabel = shownReceipt ? `Received ${shownReceipt.count}${shownReceipt.count < shownReceipt.total ? ` of ${shownReceipt.total}` : ''} ${shownReceipt.count === 1 ? 'attachment' : 'attachments'} · ${
     shownReceipt.stage === 'ready' ? 'Review ready' : shownReceipt.stage === 'reviewing' ? 'Review requested' : shownReceipt.stage === 'review_failed' ? 'Review interrupted' : shownReceipt.stage === 'not_confirmed' ? 'Review not confirmed' : 'Saved by Echo'
   }` : '';
-  const receiptContent = shownReceipt && <View accessibilityLiveRegion="polite" style={{ paddingVertical: 8 }}><Text style={{ color: colors.primary, fontSize: 14 }}>{receiptLabel}</Text>{shownReceipt.stage === 'ready' && voiceView && <Button title="View review in Chat" onPress={() => setVoiceView(false)}/>}</View>;
+  const receiptContent = shownReceipt && <View accessibilityLiveRegion="polite" style={{ paddingVertical: 8 }}><Text style={{ color: colors.primary, fontSize: 14 }}>{receiptLabel}</Text></View>;
   const mediaControls = <View style={s.mediaMenu}>
     <Text style={s.subtle}>Add to Echo · {title}</Text>
     <View style={s.mediaIcons}>
@@ -391,22 +427,21 @@ export default function AssistantScreen() {
   </View>;
   const cameraPanel = cameraOpen && focused && foreground ? <AssistantCamera busy={mediaPicking} onCapture={capturePhoto} onClose={() => setCameraOpen(false)}/> : undefined;
   const voiceDraft = <>
-    {receiptContent}
     {mediaMenu && mediaControls}
     {attachmentTray}
     {mediaPicking && <Text style={s.subtle}>Preparing attachment…</Text>}
     {!!(mediaError || error) && ready && <Text accessibilityRole="alert" style={s.error}>{mediaError || error}</Text>}
-    {outbox.length > 0 && <Button title="Delivery not confirmed · check in Text" onPress={() => setVoiceView(false)}/>}
+
     {(attachments.length > 0 || text.trim()) && <View><Text numberOfLines={2} style={s.subtle}>{text.trim() || `Send to Echo · ${title}`}</Text><Button primary title={sending ? uploadProgress || 'Sending…' : 'Send to Echo'} disabled={mediaBusy || !ready} onPress={() => {void send();}}/></View>}
   </>;
-  const unreadUpdates = messages.filter(m => parseUpdate(m) && !readIds.includes(m.id)).length;
+  const unreadUpdates = (updatesOnly ? updateMessages : messages).filter(m => parseUpdate(m) && !readIds.includes(m.id)).length;
   const discussUpdate = (item: AssistantMessage) => {
     const card = parseUpdate(item);
     setVoiceView(false);
     setText(old => old.trim() ? old : `Let's discuss the saved update “${card?.title || 'Update'}” (Home message ${item.id}). Please read that saved message for context.`);
   };
-  return <ChatViewport>
-    {voiceView ? <VoiceCallView visible={focused} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => {setCameraOpen(false);setMediaMenu(false);setVoiceView(false);}} onMore={() => setSheet('more')} onAttach={() => setMediaMenu(value => !value)} onHangUp={() => {setCameraOpen(false);setMediaMenu(false);void voice.stop();}} mediaDisabled={!ready || mediaBusy || cameraOpen} content={cameraPanel} draftContent={<>{unreadUpdates > 0 && <Button title={`${unreadUpdates} new updates in Chat`} onPress={() => {setVoiceView(false); setUpdatesOnly(true);}}/>}{voiceDraft}</>}/> : <>
+  const content = <ChatViewport>
+    {voiceView ? <VoiceCallView visible={focused} title={title} voice={voice} working={!!active || voiceNotice === 'Echo is working on your request.'} ready={ready} connectionError={error} onRetry={reconnect} caption={caption} onText={() => {setCameraOpen(false);setMediaMenu(false);setVoiceView(false);}} onMore={() => setSheet('more')} onAttach={() => setMediaMenu(value => !value)} onHangUp={() => {setCameraOpen(false);setMediaMenu(false);void voice.stop();}} mediaDisabled={!ready || mediaBusy || cameraOpen} content={cameraPanel} draftContent={voiceDraft}/> : <>
     <ScrollView style={s.conversationControls} keyboardShouldPersistTaps="handled" contentContainerStyle={{ paddingBottom: 4 }}>
     <View style={s.header}>
       <TouchableOpacity onPress={() => setSheet('projects')} accessibilityRole="button" accessibilityLabel="Select conversation" style={{ flex: 1 }}><Text style={s.heading}>Echo · {title} ▾</Text></TouchableOpacity>
@@ -420,16 +455,17 @@ export default function AssistantScreen() {
     {(mediaError || error || voice.error || voiceNotice) && <Text accessibilityRole="alert" style={s.error}>{voice.error || mediaError || error || voiceNotice}</Text>}
     {receiptContent}
     {requestedBrief && <View style={{ maxHeight: 320 }}><View style={s.row}><Text style={[s.role, {flex: 1}]}>Saved in Home · Update</Text><Button title="Close" onPress={() => router.setParams({briefMessageId: undefined})}/></View><ScrollView>{linkedBrief ? <MessageText text={parseUpdate({id: linkedBrief.id, role:'assistant', content:linkedBrief.content})?.body || linkedBrief.content}/> : <Text style={s.subtle}>{briefError || 'Loading saved brief…'}</Text>}</ScrollView></View>}
-    <View style={s.row}><Button title={updatesOnly ? 'Show all messages' : `Updates${unreadUpdates ? ` · ${unreadUpdates} new` : ''}`} onPress={() => setUpdatesOnly(value => !value)}/>{earlierPage && <Button title="Back to latest" onPress={() => { resumeHistory(); void refresh(true); }}/>}</View>
+    <View style={s.row}><Button title={updatesOnly ? 'Show all messages' : `Updates${unreadUpdates ? ` · ${unreadUpdates} new` : ''}`} onPress={() => setUpdatesOnly(value => !value)}/>{!updatesOnly && earlierPage && <Button title="Back to latest" onPress={() => { resumeHistory(); void refresh(true); }}/>}</View>
+    {updatesOnly && <View style={s.row}><Text style={s.subtle}>Briefs & reminders · Home</Text><Button title={updatesLoading ? 'Loading updates…' : updatesEarlier ? 'Latest updates' : 'Refresh updates'} disabled={updatesLoading} onPress={() => {void loadUpdates();}}/>{updatesError && <Text accessibilityRole="alert" style={s.error}>{updatesError}</Text>}</View>}
     {!ready && <View style={s.connection}>{!error && <ActivityIndicator color={colors.primary}/>}<Button title="Reconnect" onPress={reconnect} /></View>}
     </ScrollView>
-    {cameraPanel || <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={updatesOnly ? messages.filter(m => parseUpdate(m)) : messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
+    {cameraPanel || <FlatList ref={list} style={{ flex: 1, minHeight: 0 }} contentContainerStyle={s.messages} data={updatesOnly ? updateMessages : messages} keyExtractor={m => m.id} keyboardShouldPersistTaps="handled" keyboardDismissMode="interactive"
       onScroll={e => { const n = e.nativeEvent; atBottom.current = n.contentOffset.y + n.layoutMeasurement.height >= n.contentSize.height - 100; }} scrollEventThrottle={100}
       onContentSizeChange={() => { if (atBottom.current) list.current?.scrollToEnd({ animated: false }); else setNewMessages(true); }}
-      ListHeaderComponent={historyMore ? <Button title="Load earlier messages" onPress={() => { void loadEarlier(); }} /> : null}
-      ListEmptyComponent={ready ? <View style={s.empty}><Text style={s.body}>Start a conversation here or tap Live Voice. You can continue it later without starting over.</Text><Button title="Earlier chats on this phone" onPress={() => setSheet('legacy')} /></View> : null}
+      ListHeaderComponent={updatesOnly ? (updatesMore ? <Button title="Earlier updates" disabled={updatesLoading} onPress={() => {void loadUpdates(true);}}/> : null) : historyMore ? <Button title="Load earlier messages" onPress={() => { void loadEarlier(); }} /> : null}
+      ListEmptyComponent={updatesOnly ? <View style={s.empty}><Text style={s.subtle}>{updatesLoading ? 'Looking for saved updates…' : updatesMore ? 'No updates in these messages. Tap Earlier updates to keep looking.' : 'No saved updates in this history.'}</Text></View> : ready ? <View style={s.empty}><Text style={s.body}>Start a conversation here or tap Live Voice. You can continue it later without starting over.</Text><Button title="Earlier chats on this phone" onPress={() => setSheet('legacy')} /></View> : null}
       renderItem={({ item }) => parseUpdate(item) ? <UpdateCard card={parseUpdate(item)!} unread={!readIds.includes(item.id)} onRead={() => markRead(item.id)} onDiscuss={() => discussUpdate(item)} renderBody={body => <MessageText text={body}/>}/> : <TouchableOpacity activeOpacity={0.9} accessibilityHint="Long press for copy and share" onLongPress={() => Alert.alert('Message options', undefined, [{ text: 'Copy', onPress: () => { void Clipboard.setStringAsync(item.content); } }, { text: 'Share', onPress: () => { void Share.share({ message: item.content }); } }, { text: 'Cancel', style: 'cancel' }])} style={[s.message, item.role === 'user' && s.userMessage]}><Text style={s.role}>{item.role === 'user' ? 'You' : 'Echo'}</Text><MessageText text={item.content}/></TouchableOpacity>}
-      ListFooterComponent={<View>
+      ListFooterComponent={updatesOnly ? null : <View>
         {Object.entries(stream).map(([id, content]) => <View key={id} style={s.message}><Text style={s.role}>Echo · responding</Text><MessageText text={content}/></View>)}
         {outbox.map(item => <View key={item.id} style={s.message}><Text style={s.error}>Delivery not confirmed—check Activity before retrying.</Text><Text selectable style={s.body}>{item.message}</Text><Button disabled={sending} title="Check / retry same request" onPress={() => { void send(item); }}/></View>)}
         {(activity.artifacts || []).map((a: any) => <View key={a.id} style={s.message}><Text style={s.role}>File</Text><Button title={a.title} onPress={() => { void openArtifact(a); }}/></View>)}
@@ -482,6 +518,7 @@ export default function AssistantScreen() {
       </View>
     </Modal>
   </ChatViewport>;
+  return children ? children(content) : content;
 }
 const s = StyleSheet.create({
   mediaMenu: { padding: 10, borderRadius: 14, backgroundColor: colors.surface, marginBottom: 6 },
