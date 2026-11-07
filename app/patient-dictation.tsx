@@ -162,7 +162,8 @@ function PatientDictationScreenBody() {
   const activeDictation = dictationId ? dictations[dictationId] : null;
   const patientDictations = useMemo(() => (patientId ? getDictationsForPatient(patientId) : []), [getDictationsForPatient, patientId, dictations]);
   const isHistoryView = mode === 'view' && !dictationId;
-  const isReadOnly = mode === 'view';
+  const hasMissingImages = !!activeDictation?.transcriptParts.some(part => part.imageMissing);
+  const isReadOnly = mode === 'view' && !hasMissingImages;
 
   const [screenState, setScreenState] = useState<ScreenState>('input');
   const [showTextInput, setShowTextInput] = useState(false);
@@ -1121,6 +1122,7 @@ function PatientDictationScreenBody() {
         </View>
 
         {AUTOMATIC_RECOVERY_PAUSED && <CaseSaveStatus />}
+        {hasMissingImages && screenState === 'review' && <TouchableOpacity accessibilityRole="button" accessibilityLabel="Review missing images" onPress={() => setScreenState('input')}><Text style={styles.transcriptText}>Review missing images</Text></TouchableOpacity>}
 
         {showDatePicker && (
           Platform.OS === 'ios' ? (
@@ -1194,6 +1196,7 @@ function PatientDictationScreenBody() {
                   )}
                 </View>
                 <Text style={styles.transcriptText}>{part.content}{part.ocrText ? `\n\nExtracted text:\n${part.ocrText}` : ''}</Text>
+                {part.imageMissing && <Text style={styles.transcriptText}>Image needs reattachment. Its notes and extracted text are preserved.</Text>}
               </View>
             ))}
 

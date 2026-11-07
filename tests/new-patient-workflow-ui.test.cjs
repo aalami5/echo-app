@@ -186,3 +186,12 @@ test('Save & Close retries a failed save and exits only after committed guards a
  assert.equal(routes.at(-1),'back');assert.equal(blockedExits,blocks);assert.equal(store.getState().saveError,null);
  await act(async()=>tree.unmount());
 });
+test('recovered report opened through View Report exposes missing-image repair without losing its text',async()=>{
+ const id=params.dictationId,d=store.getState().dictations[id];params={...params,mode:'view'};
+ store.setState({dictations:{[id]:{...d,status:'final',generatedReport:'Recovered synthetic text',transcriptParts:[...d.transcriptParts,{id:'missing',type:'image',content:'Preserved image note',ocrText:'Preserved OCR',timestamp:'2026-11-07',imageMissing:true}]}},saveError:'Report text recovered [TEXT_RECOVERED]'});
+ let tree;await act(async()=>{tree=create(React.createElement(Dictation));});
+ assert.match(content(tree),/Recovered synthetic text/);assert.ok(button(tree,'Copy'));
+ await act(async()=>tree.root.findByProps({accessibilityLabel:'Review missing images'}).props.onPress());
+ assert.match(content(tree),/Image needs reattachment/);assert.match(content(tree),/Preserved OCR/);assert.ok(tree.root.findByProps({accessibilityLabel:'Add operative note photos'}));
+ assert.equal(store.getState().dictations[id].generatedReport,'Recovered synthetic text');await act(async()=>tree.unmount());
+});

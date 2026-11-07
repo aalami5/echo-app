@@ -5,12 +5,27 @@ import { HOSPITAL_LABELS, utf8Bytes } from './readOnlyPatients';
 
 export const CASE_INDEX_KEY = 'echo-new-patient-cases-v1';
 export const CASE_PREFIX = 'echo-new-patient-case-v1-';
-export const CASE_BYTES = 8 * 1024 * 1024;
-export const CASE_COUNT = 500;
+export const CASE_BYTES = 16 * 1024 * 1024;
+export const IMAGE_BYTES = 24 * 1024 * 1024;
+export const CASE_INDEX_BYTES = 16 * 1024 * 1024;
+export const CASE_COUNT = 5000;
 export class CaseLimitError extends Error {
   constructor(public code: 'REPORT_SIZE_LIMIT' | 'CASE_LIST_LIMIT', message: string) { super(message); }
 }
-export type NewCase = { version: 1; patient: Patient; dictation: PatientDictation };
+export type NewCase = { version: 1; patient: Patient; dictation: PatientDictation; saveId?: string; textCheckpointId?: string; textRecovery?: boolean };
+// Clone mutable metadata, but share immutable image strings instead of creating
+// several full base64 copies during every keystroke/save/readback.
+export function caseMetadata(value: NewCase): string {
+  return JSON.stringify({ ...value, dictation: { ...value.dictation, transcriptParts: value.dictation.transcriptParts.map(p => ({ ...p, imageBase64: p.imageBase64 === undefined ? undefined : '' })) } });
+}
+export function snapshotCase(value: NewCase): NewCase {
+  const snapshot: NewCase = JSON.parse(caseMetadata(value));
+  snapshot.dictation.transcriptParts.forEach((p, i) => { if (value.dictation.transcriptParts[i].imageBase64 !== undefined) p.imageBase64 = value.dictation.transcriptParts[i].imageBase64; });
+  return snapshot;
+}
+export function sameCase(a: NewCase, b: NewCase): boolean {
+  return caseMetadata(a) === caseMetadata(b) && a.dictation.transcriptParts.every((p, i) => p.imageBase64 === b.dictation.transcriptParts[i].imageBase64);
+}
 export type CaseSummary = { id: string; patientId: string; name: string; mrn: string; date: string; updatedAt: string; status: 'draft' | 'final'; patient?: Patient; hasContent?: boolean };
 export type CaseStorage = { getItem(key: string): Promise<string | null>; setItem(key: string, value: string): Promise<void> };
 const invalid = () => Error('This new case could not be read safely. Saved data has not been replaced.');
@@ -37,7 +52,8 @@ export function checkCase(value: any): asserts value is NewCase {
       !text(d.createdAt, 100) || !text(d.updatedAt, 100) ||
       !Array.isArray(d.transcriptParts) || d.transcriptParts.length > 500 ||
       !d.transcriptParts.every((part: any) => part && text(part.id, 200) && ['text', 'voice', 'image'].includes(part.type) &&
-        text(part.content, 200000) && text(part.timestamp, 100) && (part.imageBase64 === undefined || text(part.imageBase64, CASE_BYTES)) &&
+        text(part.content, 200000) && text(part.timestamp, 100) && (part.imageBase64 === undefined || text(part.imageBase64, IMAGE_BYTES)) &&
+        (part.imageMissing === undefined || typeof part.imageMissing === 'boolean') &&
         (part.ocrText === undefined || text(part.ocrText, 200000))) ||
       !Array.isArray(d.selectedProcedures) || d.selectedProcedures.length > 200 || !d.selectedProcedures.every((v: unknown) => text(v, 1000)) ||
       !(d.generatedReport === null || text(d.generatedReport, 500000))) throw invalid();
@@ -48,7 +64,7 @@ export function summaryOf(value: NewCase): CaseSummary {
 }
 function parseIndex(raw: string | null): CaseSummary[] {
   if (raw === null) return [];
-  if (raw.length > 2 * 1024 * 1024 || utf8Bytes(raw) > 2 * 1024 * 1024) throw invalid();
+  if (raw.length > CASE_INDEX_BYTES || utf8Bytes(raw) > CASE_INDEX_BYTES) throw invalid();
   const data = JSON.parse(raw);
   if (data?.version !== 1 || !Array.isArray(data.cases) || data.cases.length > CASE_COUNT ||
       !data.cases.every((v: any) => v && validId(v.id) && text(v.patientId, 200) && text(v.name, 300) && text(v.mrn, 300) &&

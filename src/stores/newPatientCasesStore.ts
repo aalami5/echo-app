@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { caseRepository as repository, caseSaveMessage } from '../services/newCasePersistence';
+import { caseRepository as repository, caseSaveMessage, TEXT_RECOVERY_MESSAGE } from '../services/newCasePersistence';
 import * as Crypto from 'expo-crypto';
 import type { Patient } from './patientsStore';
 import type { PatientDictation } from './patientDictationsStore';
@@ -61,7 +61,7 @@ export const useNewPatientCasesStore = create<State>((set, get) => ({
       // Do not rewrite report prose or any already-selected operation date.
     }
     if (request !== openRevision) throw Error('A different case was opened.');
-    set({ patients: { [value.patient.id]: value.patient }, dictations: { [id]: value.dictation }, savedAt: value.dictation.updatedAt, saveError: null });
+    set({ patients: { [value.patient.id]: value.patient }, dictations: { [id]: value.dictation }, savedAt: value.textRecovery ? null : value.dictation.updatedAt, saveError: value.textRecovery ? TEXT_RECOVERY_MESSAGE : null });
     if (dateWasMissing) persistCase(value);
   },
   start: async (input, date) => {

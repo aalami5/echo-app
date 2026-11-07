@@ -17,6 +17,7 @@ export interface TranscriptPart {
   ocrText?: string;
   ocrWarnings?: string[];
   imageBase64?: string;
+  imageMissing?: boolean; // Explicit marker on text-only recovery; never silently discarded.
   imageMimeType?: string;
   timestamp: string;
 }

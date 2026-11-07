@@ -27,7 +27,7 @@ test('unified dates/hospitals/cards respect phone overlay, keep every report ID 
 test('enriched summary validates metadata and rejects an oversized index before writing a case',async()=>{
  const dictation={id:'newcase-synthetic0000',patientId:patient.id,dateOfOperation:'2026-11-03',status:'draft',createdAt:'2026-11-03',updatedAt:'2026-11-03',transcriptParts:[{id:'newcase-synthetic0000-header',type:'text',content:'Synthetic header',timestamp:'2026-11-03'}],selectedProcedures:[],generatedReport:null};
  const value={version:1,patient,dictation};assert.equal(summaryOf(value).hasContent,false);assert.equal(summaryOf(value).patient.room,'R12');
- const big=Array.from({length:499},(_,i)=>({...summaryOf(value),id:'newcase-synthetic'+String(i).padStart(10,'0'),patient:{...patient,chiefComplaint:'x'.repeat(4000)}}));
+ const big=Array.from({length:4999},(_,i)=>({...summaryOf(value),id:'newcase-synthetic'+String(i).padStart(10,'0'),patient:{...patient,chiefComplaint:'x'.repeat(4000)}}));
  const map=new Map([[CASE_INDEX_KEY,JSON.stringify({version:1,cases:big})]]);const writes=[];
  const repo=createCaseRepository({getItem:async k=>map.get(k)??null,setItem:async(k,v)=>writes.push([k,v])});
  await assert.rejects(repo.save(value));assert.equal(writes.length,0);
