@@ -1,6 +1,6 @@
 import { useRealtimeVoice } from '../../src/hooks/useRealtimeVoice';
 import React from 'react';
-import { Tabs, usePathname, useGlobalSearchParams } from 'expo-router';
+import { Tabs, usePathname } from 'expo-router';
 import AssistantScreen from '../../src/screens/AssistantScreen';
 import { AssistantWorkspaceContext } from '../../src/screens/AssistantWorkspace';
 import { Ionicons } from '@expo/vector-icons';
@@ -27,10 +27,8 @@ function TabBarIcon({
 export default function TabLayout() {
   const voice = useRealtimeVoice();
   const pathname = usePathname();
-  const params = useGlobalSearchParams<{ briefMessageId?: string }>();
   return (
-    <AssistantScreen mode={pathname === '/chat' ? 'chat' : 'live'}
-      workspaceFocused={pathname === '/' || pathname === '/chat'} briefMessageId={params.briefMessageId}>
+    <AssistantScreen mode="live" workspaceFocused={pathname === '/'}>
     {content => <AssistantWorkspaceContext.Provider value={content}>
     <Tabs
       screenOptions={{

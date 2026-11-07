@@ -137,10 +137,10 @@ export function ChatMessage({ message, onRetry, onSpeak, onLongPress }: ChatMess
           </TouchableOpacity>
         )}
         <Text style={timestampStyle}>
-          {new Date(message.timestamp).toLocaleTimeString([], { 
+          {message.timestamp && !Number.isNaN(Date.parse(message.timestamp)) ? new Date(message.timestamp).toLocaleTimeString([], {
             hour: '2-digit', 
             minute: '2-digit' 
-          })}
+          }) : ''}
         </Text>
         {isFromUser && (
           <MessageStatusIndicator 

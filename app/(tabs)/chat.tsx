@@ -1,1 +1,1 @@
-export { default } from '../../src/screens/AssistantWorkspace';
+export { default } from '../../src/screens/GatewayChatScreen';

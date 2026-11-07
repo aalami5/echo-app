@@ -45,7 +45,7 @@ export default function AssistantScreen({ mode, workspaceFocused, briefMessageId
 } = {}) {
   const params = useLocalSearchParams<{ briefMessageId?: string }>();
   const router = useRouter();
-  const requestedBrief = linkedBriefId({ conversationId: 'home', chatMessageId: briefMessageId ?? params.briefMessageId });
+  const requestedBrief = mode === 'live' ? null : linkedBriefId({ conversationId: 'home', chatMessageId: briefMessageId ?? params.briefMessageId });
   const [linkedBrief, setLinkedBrief] = useState<{ id: string; content: string } | null>(null);
   const [briefError, setBriefError] = useState<string | null>(null);
   const insets = useSafeAreaInsets();
